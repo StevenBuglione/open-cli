@@ -6,6 +6,8 @@ Language-neutral fixtures and expected outputs for validating OAS-CLI implementa
 
 - `fixtures/`: discovery, OpenAPI, overlay, workflow, and config inputs
 - `expected/`: expected normalized outputs
+- `compatibility-matrix.json`: machine-readable suite/spec/implementation compatibility publication
+- `COMPATIBILITY.md`: human-readable compatibility summary
 - `scripts/run_conformance.py`: fixture validation and optional output comparison
 
 ## Usage
@@ -17,3 +19,5 @@ python3 scripts/run_conformance.py --schema-root /path/to/oas-cli-spec/schemas -
 ```
 
 The runner validates expected artifacts against the published schemas from `oas-cli-spec`, so standalone CI jobs must either check out that repository or provide an equivalent schema directory via `--schema-root` or `OASCLI_SCHEMA_ROOT`.
+
+The same runner also validates `compatibility-matrix.json` against the published compatibility matrix schema and ensures the published matrix is linked from the repository documentation.

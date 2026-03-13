@@ -1,0 +1,21 @@
+{
+  "suiteVersion": "1.0.0",
+  "specVersion": "0.1.0",
+  "publishedAt": "2026-03-13T12:00:00Z",
+  "implementations": [
+    {
+      "repo": "https://github.com/StevenBuglione/oas-cli-go",
+      "version": "main",
+      "status": "passing",
+      "features": {
+        "httpCaching": "passing",
+        "refresh": "passing",
+        "observabilityHooks": "passing",
+        "compatibilityMatrix": "passing"
+      },
+      "notes": [
+        "Reference implementation status after the 2026-03-13 spec completion pass."
+      ]
+    }
+  ]
+}

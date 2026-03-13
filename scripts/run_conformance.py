@@ -46,6 +46,18 @@ def validate_expected_ntc(schema_root: Path) -> None:
         ))
 
 
+def validate_compatibility_matrix(schema_root: Path) -> None:
+    schema = load_json(schema_root / "compatibility-matrix.schema.json")
+    matrix = load_json(ROOT / "compatibility-matrix.json")
+    validator = Draft202012Validator(schema)
+    errors = sorted(validator.iter_errors(matrix), key=lambda error: list(error.path))
+    if errors:
+        raise SystemExit("\n".join(
+            ["compatibility-matrix.json failed schema validation:"]
+            + [f"  - {'.'.join(str(part) for part in error.path) or '<root>'}: {error.message}" for error in errors]
+        ))
+
+
 def validate_fixture_shapes() -> None:
     load_json(ROOT / "fixtures" / "discovery" / "api-catalog.linkset.json")
     load_json(ROOT / "fixtures" / "discovery" / "service-meta.linkset.json")
@@ -53,6 +65,15 @@ def validate_fixture_shapes() -> None:
     yaml.safe_load((ROOT / "fixtures" / "overlays" / "tickets.overlay.yaml").read_text())
     yaml.safe_load((ROOT / "fixtures" / "workflows" / "tickets.arazzo.yaml").read_text())
     load_json(ROOT / "fixtures" / "config" / "project.cli.json")
+
+
+def validate_docs_linkage() -> None:
+    readme = (ROOT / "README.md").read_text()
+    compatibility_doc = ROOT / "COMPATIBILITY.md"
+    if not compatibility_doc.exists():
+        raise SystemExit("COMPATIBILITY.md is missing")
+    if "COMPATIBILITY.md" not in readme and "compatibility-matrix.json" not in readme:
+        raise SystemExit("README.md must mention the published compatibility matrix")
 
 
 def compare_candidate(candidate_path: Path) -> None:
@@ -81,6 +102,8 @@ def main() -> None:
     schema_root = resolve_schema_root(args.schema_root)
     validate_fixture_shapes()
     validate_expected_ntc(schema_root)
+    validate_compatibility_matrix(schema_root)
+    validate_docs_linkage()
     if args.candidate:
         compare_candidate(args.candidate)
     print("conformance fixture validation passed")
