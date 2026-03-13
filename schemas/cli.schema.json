@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stevenbuglione.github.io/oas-cli-spec/schemas/cli.schema.json",
+  "title": "OAS-CLI Config",
+  "type": "object",
+  "required": ["cli", "mode", "sources"],
+  "properties": {
+    "cli": { "type": "string" },
+    "mode": {
+      "type": "object",
+      "required": ["default"],
+      "properties": {
+        "default": { "enum": ["discover", "curated"] }
+      },
+      "additionalProperties": false
+    },
+    "sources": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "uri"],
+        "properties": {
+          "type": { "enum": ["apiCatalog", "serviceRoot", "openapi"] },
+          "uri": { "type": "string" },
+          "enabled": { "type": "boolean" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["source"],
+        "properties": {
+          "source": { "type": "string" },
+          "alias": { "type": "string" },
+          "overlays": { "type": "array", "items": { "type": "string" } },
+          "skills": { "type": "array", "items": { "type": "string" } },
+          "workflows": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "curation": {
+      "type": "object",
+      "properties": {
+        "toolSets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "allow": { "type": "array", "items": { "type": "string" } },
+              "deny": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "agents": {
+      "type": "object",
+      "properties": {
+        "defaultProfile": { "type": "string" },
+        "profiles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "mode": { "enum": ["discover", "curated"] },
+              "toolSet": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "deny": { "type": "array", "items": { "type": "string" } },
+        "approvalRequired": { "type": "array", "items": { "type": "string" } },
+        "allowExecSecrets": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["env", "file", "osKeychain", "exec"] },
+          "value": { "type": "string" },
+          "command": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

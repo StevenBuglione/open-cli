@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stevenbuglione.github.io/oas-cli-spec/schemas/ntc.schema.json",
+  "title": "Normalized Tool Catalog",
+  "type": "object",
+  "required": ["catalogVersion", "generatedAt", "sourceFingerprint", "services", "tools", "effectiveViews"],
+  "properties": {
+    "catalogVersion": { "type": "string" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "sourceFingerprint": { "type": "string" },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "alias", "sourceId", "title"],
+        "properties": {
+          "id": { "type": "string" },
+          "alias": { "type": "string" },
+          "sourceId": { "type": "string" },
+          "title": { "type": "string" },
+          "servers": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "serviceId", "method", "path", "group", "command", "safety"],
+        "properties": {
+          "id": { "type": "string" },
+          "serviceId": { "type": "string" },
+          "operationId": { "type": "string" },
+          "method": { "type": "string" },
+          "path": { "type": "string" },
+          "group": { "type": "string" },
+          "command": { "type": "string" },
+          "summary": { "type": "string" },
+          "pathParams": { "type": "array", "items": { "type": "object" } },
+          "flags": { "type": "array", "items": { "type": "object" } },
+          "auth": { "type": "array", "items": { "type": "object" } },
+          "safety": {
+            "type": "object",
+            "required": ["destructive", "readOnly", "requiresApproval"],
+            "properties": {
+              "destructive": { "type": "boolean" },
+              "readOnly": { "type": "boolean" },
+              "requiresApproval": { "type": "boolean" }
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "workflows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["workflowId", "steps"],
+        "properties": {
+          "workflowId": { "type": "string" },
+          "steps": { "type": "array", "items": { "type": "object" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "effectiveViews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "mode", "tools"],
+        "properties": {
+          "name": { "type": "string" },
+          "mode": { "type": "string" },
+          "tools": { "type": "array", "items": { "type": "object" } }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
