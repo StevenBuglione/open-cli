@@ -1,0 +1,6 @@
+.worktrees/
+.cli.local.json
+bin/
+dist/
+.cache/
+coverage.out
