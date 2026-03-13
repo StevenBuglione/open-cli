@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 from pathlib import Path
 
 import yaml
@@ -8,15 +9,33 @@ from jsonschema import Draft202012Validator
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC_ROOT = ROOT.parent / "oas-cli-spec"
 
 
 def load_json(path: Path):
     return json.loads(path.read_text())
 
 
-def validate_expected_ntc() -> None:
-    schema = load_json(SPEC_ROOT / "schemas" / "ntc.schema.json")
+def resolve_schema_root(explicit_root: Path | None = None) -> Path:
+    candidates = []
+    if explicit_root is not None:
+        candidates.append(explicit_root)
+
+    env_root = os.getenv("OASCLI_SCHEMA_ROOT")
+    if env_root:
+        candidates.append(Path(env_root))
+
+    candidates.append(ROOT.parent / "oas-cli-spec" / "schemas")
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+
+    searched = ", ".join(str(candidate) for candidate in candidates)
+    raise FileNotFoundError(f"schema root not found; searched: {searched}")
+
+
+def validate_expected_ntc(schema_root: Path) -> None:
+    schema = load_json(schema_root / "ntc.schema.json")
     expected = load_json(ROOT / "expected" / "tickets.ntc.json")
     validator = Draft202012Validator(schema)
     errors = sorted(validator.iter_errors(expected), key=lambda error: list(error.path))
@@ -47,16 +66,21 @@ def normalize_ntc(document: dict) -> dict:
     normalized = json.loads(json.dumps(document))
     normalized.pop("generatedAt", None)
     normalized.pop("sourceFingerprint", None)
+    for source in normalized.get("sources", []):
+        provenance = source.get("provenance", {})
+        provenance.pop("at", None)
     return normalized
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate", type=Path)
+    parser.add_argument("--schema-root", type=Path)
     args = parser.parse_args()
 
+    schema_root = resolve_schema_root(args.schema_root)
     validate_fixture_shapes()
-    validate_expected_ntc()
+    validate_expected_ntc(schema_root)
     if args.candidate:
         compare_candidate(args.candidate)
     print("conformance fixture validation passed")

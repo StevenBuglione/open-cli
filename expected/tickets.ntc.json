@@ -2,6 +2,17 @@
   "catalogVersion": "1.0.0",
   "generatedAt": "2026-03-12T23:59:59Z",
   "sourceFingerprint": "demo-fingerprint",
+  "sources": [
+    {
+      "id": "ticketsSource",
+      "type": "openapi",
+      "uri": "../openapi/tickets.openapi.yaml",
+      "provenance": {
+        "method": "explicit",
+        "at": "2026-03-12T23:59:59Z"
+      }
+    }
+  ],
   "services": [
     {
       "id": "tickets",
