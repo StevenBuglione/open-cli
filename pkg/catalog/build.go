@@ -287,6 +287,9 @@ func loadWorkflows(baseDir string, refs []string, bindings map[string]string, fe
 				if toolID == "" {
 					toolID = bindings[step.OperationPath]
 				}
+				if toolID == "" {
+					return nil, nil, fmt.Errorf("workflow %q step %q references %s, but no matching tool is available in the catalog", workflow.WorkflowID, step.StepID, workflowReferenceLabel(step))
+				}
 				current.Steps = append(current.Steps, WorkflowStep{
 					StepID: step.StepID,
 					ToolID: toolID,
@@ -299,6 +302,17 @@ func loadWorkflows(baseDir string, refs []string, bindings map[string]string, fe
 		}
 	}
 	return workflows, fetches, nil
+}
+
+func workflowReferenceLabel(step workflowStepSpec) string {
+	switch {
+	case step.OperationID != "":
+		return fmt.Sprintf("operationId %q", step.OperationID)
+	case step.OperationPath != "":
+		return fmt.Sprintf("operationPath %q", step.OperationPath)
+	default:
+		return "an empty workflow reference"
+	}
 }
 
 func buildTools(service Service, document *openapi3.T, guidance map[string]Guidance, bindings map[string]string) ([]Tool, error) {

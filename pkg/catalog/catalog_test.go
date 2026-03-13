@@ -425,3 +425,241 @@ actions:
 		t.Fatalf("expected output hints on create tool, got %#v", createTool)
 	}
 }
+
+func TestBuildRejectsWorkflowReferencingIgnoredOperation(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Example Tickets API
+  version: "2026-03-01"
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List tickets
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: deleteTickets
+      tags: [tickets]
+      summary: Delete tickets
+      responses:
+        "204":
+          description: No Content
+`)
+	writeFile(t, dir, "overlays/tickets.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/tickets'].delete"
+    update:
+      x-cli-ignore: true
+`)
+	writeFile(t, dir, "workflows/tickets.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Ticket workflows
+  version: 1.0.0
+workflows:
+  - workflowId: deleteWorkflow
+    steps:
+      - stepId: delete
+        operationId: deleteTickets
+`)
+
+	cfg := config.Config{
+		CLI:  "1.0.0",
+		Mode: config.ModeConfig{Default: "discover"},
+		Sources: map[string]config.Source{
+			"ticketsSource": {
+				Type:    "openapi",
+				URI:     filepath.ToSlash(filepath.Join(dir, "tickets.openapi.yaml")),
+				Enabled: true,
+			},
+		},
+		Services: map[string]config.Service{
+			"tickets": {
+				Source:    "ticketsSource",
+				Alias:     "tickets",
+				Overlays:  []string{"./overlays/tickets.overlay.yaml"},
+				Workflows: []string{"./workflows/tickets.arazzo.yaml"},
+			},
+		},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{
+		Config:  cfg,
+		BaseDir: dir,
+	})
+	if err == nil {
+		t.Fatal("expected Build to fail when workflow references an ignored operation")
+	}
+	if !strings.Contains(err.Error(), `workflow "deleteWorkflow" step "delete" references operationId "deleteTickets"`) {
+		t.Fatalf("expected clear workflow reference error, got %v", err)
+	}
+}
+
+func TestBuildRejectsWorkflowReferencingIgnoredOperationPath(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Example Tickets API
+  version: "2026-03-01"
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /tickets:
+    delete:
+      operationId: deleteTickets
+      tags: [tickets]
+      summary: Delete tickets
+      responses:
+        "204":
+          description: No Content
+`)
+	writeFile(t, dir, "overlays/tickets.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/tickets'].delete"
+    update:
+      x-cli-ignore: true
+`)
+	writeFile(t, dir, "workflows/tickets.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Ticket workflows
+  version: 1.0.0
+workflows:
+  - workflowId: deleteWorkflow
+    steps:
+      - stepId: delete
+        operationPath: DELETE /tickets
+`)
+
+	cfg := config.Config{
+		CLI:  "1.0.0",
+		Mode: config.ModeConfig{Default: "discover"},
+		Sources: map[string]config.Source{
+			"ticketsSource": {
+				Type:    "openapi",
+				URI:     filepath.ToSlash(filepath.Join(dir, "tickets.openapi.yaml")),
+				Enabled: true,
+			},
+		},
+		Services: map[string]config.Service{
+			"tickets": {
+				Source:    "ticketsSource",
+				Alias:     "tickets",
+				Overlays:  []string{"./overlays/tickets.overlay.yaml"},
+				Workflows: []string{"./workflows/tickets.arazzo.yaml"},
+			},
+		},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{
+		Config:  cfg,
+		BaseDir: dir,
+	})
+	if err == nil {
+		t.Fatal("expected Build to fail when workflow references an ignored operation path")
+	}
+	if !strings.Contains(err.Error(), `workflow "deleteWorkflow" step "delete" references operationPath "DELETE /tickets"`) {
+		t.Fatalf("expected clear workflow path reference error, got %v", err)
+	}
+}
+
+func TestBuildRejectsWorkflowWhenAnyStepReferencesIgnoredOperation(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Example Tickets API
+  version: "2026-03-01"
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List tickets
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: createTicket
+      tags: [tickets]
+      summary: Create ticket
+      responses:
+        "201":
+          description: Created
+    delete:
+      operationId: deleteTickets
+      tags: [tickets]
+      summary: Delete tickets
+      responses:
+        "204":
+          description: No Content
+`)
+	writeFile(t, dir, "overlays/tickets.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/tickets'].delete"
+    update:
+      x-cli-ignore: true
+`)
+	writeFile(t, dir, "workflows/tickets.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Ticket workflows
+  version: 1.0.0
+workflows:
+  - workflowId: ticketLifecycle
+    steps:
+      - stepId: list
+        operationId: listTickets
+      - stepId: create
+        operationId: createTicket
+      - stepId: delete
+        operationId: deleteTickets
+`)
+
+	cfg := config.Config{
+		CLI:  "1.0.0",
+		Mode: config.ModeConfig{Default: "discover"},
+		Sources: map[string]config.Source{
+			"ticketsSource": {
+				Type:    "openapi",
+				URI:     filepath.ToSlash(filepath.Join(dir, "tickets.openapi.yaml")),
+				Enabled: true,
+			},
+		},
+		Services: map[string]config.Service{
+			"tickets": {
+				Source:    "ticketsSource",
+				Alias:     "tickets",
+				Overlays:  []string{"./overlays/tickets.overlay.yaml"},
+				Workflows: []string{"./workflows/tickets.arazzo.yaml"},
+			},
+		},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{
+		Config:  cfg,
+		BaseDir: dir,
+	})
+	if err == nil {
+		t.Fatal("expected Build to fail when any workflow step references an ignored operation")
+	}
+	if !strings.Contains(err.Error(), `workflow "ticketLifecycle" step "delete" references operationId "deleteTickets"`) {
+		t.Fatalf("expected error to point to the invalid step, got %v", err)
+	}
+}

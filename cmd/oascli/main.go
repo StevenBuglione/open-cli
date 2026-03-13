@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	embeddedruntime "github.com/StevenBuglione/oas-cli-go/internal/runtime"
 	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
@@ -70,6 +72,8 @@ type httpRuntimeClient struct {
 type embeddedRuntimeClient struct {
 	handler http.Handler
 }
+
+const defaultRuntimeURL = "http://127.0.0.1:8765"
 
 func main() {
 	options := bootstrapFromArgs(os.Args[1:])
@@ -555,7 +559,7 @@ func resolveCommandOptions(options CommandOptions) (CommandOptions, error) {
 		}
 	}
 	if options.RuntimeURL == "" {
-		options.RuntimeURL = "http://127.0.0.1:8765"
+		options.RuntimeURL = defaultRuntimeURL
 	}
 	return options, nil
 }
@@ -585,7 +589,24 @@ func resolveRuntimeURLFromInstance(options CommandOptions) (string, bool) {
 	if err != nil || info.URL == "" {
 		return "", false
 	}
+	if !runtimeURLReachable(info.URL) {
+		_ = os.Remove(paths.RuntimePath)
+		return "", false
+	}
 	return info.URL, true
+}
+
+func runtimeURLReachable(runtimeURL string) bool {
+	parsed, err := url.Parse(runtimeURL)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	conn, err := net.DialTimeout("tcp", parsed.Host, time.Second)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 func resolveInstancePaths(options CommandOptions) (instance.Paths, error) {

@@ -367,3 +367,46 @@ paths:
 		t.Fatalf("expected embedded runtime output, got %s", stdout.String())
 	}
 }
+
+func TestResolveCommandOptionsFallsBackWhenRuntimeRegistryIsStale(t *testing.T) {
+	t.Setenv("OASCLI_RUNTIME_URL", "")
+	t.Setenv("OASCLI_EMBEDDED", "")
+
+	deadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	deadURL := deadServer.URL
+	deadServer.Close()
+
+	stateDir := t.TempDir()
+	paths, err := instance.Resolve(instance.Options{
+		InstanceID: "stale",
+		StateRoot:  stateDir,
+		CacheRoot:  filepath.Join(stateDir, "cache"),
+	})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if err := instance.WriteRuntimeInfo(paths.RuntimePath, instance.RuntimeInfo{
+		InstanceID: "stale",
+		URL:        deadURL,
+		AuditPath:  paths.AuditPath,
+		CacheDir:   paths.CacheDir,
+	}); err != nil {
+		t.Fatalf("WriteRuntimeInfo: %v", err)
+	}
+
+	resolved, err := resolveCommandOptions(CommandOptions{
+		InstanceID: "stale",
+		StateDir:   stateDir,
+	})
+	if err != nil {
+		t.Fatalf("resolveCommandOptions: %v", err)
+	}
+	if resolved.RuntimeURL != "http://127.0.0.1:8765" {
+		t.Fatalf("expected stale runtime registry to fall back to default runtime, got %q", resolved.RuntimeURL)
+	}
+	if _, err := os.Stat(paths.RuntimePath); !os.IsNotExist(err) {
+		t.Fatalf("expected stale runtime registry to be removed, stat err=%v", err)
+	}
+}
