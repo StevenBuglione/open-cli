@@ -97,14 +97,14 @@ type SecretRef struct {
 }
 
 type Config struct {
-	CLI      string               `json:"cli"`
-	Mode     ModeConfig           `json:"mode"`
-	Sources  map[string]Source    `json:"sources"`
-	Services map[string]Service   `json:"services,omitempty"`
-	Curation CurationConfig       `json:"curation,omitempty"`
-	Agents   AgentsConfig         `json:"agents,omitempty"`
-	Policy   PolicyConfig         `json:"policy,omitempty"`
-	Secrets  map[string]Secret    `json:"secrets,omitempty"`
+	CLI      string             `json:"cli"`
+	Mode     ModeConfig         `json:"mode"`
+	Sources  map[string]Source  `json:"sources"`
+	Services map[string]Service `json:"services,omitempty"`
+	Curation CurationConfig     `json:"curation,omitempty"`
+	Agents   AgentsConfig       `json:"agents,omitempty"`
+	Policy   PolicyConfig       `json:"policy,omitempty"`
+	Secrets  map[string]Secret  `json:"secrets,omitempty"`
 }
 
 type LoadOptions struct {

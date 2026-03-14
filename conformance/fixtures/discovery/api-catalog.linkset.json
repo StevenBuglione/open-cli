@@ -1,0 +1,8 @@
+{
+  "linkset": [
+    {
+      "href": "https://api.example.com/v1",
+      "rel": "item"
+    }
+  ]
+}

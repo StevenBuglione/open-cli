@@ -18,6 +18,30 @@ jobs:
       - name: Verify
         run: make verify
 
+  spec-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install spec dependencies
+        run: pip install -r spec/requirements.txt
+      - name: Validate spec examples
+        run: cd spec && python3 scripts/validate_examples.py
+
+  conformance-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install conformance dependencies
+        run: pip install -r conformance/requirements.txt
+      - name: Run conformance checks
+        run: cd conformance && python3 scripts/run_conformance.py --schema-root ../spec/schemas
+
   docs-build:
     runs-on: ubuntu-latest
     defaults:

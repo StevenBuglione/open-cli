@@ -1,0 +1,84 @@
+{
+  "catalogVersion": "1.0.0",
+  "generatedAt": "2026-03-12T23:59:59Z",
+  "sourceFingerprint": "demo-fingerprint",
+  "sources": [
+    {
+      "id": "ticketsSource",
+      "type": "serviceRoot",
+      "uri": "https://api.example.com/v1",
+      "provenance": {
+        "method": "rfc8631",
+        "at": "2026-03-12T23:59:59Z",
+        "fetches": [
+          {
+            "url": "https://api.example.com/v1",
+            "fetchedAt": "2026-03-12T23:59:59Z",
+            "method": "rfc8631",
+            "requestMethod": "GET",
+            "statusCode": 304,
+            "cacheOutcome": "revalidated_hit",
+            "etag": "\"tickets-v1\"",
+            "cacheControl": "max-age=0",
+            "expiresAt": "2026-03-12T23:59:59Z"
+          }
+        ]
+      }
+    }
+  ],
+  "services": [
+    {
+      "id": "tickets",
+      "alias": "tickets",
+      "sourceId": "ticketsSource",
+      "title": "Tickets API",
+      "servers": ["https://api.example.com/v1"]
+    }
+  ],
+  "tools": [
+    {
+      "id": "tickets:listTickets",
+      "serviceId": "tickets",
+      "operationId": "listTickets",
+      "method": "GET",
+      "path": "/tickets",
+      "group": "tickets",
+      "command": "list",
+      "summary": "List tickets",
+      "flags": [
+        {
+          "name": "state",
+          "originalName": "status",
+          "location": "query",
+          "required": false
+        }
+      ],
+      "safety": {
+        "destructive": false,
+        "readOnly": true,
+        "requiresApproval": false
+      }
+    }
+  ],
+  "effectiveViews": [
+    {
+      "name": "discover",
+      "mode": "discover",
+      "tools": [
+        {
+          "id": "tickets:listTickets",
+          "serviceId": "tickets",
+          "method": "GET",
+          "path": "/tickets",
+          "group": "tickets",
+          "command": "list",
+          "safety": {
+            "destructive": false,
+            "readOnly": true,
+            "requiresApproval": false
+          }
+        }
+      ]
+    }
+  ]
+}

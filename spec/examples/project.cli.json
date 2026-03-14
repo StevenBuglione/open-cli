@@ -1,0 +1,40 @@
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "ticketsSource": {
+      "type": "serviceRoot",
+      "uri": "https://api.example.com/v1",
+      "enabled": true,
+      "refresh": {
+        "maxAgeSeconds": 300,
+        "manualOnly": false
+      }
+    }
+  },
+  "services": {
+    "tickets": {
+      "source": "ticketsSource",
+      "alias": "tickets",
+      "overlays": ["./overlays/tickets.overlay.yaml"],
+      "skills": ["./skills/tickets.skill.json"]
+    }
+  },
+  "agents": {
+    "profiles": {
+      "sandbox": {
+        "mode": "curated",
+        "toolSet": "sandbox-default"
+      }
+    },
+    "defaultProfile": "sandbox"
+  },
+  "curation": {
+    "toolSets": {
+      "sandbox-default": {
+        "allow": ["tickets:listTickets", "tickets:getTicket"],
+        "deny": ["**"]
+      }
+    }
+  }
+}

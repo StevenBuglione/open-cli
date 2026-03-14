@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stevenbuglione.github.io/oas-cli-spec/schemas/skill-manifest.schema.json",
+  "title": "OAS-CLI Skill Manifest",
+  "type": "object",
+  "required": ["oasCliSkill", "serviceId", "toolGuidance"],
+  "properties": {
+    "oasCliSkill": { "type": "string" },
+    "serviceId": { "type": "string" },
+    "summary": { "type": "string" },
+    "toolGuidance": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "whenToUse": { "type": "array", "items": { "type": "string" } },
+          "avoidWhen": { "type": "array", "items": { "type": "string" } },
+          "examples": { "type": "array", "items": { "type": "object" } }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

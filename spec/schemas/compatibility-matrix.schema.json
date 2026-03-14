@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stevenbuglione.github.io/oas-cli-spec/schemas/compatibility-matrix.schema.json",
+  "title": "OAS-CLI Compatibility Matrix",
+  "type": "object",
+  "required": ["suiteVersion", "specVersion", "publishedAt", "implementations"],
+  "properties": {
+    "suiteVersion": { "type": "string", "minLength": 1 },
+    "specVersion": { "type": "string", "minLength": 1 },
+    "publishedAt": { "type": "string", "format": "date-time" },
+    "implementations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["repo", "version", "status", "features"],
+        "properties": {
+          "repo": { "type": "string", "format": "uri" },
+          "version": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["passing", "partial", "failing"] },
+          "features": {
+            "type": "object",
+            "required": ["httpCaching", "refresh", "observabilityHooks", "compatibilityMatrix", "mcpTransports", "oauthRuntime"],
+            "properties": {
+              "httpCaching": { "enum": ["passing", "partial", "failing", "not_applicable"] },
+              "refresh": { "enum": ["passing", "partial", "failing", "not_applicable"] },
+              "observabilityHooks": { "enum": ["passing", "partial", "failing", "not_applicable"] },
+              "compatibilityMatrix": { "enum": ["passing", "partial", "failing", "not_applicable"] },
+              "mcpTransports": { "enum": ["passing", "partial", "failing", "not_applicable"] },
+              "oauthRuntime": { "enum": ["passing", "partial", "failing", "not_applicable"] }
+            },
+            "additionalProperties": false
+          },
+          "notes": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

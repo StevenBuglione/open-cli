@@ -1,0 +1,14 @@
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "filesystem": {
+      "type": "mcp",
+      "uri": "https://example.com/not-valid",
+      "transport": {
+        "type": "stdio",
+        "command": "npx"
+      }
+    }
+  }
+}

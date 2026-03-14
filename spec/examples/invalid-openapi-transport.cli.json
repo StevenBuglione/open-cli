@@ -1,0 +1,14 @@
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "tickets": {
+      "type": "openapi",
+      "uri": "https://example.com/openapi.json",
+      "transport": {
+        "type": "stdio",
+        "command": "npx"
+      }
+    }
+  }
+}

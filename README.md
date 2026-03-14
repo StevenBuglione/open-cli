@@ -134,6 +134,18 @@ make verify
 
 That target formats Go code, runs `go test ./...`, and builds both binaries.
 
+### Spec and conformance
+
+`spec/` is the single source of truth for the OAS-CLI contract.  `conformance/` holds the language-neutral fixtures that validate implementations against those schemas.
+
+```bash
+make verify-spec          # validate spec examples against schemas
+make verify-conformance   # run conformance fixtures against spec/schemas
+make verify-all           # verify + verify-spec + verify-conformance
+```
+
+Both targets install their own Python dependencies via `pip install -q -r requirements.txt` before running.
+
 ### Docs site
 
 When `README.md`, `website/`, or repo-facing docs change, also verify the Docusaurus site:
@@ -160,6 +172,8 @@ The Docusaurus site is the long-form documentation for this repo:
 - `cmd/oasclird`: daemon entrypoint
 - `internal/runtime`: runtime HTTP API and wiring
 - `pkg/`: reusable packages for config, discovery, catalog building, policy, execution, caching, audit, and observability
+- `spec/`: normative OAS-CLI specification and JSON schemas (single source of truth for the public contract)
+- `conformance/`: language-neutral conformance fixtures and expected outputs
 - `website/`: Docusaurus site content, navigation, and landing page
 - `.github/workflows/`: CI and Pages automation
 
