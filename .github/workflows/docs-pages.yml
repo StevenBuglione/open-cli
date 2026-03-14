@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/full-spec-sweep
     paths:
       - website/**
       - .github/workflows/docs-pages.yml
