@@ -1,0 +1,14 @@
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "everything": {
+      "type": "mcp",
+      "enabled": true,
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://localhost:3001/mcp"
+      }
+    }
+  }
+}
