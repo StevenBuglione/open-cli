@@ -15,6 +15,8 @@ import (
 	"github.com/StevenBuglione/oas-cli-go/pkg/cache"
 	"github.com/StevenBuglione/oas-cli-go/pkg/config"
 	"github.com/StevenBuglione/oas-cli-go/pkg/discovery"
+	mcpclient "github.com/StevenBuglione/oas-cli-go/pkg/mcp/client"
+	mcpopenapi "github.com/StevenBuglione/oas-cli-go/pkg/mcp/openapi"
 	"github.com/StevenBuglione/oas-cli-go/pkg/openapi"
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
@@ -411,6 +413,9 @@ func buildTools(service Service, document *openapi3.T, guidance map[string]Guida
 
 func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy) ([]SourceFetch, error) {
 	method := provenanceMethodForSourceType(sourceConfig.Type)
+	if sourceConfig.Type == "mcp" {
+		return buildMCPServiceCatalog(ctx, ntc, cfg, baseDir, serviceID, serviceConfig, sourceConfig, fingerprint, fetcher, policy)
+	}
 	openapiRef, metadataRefs, fetches, err := resolveServiceSource(ctx, baseDir, sourceConfig, fetcher, policy)
 	if err != nil {
 		return nil, err
@@ -464,6 +469,61 @@ func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *confi
 	fetches = append(fetches, workflowFetches...)
 	ntc.Workflows = append(ntc.Workflows, workflows...)
 	return fetches, nil
+}
+
+func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy) ([]SourceFetch, error) {
+	client, err := mcpclient.Open(sourceConfig, ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	descriptors, err := client.ListTools(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	document, err := mcpopenapi.BuildDocument(serviceID, descriptors, sourceConfig.DisabledTools)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(document)
+	if err == nil {
+		fingerprint.Write(data)
+	}
+
+	method := provenanceMethodForSourceType(sourceConfig.Type)
+	guidance, guidanceFetches, err := loadGuidance(baseDir, serviceConfig.Skills, fetcher, policy, method)
+	if err != nil {
+		return nil, err
+	}
+
+	alias := serviceConfig.Alias
+	if alias == "" {
+		alias = serviceID
+	}
+	service := Service{
+		ID:       serviceID,
+		Alias:    alias,
+		SourceID: serviceConfig.Source,
+		Title:    document.Info.Title,
+	}
+	ntc.Services = append(ntc.Services, service)
+
+	operationBindings := map[string]string{}
+	tools, err := buildTools(service, document, guidance, operationBindings)
+	if err != nil {
+		return nil, err
+	}
+	ntc.Tools = append(ntc.Tools, tools...)
+
+	workflows, workflowFetches, err := loadWorkflows(baseDir, serviceConfig.Workflows, operationBindings, fetcher, policy, method)
+	if err != nil {
+		return nil, err
+	}
+	ntc.Workflows = append(ntc.Workflows, workflows...)
+	return append(guidanceFetches, workflowFetches...), nil
 }
 
 type metadataReferences struct {
