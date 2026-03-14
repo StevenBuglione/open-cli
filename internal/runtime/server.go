@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/StevenBuglione/oas-cli-go/pkg/audit"
+	oauth "github.com/StevenBuglione/oas-cli-go/pkg/auth"
 	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
 	"github.com/StevenBuglione/oas-cli-go/pkg/config"
 	httpexec "github.com/StevenBuglione/oas-cli-go/pkg/exec"
@@ -24,6 +25,7 @@ import (
 type Options struct {
 	AuditPath         string
 	CacheDir          string
+	StateDir          string
 	DefaultConfigPath string
 	HTTPClient        *http.Client
 	Observer          obs.Observer
@@ -34,6 +36,7 @@ type Server struct {
 	auditStore        *audit.FileStore
 	client            *http.Client
 	cacheDir          string
+	stateDir          string
 	defaultConfigPath string
 	observer          obs.Observer
 	keychainResolver  func(string) (string, error)
@@ -103,6 +106,7 @@ func NewServer(options Options) *Server {
 		auditStore:        audit.NewFileStore(options.AuditPath),
 		client:            options.HTTPClient,
 		cacheDir:          options.CacheDir,
+		stateDir:          firstNonEmpty(options.StateDir, filepath.Dir(options.AuditPath)),
 		defaultConfigPath: options.DefaultConfigPath,
 		observer:          options.Observer,
 		keychainResolver:  options.KeychainResolver,
@@ -190,13 +194,7 @@ func (server *Server) handleExecuteTool(w http.ResponseWriter, r *http.Request) 
 	}
 
 	execStart := time.Now()
-	result, err := httpexec.Execute(ctx, server.client, httpexec.Request{
-		Tool:     *tool,
-		PathArgs: request.PathArgs,
-		Flags:    request.Flags,
-		Body:     request.Body,
-		Auth:     server.resolveAuth(cfg.Config, *tool),
-	})
+	result, err := server.executeTool(ctx, cfg.Config, *tool, request)
 	if err != nil {
 		finishErr = err
 		server.recordEvent(*tool, request.AgentProfile, policy.Decision{Allowed: false, ReasonCode: "execution_error"}, 0, 0, 0)
@@ -216,6 +214,48 @@ func (server *Server) handleExecuteTool(w http.ResponseWriter, r *http.Request) 
 		response.Text = string(result.Body)
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (server *Server) executeTool(ctx context.Context, cfg config.Config, tool catalog.Tool, request executeToolRequest) (*httpexec.Result, error) {
+	if tool.Backend != nil && tool.Backend.Kind == "mcp" {
+		if sourceConfig, exists := cfg.Sources[tool.Backend.SourceID]; exists && sourceConfig.Type == "mcp" {
+			return httpexec.ExecuteMCP(ctx, httpexec.MCPRequest{
+				Tool:       tool,
+				Source:     sourceConfig,
+				Secrets:    cfg.Secrets,
+				Policy:     cfg.Policy,
+				StateDir:   server.stateDir,
+				HTTPClient: server.client,
+				Body:       request.Body,
+			})
+		}
+	}
+	serviceConfig, ok := cfg.Services[tool.ServiceID]
+	if ok {
+		if sourceConfig, exists := cfg.Sources[serviceConfig.Source]; exists && sourceConfig.Type == "mcp" {
+			return httpexec.ExecuteMCP(ctx, httpexec.MCPRequest{
+				Tool:       tool,
+				Source:     sourceConfig,
+				Secrets:    cfg.Secrets,
+				Policy:     cfg.Policy,
+				StateDir:   server.stateDir,
+				HTTPClient: server.client,
+				Body:       request.Body,
+			})
+		}
+	}
+
+	authSchemes, err := server.resolveAuth(ctx, cfg, tool)
+	if err != nil {
+		return nil, err
+	}
+	return httpexec.Execute(ctx, server.client, httpexec.Request{
+		Tool:     tool,
+		PathArgs: request.PathArgs,
+		Flags:    request.Flags,
+		Body:     request.Body,
+		Auth:     authSchemes,
+	})
 }
 
 func (server *Server) handleWorkflowRun(w http.ResponseWriter, r *http.Request) {
@@ -358,6 +398,7 @@ func (server *Server) loadCatalog(ctx context.Context, configPath string, forceR
 		BaseDir:      cfg.BaseDir,
 		HTTPClient:   server.client,
 		CacheDir:     server.cacheDir,
+		StateDir:     server.stateDir,
 		ForceRefresh: forceRefresh,
 		Observer:     server.observer,
 	})
@@ -422,18 +463,31 @@ func requestID(request *http.Request) string {
 	return strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
 }
 
-func (server *Server) resolveAuth(cfg config.Config, tool catalog.Tool) []httpexec.AuthScheme {
-	var auth []httpexec.AuthScheme
+func (server *Server) resolveAuth(ctx context.Context, cfg config.Config, tool catalog.Tool) ([]httpexec.AuthScheme, error) {
+	var authSchemes []httpexec.AuthScheme
 	for _, requirement := range tool.Auth {
-		secret, ok := cfg.Secrets[requirement.Name]
+		secretKey, secret, ok := lookupSecret(cfg.Secrets, tool.ServiceID, requirement.Name)
 		if !ok {
 			continue
 		}
+		if requirement.Type == "oauth2" || requirement.Type == "openIdConnect" {
+			token, err := oauth.ResolveOAuthAccessToken(ctx, server.client, cfg.Policy, secret, requirement, secretKey, server.stateDir, server.keychainResolver)
+			if err != nil {
+				return nil, err
+			}
+			authSchemes = append(authSchemes, httpexec.AuthScheme{
+				Type:   "http",
+				Scheme: "bearer",
+				Value:  token,
+			})
+			continue
+		}
+
 		value, err := resolveSecret(cfg.Policy, secret, server.keychainResolver)
 		if err != nil {
 			continue
 		}
-		auth = append(auth, httpexec.AuthScheme{
+		authSchemes = append(authSchemes, httpexec.AuthScheme{
 			Type:   requirement.Type,
 			Scheme: requirement.Scheme,
 			In:     requirement.In,
@@ -441,10 +495,30 @@ func (server *Server) resolveAuth(cfg config.Config, tool catalog.Tool) []httpex
 			Value:  value,
 		})
 	}
-	return auth
+	return authSchemes, nil
 }
 
-func resolveSecret(policyConfig config.PolicyConfig, secret config.SecretRef, keychainResolver func(string) (string, error)) (string, error) {
+func lookupSecret(secrets map[string]config.Secret, serviceID, name string) (string, config.Secret, bool) {
+	if serviceID != "" {
+		key := serviceID + "." + name
+		if secret, ok := secrets[key]; ok {
+			return key, secret, true
+		}
+	}
+	secret, ok := secrets[name]
+	return name, secret, ok
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func resolveSecret(policyConfig config.PolicyConfig, secret config.Secret, keychainResolver func(string) (string, error)) (string, error) {
 	switch secret.Type {
 	case "env":
 		return os.Getenv(secret.Value), nil
@@ -460,13 +534,14 @@ func resolveSecret(policyConfig config.PolicyConfig, secret config.SecretRef, ke
 		if !policyConfig.AllowExecSecrets {
 			return "", fmt.Errorf("exec secrets are disabled")
 		}
-		if len(secret.Command) == 0 {
+		command := append([]string(nil), secret.Command...)
+		if len(command) == 0 {
 			if secret.Value == "" {
 				return "", fmt.Errorf("exec secret requires command or value")
 			}
-			secret.Command = []string{secret.Value}
+			command = []string{secret.Value}
 		}
-		output, err := exec.Command(secret.Command[0], secret.Command[1:]...).Output()
+		output, err := exec.Command(command[0], command[1:]...).Output()
 		return string(output), err
 	default:
 		return "", fmt.Errorf("unsupported secret type %q", secret.Type)

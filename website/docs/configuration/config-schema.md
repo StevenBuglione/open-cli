@@ -17,6 +17,7 @@ This implementation also carries a local copy at `pkg/config/cli.schema.json`, a
 | `cli` | string | yes | Must be non-empty. |
 | `mode` | object | yes | Requires `default`. |
 | `sources` | object | yes | Must contain at least one source after final merge. |
+| `mcpServers` | object | no | Compatibility input normalized into canonical MCP sources and services. |
 | `services` | object | no | Optional named services. |
 | `curation` | object | no | Tool sets for curated views. |
 | `agents` | object | no | Profiles and default profile. |
@@ -27,11 +28,35 @@ This implementation also carries a local copy at `pkg/config/cli.schema.json`, a
 
 | Field | Type | Required | Values / meaning |
 | --- | --- | --- | --- |
-| `type` | string | yes | `apiCatalog`, `serviceRoot`, or `openapi` |
-| `uri` | string | yes | URL or file/path reference depending on source type |
+| `type` | string | yes | `apiCatalog`, `serviceRoot`, `openapi`, or `mcp` |
+| `uri` | string | depends | Required for non-MCP sources |
 | `enabled` | boolean | no | Defaults to enabled for newly introduced sources |
 | `refresh.maxAgeSeconds` | integer | no | Must be `>= 0` |
 | `refresh.manualOnly` | boolean | no | Reuse cache until a forced refresh is requested |
+| `transport` | object | for `mcp` | MCP transport configuration |
+| `disabledTools` | string[] | no | MCP tools removed before normalization |
+| `oauth` | object | streamable-http only | Source-local MCP transport OAuth (`clientCredentials` only) |
+
+## `sources.*.transport`
+
+| Field | `stdio` | `sse` | `streamable-http` |
+| --- | --- | --- | --- |
+| `type` | required | required | required |
+| `command` | required | forbidden | forbidden |
+| `args` | optional | forbidden | forbidden |
+| `env` | optional | forbidden | forbidden |
+| `url` | forbidden | required | required |
+| `headers` | forbidden | optional | optional |
+| `headerSecrets` | forbidden | optional | optional |
+
+Current stdio framing is newline-delimited JSON-RPC.
+
+## `mcpServers.*`
+
+`mcpServers` is a compatibility input for `.mcp.json`-style configuration. Each entry is normalized into:
+
+- `sources.<name>` with `type: "mcp"`
+- `services.<name>` when an explicit service is not already present
 
 ## `services.*`
 
@@ -70,9 +95,14 @@ This implementation also carries a local copy at `pkg/config/cli.schema.json`, a
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `type` | string | `env`, `file`, `osKeychain`, or `exec` |
+| `type` | string | `env`, `file`, `osKeychain`, `exec`, or `oauth2` |
 | `value` | string | Env var name, file path, keychain ref, or fallback command |
 | `command` | string[] | Explicit argv for `exec` secrets |
+| `mode` | string | For `oauth2`: `authorizationCode` or `clientCredentials` |
+| `issuer` / `authorizationURL` / `tokenURL` | string | OAuth endpoint configuration |
+| `clientId` / `clientSecret` | object | Nested static secret refs for OAuth clients |
+| `scopes` / `audience` | string[] / string | Optional OAuth request shaping |
+| `interactive`, `callbackPort`, `redirectURI`, `tokenStorage` | mixed | Authorization-code and token caching controls |
 
 ## Loader behavior that matters in practice
 
@@ -87,6 +117,8 @@ The loader calls `DisallowUnknownFields()` during JSON decoding. In practice, th
 ### Cross-reference validation exists
 
 After schema validation, the loader also checks that every `services.<id>.source` points at a known source.
+
+It also validates MCP transport constraints, OAuth ownership of the transport `Authorization` header, and MCP/OAuth compatibility rules such as "SSE forbids source-local OAuth".
 
 ### Final validation is stricter than per-scope validation
 

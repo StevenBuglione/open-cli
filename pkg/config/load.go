@@ -6,21 +6,25 @@ import (
 )
 
 type rawConfig struct {
-	CLI      string                `json:"cli"`
-	Mode     *ModeConfig           `json:"mode,omitempty"`
-	Sources  map[string]rawSource  `json:"sources,omitempty"`
-	Services map[string]rawService `json:"services,omitempty"`
-	Curation *rawCurationConfig    `json:"curation,omitempty"`
-	Agents   *rawAgentsConfig      `json:"agents,omitempty"`
-	Policy   *rawPolicyConfig      `json:"policy,omitempty"`
-	Secrets  map[string]SecretRef  `json:"secrets,omitempty"`
+	CLI        string                  `json:"cli"`
+	Mode       *ModeConfig             `json:"mode,omitempty"`
+	Sources    map[string]rawSource    `json:"sources,omitempty"`
+	MCPServers map[string]rawMCPServer `json:"mcpServers,omitempty"`
+	Services   map[string]rawService   `json:"services,omitempty"`
+	Curation   *rawCurationConfig      `json:"curation,omitempty"`
+	Agents     *rawAgentsConfig        `json:"agents,omitempty"`
+	Policy     *rawPolicyConfig        `json:"policy,omitempty"`
+	Secrets    map[string]Secret       `json:"secrets,omitempty"`
 }
 
 type rawSource struct {
-	Type    *string        `json:"type,omitempty"`
-	URI     *string        `json:"uri,omitempty"`
-	Enabled *bool          `json:"enabled,omitempty"`
-	Refresh *RefreshPolicy `json:"refresh,omitempty"`
+	Type          *string          `json:"type,omitempty"`
+	URI           *string          `json:"uri,omitempty"`
+	Enabled       *bool            `json:"enabled,omitempty"`
+	Refresh       *RefreshPolicy   `json:"refresh,omitempty"`
+	Transport     *rawMCPTransport `json:"transport,omitempty"`
+	DisabledTools []string         `json:"disabledTools,omitempty"`
+	OAuth         *rawOAuthConfig  `json:"oauth,omitempty"`
 }
 
 type rawService struct {
@@ -63,10 +67,12 @@ func LoadEffective(options LoadOptions) (*EffectiveConfig, error) {
 			Services: map[string]Service{},
 			Curation: CurationConfig{ToolSets: map[string]ToolSet{}},
 			Agents:   AgentsConfig{Profiles: map[string]AgentProfile{}},
-			Secrets:  map[string]SecretRef{},
+			Secrets:  map[string]Secret{},
 		},
 		ScopePaths: map[Scope]string{},
 	}
+	sourceNames := map[string]struct{}{}
+	mcpServerNames := map[string]struct{}{}
 
 	discoveredPaths := DiscoverScopePaths(options)
 	scopedPaths := []struct {
@@ -86,6 +92,15 @@ func LoadEffective(options LoadOptions) (*EffectiveConfig, error) {
 
 		raw, err := loadRaw(entry.path)
 		if err != nil {
+			return nil, err
+		}
+		if err := validateMCPSourceAmbiguity(raw, sourceNames, mcpServerNames); err != nil {
+			return nil, err
+		}
+		if err := normalizeMCPServers(&raw); err != nil {
+			return nil, err
+		}
+		if err := normalizeMCPSources(effective.Config, &raw); err != nil {
 			return nil, err
 		}
 		effective.ScopePaths[entry.scope] = entry.path
@@ -130,20 +145,36 @@ func (cfg *Config) merge(scope Scope, raw rawConfig) {
 
 	for key, source := range raw.Sources {
 		current := cfg.Sources[key]
+		isNewSource := isZeroSource(current)
 		if source.Type != nil {
+			resetSourceExclusiveFields(&current, *source.Type)
 			current.Type = *source.Type
+		}
+		transportTypeChanged := false
+		newTransportType := ""
+		if source.Transport != nil && source.Transport.Type != nil {
+			newTransportType = *source.Transport.Type
+			transportTypeChanged = current.Transport == nil || current.Transport.Type != newTransportType
 		}
 		if source.URI != nil {
 			current.URI = *source.URI
 		}
 		if source.Enabled != nil {
 			current.Enabled = *source.Enabled
-		} else if current.Type == "" && current.URI == "" && !current.Enabled {
+		} else if isNewSource {
 			current.Enabled = true
 		}
 		if source.Refresh != nil {
 			current.Refresh = source.Refresh
 		}
+		current.Transport = mergeRawTransport(current.Transport, source.Transport)
+		if source.DisabledTools != nil {
+			current.DisabledTools = copyStrings(source.DisabledTools)
+		}
+		if transportTypeChanged && newTransportType != "streamable-http" && source.OAuth == nil {
+			current.OAuth = nil
+		}
+		current.OAuth = mergeRawOAuth(current.OAuth, source.OAuth)
 		cfg.Sources[key] = current
 	}
 
@@ -223,6 +254,32 @@ func validateCrossReferences(cfg Config) error {
 		}
 		if _, ok := cfg.Sources[service.Source]; !ok {
 			diagnostics = append(diagnostics, Diagnostic{Path: "services." + key + ".source", Message: "references unknown source"})
+			continue
+		}
+		if cfg.Sources[service.Source].Type == "mcp" && key != service.Source {
+			diagnostics = append(diagnostics, Diagnostic{
+				Path:    "services." + key + ".source",
+				Message: "is a second service pointing at mcp source " + service.Source,
+			})
+		}
+	}
+	for sourceName, source := range cfg.Sources {
+		if source.Type != "mcp" {
+			continue
+		}
+		service, ok := cfg.Services[sourceName]
+		if !ok || service.Source == "" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Path:    "services." + sourceName + ".source",
+				Message: "must reference \"" + sourceName + "\" for mcp source",
+			})
+			continue
+		}
+		if service.Source != sourceName {
+			diagnostics = append(diagnostics, Diagnostic{
+				Path:    "services." + sourceName + ".source",
+				Message: "must reference \"" + sourceName + "\" for mcp source",
+			})
 		}
 	}
 	if len(diagnostics) > 0 {
@@ -257,4 +314,15 @@ func uniqueStrings(existing, additional []string) []string {
 	}
 
 	return merged
+}
+
+func resetSourceExclusiveFields(source *Source, newType string) {
+	if newType == "mcp" {
+		source.URI = ""
+		return
+	}
+
+	source.Transport = nil
+	source.DisabledTools = nil
+	source.OAuth = nil
 }

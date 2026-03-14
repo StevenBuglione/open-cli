@@ -10,15 +10,43 @@ type ModeConfig struct {
 }
 
 type Source struct {
-	Type    string         `json:"type"`
-	URI     string         `json:"uri"`
-	Enabled bool           `json:"enabled"`
-	Refresh *RefreshPolicy `json:"refresh,omitempty"`
+	Type          string         `json:"type"`
+	URI           string         `json:"uri,omitempty"`
+	Enabled       bool           `json:"enabled"`
+	Refresh       *RefreshPolicy `json:"refresh,omitempty"`
+	Transport     *MCPTransport  `json:"transport,omitempty"`
+	DisabledTools []string       `json:"disabledTools,omitempty"`
+	OAuth         *OAuthConfig   `json:"oauth,omitempty"`
 }
 
 type RefreshPolicy struct {
 	MaxAgeSeconds int  `json:"maxAgeSeconds,omitempty"`
 	ManualOnly    bool `json:"manualOnly,omitempty"`
+}
+
+type MCPTransport struct {
+	Type          string            `json:"type"`
+	Command       string            `json:"command,omitempty"`
+	Args          []string          `json:"args,omitempty"`
+	Env           map[string]string `json:"env,omitempty"`
+	URL           string            `json:"url,omitempty"`
+	Headers       map[string]string `json:"headers,omitempty"`
+	HeaderSecrets map[string]string `json:"headerSecrets,omitempty"`
+}
+
+type OAuthConfig struct {
+	Mode             string     `json:"mode,omitempty"`
+	Issuer           string     `json:"issuer,omitempty"`
+	AuthorizationURL string     `json:"authorizationURL,omitempty"`
+	TokenURL         string     `json:"tokenURL,omitempty"`
+	ClientID         *SecretRef `json:"clientId,omitempty"`
+	ClientSecret     *SecretRef `json:"clientSecret,omitempty"`
+	Scopes           []string   `json:"scopes,omitempty"`
+	Audience         string     `json:"audience,omitempty"`
+	Interactive      *bool      `json:"interactive,omitempty"`
+	CallbackPort     *int       `json:"callbackPort,omitempty"`
+	RedirectURI      string     `json:"redirectURI,omitempty"`
+	TokenStorage     string     `json:"tokenStorage,omitempty"`
 }
 
 type Service struct {
@@ -55,6 +83,13 @@ type PolicyConfig struct {
 	AllowExecSecrets bool     `json:"allowExecSecrets,omitempty"`
 }
 
+type Secret struct {
+	Type    string   `json:"type"`
+	Value   string   `json:"value,omitempty"`
+	Command []string `json:"command,omitempty"`
+	OAuthConfig
+}
+
 type SecretRef struct {
 	Type    string   `json:"type"`
 	Value   string   `json:"value,omitempty"`
@@ -69,7 +104,7 @@ type Config struct {
 	Curation CurationConfig       `json:"curation,omitempty"`
 	Agents   AgentsConfig         `json:"agents,omitempty"`
 	Policy   PolicyConfig         `json:"policy,omitempty"`
-	Secrets  map[string]SecretRef `json:"secrets,omitempty"`
+	Secrets  map[string]Secret    `json:"secrets,omitempty"`
 }
 
 type LoadOptions struct {

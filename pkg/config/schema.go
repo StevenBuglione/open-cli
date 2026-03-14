@@ -33,6 +33,9 @@ func validateDocument(data []byte, partial bool) error {
 
 	diagnostics := make([]Diagnostic, 0, len(result.Errors()))
 	for _, item := range result.Errors() {
+		if shouldSkipSchemaDiagnostic(item.Description()) {
+			continue
+		}
 		path := normalizePath(item.Context().String(), item.Description())
 		if path == "(root)" {
 			path = ""
@@ -46,6 +49,10 @@ func validateDocument(data []byte, partial bool) error {
 		})
 	}
 	return &ValidationError{Diagnostics: diagnostics}
+}
+
+func shouldSkipSchemaDiagnostic(message string) bool {
+	return strings.HasPrefix(message, "Must validate")
 }
 
 func normalizePath(context, message string) string {
@@ -91,7 +98,10 @@ func validateConfig(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return validateDocument(data, false)
+	if err := validateDocument(data, false); err != nil {
+		return err
+	}
+	return validateMCPConfig(cfg)
 }
 
 func decodeRawConfig(data []byte) (rawConfig, error) {

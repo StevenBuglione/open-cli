@@ -1,14 +1,413 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["cli", "mode", "sources"],
+  "required": [
+    "cli",
+    "mode"
+  ],
+  "$defs": {
+    "refreshPolicy": {
+      "type": "object",
+      "properties": {
+        "maxAgeSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "manualOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "secretRef": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "env",
+            "file",
+            "osKeychain",
+            "exec"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "oauthSecret": {
+      "type": "object",
+      "required": [
+        "type",
+        "mode"
+      ],
+      "properties": {
+        "type": {
+          "const": "oauth2"
+        },
+        "mode": {
+          "enum": [
+            "authorizationCode",
+            "clientCredentials"
+          ]
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorizationURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tokenURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientId": {
+          "$ref": "#/$defs/secretRef"
+        },
+        "clientSecret": {
+          "$ref": "#/$defs/secretRef"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interactive": {
+          "type": "boolean"
+        },
+        "callbackPort": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "redirectURI": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tokenStorage": {
+          "enum": [
+            "instance",
+            "memory"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "oauthConfig": {
+      "type": "object",
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "authorizationCode",
+            "clientCredentials",
+            "openIdConnect"
+          ]
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorizationURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tokenURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientId": {
+          "$ref": "#/$defs/secretRef"
+        },
+        "clientSecret": {
+          "$ref": "#/$defs/secretRef"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interactive": {
+          "type": "boolean"
+        },
+        "callbackPort": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "redirectURI": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tokenStorage": {
+          "enum": [
+            "instance",
+            "memory"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "mcpTransport": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "stdio",
+            "sse",
+            "streamable-http"
+          ]
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "headerSecrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "apiCatalog",
+            "serviceRoot",
+            "openapi",
+            "mcp"
+          ]
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "refresh": {
+          "$ref": "#/$defs/refreshPolicy"
+        },
+        "transport": {
+          "$ref": "#/$defs/mcpTransport"
+        },
+        "disabledTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "oauth": {
+          "$ref": "#/$defs/oauthConfig"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "mcp"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "transport"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "apiCatalog",
+                  "serviceRoot",
+                  "openapi"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "uri"
+            ]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "service": {
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "alias": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overlays": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mcpServer": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "stdio",
+            "sse",
+            "streamable-http"
+          ]
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "headerSecrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "disabledTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "oauth": {
+          "$ref": "#/$defs/oauthConfig"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
   "properties": {
-    "cli": { "type": "string", "minLength": 1 },
+    "cli": {
+      "type": "string",
+      "minLength": 1
+    },
     "mode": {
       "type": "object",
-      "required": ["default"],
+      "required": [
+        "default"
+      ],
       "properties": {
-        "default": { "enum": ["discover", "curated"] }
+        "default": {
+          "enum": [
+            "discover",
+            "curated"
+          ]
+        }
       },
       "additionalProperties": false
     },
@@ -16,37 +415,19 @@
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {
-        "type": "object",
-        "required": ["type", "uri"],
-        "properties": {
-          "type": { "enum": ["apiCatalog", "serviceRoot", "openapi"] },
-          "uri": { "type": "string", "minLength": 1 },
-          "enabled": { "type": "boolean" },
-          "refresh": {
-            "type": "object",
-            "properties": {
-              "maxAgeSeconds": { "type": "integer", "minimum": 0 },
-              "manualOnly": { "type": "boolean" }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": true
+        "$ref": "#/$defs/source"
+      }
+    },
+    "mcpServers": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/mcpServer"
       }
     },
     "services": {
       "type": "object",
       "additionalProperties": {
-        "type": "object",
-        "required": ["source"],
-        "properties": {
-          "source": { "type": "string", "minLength": 1 },
-          "alias": { "type": "string", "minLength": 1 },
-          "overlays": { "type": "array", "items": { "type": "string" } },
-          "skills": { "type": "array", "items": { "type": "string" } },
-          "workflows": { "type": "array", "items": { "type": "string" } }
-        },
-        "additionalProperties": true
+        "$ref": "#/$defs/service"
       }
     },
     "curation": {
@@ -57,8 +438,18 @@
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "allow": { "type": "array", "items": { "type": "string" } },
-              "deny": { "type": "array", "items": { "type": "string" } }
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "deny": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             },
             "additionalProperties": false
           }
@@ -69,14 +460,25 @@
     "agents": {
       "type": "object",
       "properties": {
-        "defaultProfile": { "type": "string", "minLength": 1 },
+        "defaultProfile": {
+          "type": "string",
+          "minLength": 1
+        },
         "profiles": {
           "type": "object",
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "mode": { "enum": ["discover", "curated"] },
-              "toolSet": { "type": "string", "minLength": 1 }
+              "mode": {
+                "enum": [
+                  "discover",
+                  "curated"
+                ]
+              },
+              "toolSet": {
+                "type": "string",
+                "minLength": 1
+              }
             },
             "additionalProperties": false
           }
@@ -87,25 +489,49 @@
     "policy": {
       "type": "object",
       "properties": {
-        "deny": { "type": "array", "items": { "type": "string" } },
-        "approvalRequired": { "type": "array", "items": { "type": "string" } },
-        "allowExecSecrets": { "type": "boolean" }
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "approvalRequired": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowExecSecrets": {
+          "type": "boolean"
+        }
       },
       "additionalProperties": false
     },
     "secrets": {
       "type": "object",
       "additionalProperties": {
-        "type": "object",
-        "required": ["type"],
-        "properties": {
-          "type": { "enum": ["env", "file", "osKeychain", "exec"] },
-          "value": { "type": "string", "minLength": 1 },
-          "command": { "type": "array", "items": { "type": "string" } }
-        },
-        "additionalProperties": false
+        "anyOf": [
+          {
+            "$ref": "#/$defs/secretRef"
+          },
+          {
+            "$ref": "#/$defs/oauthSecret"
+          }
+        ]
       }
     }
   },
+  "anyOf": [
+    {
+      "required": [
+        "sources"
+      ]
+    },
+    {
+      "required": [
+        "mcpServers"
+      ]
+    }
+  ],
   "additionalProperties": false
 }
