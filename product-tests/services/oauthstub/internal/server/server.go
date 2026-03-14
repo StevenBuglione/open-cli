@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	defaultTTLSeconds  = 3600
-	shortTTLSeconds    = 2 // for refresh-testing scenarios
+	defaultTTLSeconds = 3600
+	shortTTLSeconds   = 2 // for refresh-testing scenarios
 )
 
 // tokenRecord holds an issued access token and its metadata.
@@ -25,10 +25,10 @@ type tokenRecord struct {
 
 // Server implements a minimal OAuth 2.0 authorization server stub.
 type Server struct {
-	store    *Store
-	mu       sync.Mutex
-	tokens   map[string]*tokenRecord
-	issuer   string
+	store  *Store
+	mu     sync.Mutex
+	tokens map[string]*tokenRecord
+	issuer string
 }
 
 // New creates a new Server backed by the provided Store.

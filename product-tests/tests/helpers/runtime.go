@@ -17,7 +17,7 @@ import (
 // Instance wraps a runtime.Server backed by an httptest.Server with fully
 // isolated filesystem directories for audit logs, state, and HTTP cache.
 type Instance struct {
-	URL      string
+	URL       string
 	AuditPath string
 	StateDir  string
 	CacheDir  string
@@ -43,7 +43,7 @@ func NewIsolatedInstance(t *testing.T) *Instance {
 	t.Cleanup(ts.Close)
 
 	return &Instance{
-		URL:      ts.URL,
+		URL:       ts.URL,
 		AuditPath: auditPath,
 		StateDir:  stateDir,
 		CacheDir:  cacheDir,

@@ -24,10 +24,10 @@ func newOAuthStubHandler(t *testing.T, validClientID, validSecret, validScope st
 		base := "http://" + r.Host
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"issuer":                 base,
-			"token_endpoint":         base + "/oauth/token",
-			"grant_types_supported":  []string{"client_credentials"},
-			"scopes_supported":       []string{"api.read", "api.write"},
+			"issuer":                base,
+			"token_endpoint":        base + "/oauth/token",
+			"grant_types_supported": []string{"client_credentials"},
+			"scopes_supported":      []string{"api.read", "api.write"},
 		})
 	})
 

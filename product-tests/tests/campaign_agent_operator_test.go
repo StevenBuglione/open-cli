@@ -280,7 +280,7 @@ func TestCampaignAgentOperator(t *testing.T) {
 	// ── Step 8: Audit surface ─────────────────────────────────────────────────
 	t.Run("audit-trail", func(t *testing.T) {
 		inst := &helpers.Instance{
-			URL:      srv.URL,
+			URL:       srv.URL,
 			AuditPath: filepath.Join(dir, "audit.log"),
 		}
 		count := inst.AuditEventCount(t)
