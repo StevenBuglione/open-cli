@@ -1,0 +1,36 @@
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "ticketsSource": {
+      "type": "openapi",
+      "uri": "../openapi/tickets.openapi.yaml",
+      "enabled": true
+    }
+  },
+  "services": {
+    "tickets": {
+      "source": "ticketsSource",
+      "alias": "tickets",
+      "overlays": ["../overlays/tickets.overlay.yaml"],
+      "workflows": ["../workflows/tickets.arazzo.yaml"]
+    }
+  },
+  "agents": {
+    "profiles": {
+      "sandbox": {
+        "mode": "curated",
+        "toolSet": "sandbox-default"
+      }
+    },
+    "defaultProfile": "sandbox"
+  },
+  "curation": {
+    "toolSets": {
+      "sandbox-default": {
+        "allow": ["tickets:listTickets", "tickets:getTicket"],
+        "deny": ["**"]
+      }
+    }
+  }
+}

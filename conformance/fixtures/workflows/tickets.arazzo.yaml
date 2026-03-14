@@ -1,0 +1,11 @@
+arazzo: 1.0.0
+info:
+  title: Ticket workflows
+  version: 1.0.0
+workflows:
+  - workflowId: triageTicket
+    steps:
+      - stepId: list
+        operationId: listTickets
+      - stepId: fetch
+        operationId: getTicket

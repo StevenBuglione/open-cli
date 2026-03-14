@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: StevenBuglione/oas-cli-spec
+          path: oas-cli-spec
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run conformance checks
+        run: python scripts/run_conformance.py --schema-root "$GITHUB_WORKSPACE/oas-cli-spec/schemas"

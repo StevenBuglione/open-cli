@@ -1,0 +1,37 @@
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "remoteDocs": {
+      "type": "mcp",
+      "enabled": true,
+      "transport": {
+        "type": "streamable-http",
+        "url": "https://mcp.example.com/mcp",
+        "headerSecrets": {
+          "X-API-Key": "mcp.apiKey"
+        }
+      },
+      "oauth": {
+        "mode": "clientCredentials",
+        "tokenURL": "https://auth.example.com/oauth/token",
+        "clientId": { "type": "env", "value": "MCP_CLIENT_ID" },
+        "clientSecret": { "type": "env", "value": "MCP_CLIENT_SECRET" },
+        "scopes": ["mcp.read"]
+      },
+      "disabledTools": ["delete_file"]
+    }
+  },
+  "services": {
+    "remoteDocs": {
+      "source": "remoteDocs",
+      "alias": "remote-docs"
+    }
+  },
+  "secrets": {
+    "mcp.apiKey": {
+      "type": "env",
+      "value": "MCP_API_KEY"
+    }
+  }
+}

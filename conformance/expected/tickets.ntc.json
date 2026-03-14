@@ -1,0 +1,200 @@
+{
+  "catalogVersion": "1.0.0",
+  "generatedAt": "2026-03-12T23:59:59Z",
+  "sourceFingerprint": "demo-fingerprint",
+  "sources": [
+    {
+      "id": "ticketsSource",
+      "type": "openapi",
+      "uri": "../openapi/tickets.openapi.yaml",
+      "provenance": {
+        "method": "explicit",
+        "at": "2026-03-12T23:59:59Z"
+      }
+    }
+  ],
+  "services": [
+    {
+      "id": "tickets",
+      "alias": "tickets",
+      "sourceId": "ticketsSource",
+      "title": "Example Tickets API",
+      "servers": ["https://api.example.com/v1"]
+    }
+  ],
+  "tools": [
+    {
+      "id": "tickets:getTicket",
+      "serviceId": "tickets",
+      "operationId": "getTicket",
+      "method": "GET",
+      "path": "/tickets/{id}",
+      "group": "tickets",
+      "command": "get-ticket",
+      "summary": "Get a ticket",
+      "pathParams": [
+        {
+          "name": "id",
+          "originalName": "id",
+          "location": "path",
+          "required": true
+        }
+      ],
+      "safety": {
+        "destructive": false,
+        "readOnly": true,
+        "requiresApproval": false
+      },
+      "servers": ["https://api.example.com/v1"]
+    },
+    {
+      "id": "tickets:listTickets",
+      "serviceId": "tickets",
+      "operationId": "listTickets",
+      "method": "GET",
+      "path": "/tickets",
+      "group": "tickets",
+      "command": "list",
+      "summary": "List tickets",
+      "flags": [
+        {
+          "name": "state",
+          "originalName": "status",
+          "location": "query",
+          "required": false
+        }
+      ],
+      "safety": {
+        "destructive": false,
+        "readOnly": true,
+        "requiresApproval": false
+      },
+      "servers": ["https://api.example.com/v1"]
+    }
+  ],
+  "workflows": [
+    {
+      "workflowId": "triageTicket",
+      "steps": [
+        {
+          "stepId": "list",
+          "toolId": "tickets:listTickets"
+        },
+        {
+          "stepId": "fetch",
+          "toolId": "tickets:getTicket"
+        }
+      ]
+    }
+  ],
+  "effectiveViews": [
+    {
+      "name": "discover",
+      "mode": "discover",
+      "tools": [
+        {
+          "id": "tickets:getTicket",
+          "serviceId": "tickets",
+          "operationId": "getTicket",
+          "method": "GET",
+          "path": "/tickets/{id}",
+          "group": "tickets",
+          "command": "get-ticket",
+          "summary": "Get a ticket",
+          "pathParams": [
+            {
+              "name": "id",
+              "originalName": "id",
+              "location": "path",
+              "required": true
+            }
+          ],
+          "safety": {
+            "destructive": false,
+            "readOnly": true,
+            "requiresApproval": false
+          },
+          "servers": ["https://api.example.com/v1"]
+        },
+        {
+          "id": "tickets:listTickets",
+          "serviceId": "tickets",
+          "operationId": "listTickets",
+          "method": "GET",
+          "path": "/tickets",
+          "group": "tickets",
+          "command": "list",
+          "summary": "List tickets",
+          "flags": [
+            {
+              "name": "state",
+              "originalName": "status",
+              "location": "query",
+              "required": false
+            }
+          ],
+          "safety": {
+            "destructive": false,
+            "readOnly": true,
+            "requiresApproval": false
+          },
+          "servers": ["https://api.example.com/v1"]
+        }
+      ]
+    },
+    {
+      "name": "sandbox",
+      "mode": "curated",
+      "tools": [
+        {
+          "id": "tickets:getTicket",
+          "serviceId": "tickets",
+          "operationId": "getTicket",
+          "method": "GET",
+          "path": "/tickets/{id}",
+          "group": "tickets",
+          "command": "get-ticket",
+          "summary": "Get a ticket",
+          "pathParams": [
+            {
+              "name": "id",
+              "originalName": "id",
+              "location": "path",
+              "required": true
+            }
+          ],
+          "safety": {
+            "destructive": false,
+            "readOnly": true,
+            "requiresApproval": false
+          },
+          "servers": ["https://api.example.com/v1"]
+        },
+        {
+          "id": "tickets:listTickets",
+          "serviceId": "tickets",
+          "operationId": "listTickets",
+          "method": "GET",
+          "path": "/tickets",
+          "group": "tickets",
+          "command": "list",
+          "summary": "List tickets",
+          "flags": [
+            {
+              "name": "state",
+              "originalName": "status",
+              "location": "query",
+              "required": false
+            }
+          ],
+          "safety": {
+            "destructive": false,
+            "readOnly": true,
+            "requiresApproval": false
+          },
+          "servers": ["https://api.example.com/v1"]
+        }
+      ]
+    }
+  ]
+}
