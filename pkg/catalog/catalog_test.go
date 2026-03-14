@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
@@ -192,5 +193,473 @@ workflows:
 
 	if _, err := json.Marshal(ntc); err != nil {
 		t.Fatalf("catalog should be json serializable: %v", err)
+	}
+}
+
+func TestBuildExposesRequestBodiesAndCliMetadataHints(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Example Tickets API
+  version: "2026-03-13"
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List tickets
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: createTicket
+      tags: [tickets]
+      summary: Create ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          description: Created
+  /tickets/archive:
+    post:
+      operationId: archiveTickets
+      tags: [tickets]
+      summary: Archive tickets
+      responses:
+        "202":
+          description: Accepted
+  /admin/tickets:
+    delete:
+      operationId: purgeTickets
+      tags: [admin]
+      summary: Purge tickets
+      responses:
+        "204":
+          description: Deleted
+`)
+	writeFile(t, dir, "overlays/tickets.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/tickets'].get"
+    update:
+      x-cli-name: list
+      x-cli-pagination:
+        style: cursor
+        cursorParam: cursor
+      x-cli-retry:
+        recommended: true
+        locationHeader: true
+  - target: "$.paths['/tickets'].post"
+    update:
+      x-cli-name: create
+      x-cli-aliases: [new-ticket]
+      x-cli-description: "Create a ticket from structured JSON input."
+      x-cli-output:
+        defaultFields: [id, title]
+        redactions: [requester.email]
+      x-cli-safety:
+        destructive: false
+        readOnly: false
+        requiresApproval: false
+        idempotent: false
+  - target: "$.paths['/tickets/archive'].post"
+    update:
+      x-cli-name: archive
+      x-cli-hidden: true
+      x-cli-safety:
+        destructive: true
+        readOnly: false
+        requiresApproval: true
+  - target: "$.paths['/admin/tickets'].delete"
+    update:
+      x-cli-name: purge
+      x-cli-ignore: true
+`)
+	writeFile(t, dir, "skills/tickets.skill.json", `{
+	  "oasCliSkill": "1.0.0",
+	  "serviceId": "tickets",
+	  "summary": "Guidance for using the Tickets API via OAS-CLI",
+	  "toolGuidance": {
+	    "tickets:createTicket": {
+	      "whenToUse": ["Need to file a new ticket"],
+	      "avoidWhen": ["You only need to list tickets"],
+	      "examples": [
+	        {
+	          "goal": "Create a ticket from a JSON payload",
+	          "command": "oascli tickets tickets create --body @ticket.json"
+	        }
+	      ]
+	    }
+	  }
+	}`)
+
+	cfg := config.Config{
+		CLI:  "1.0.0",
+		Mode: config.ModeConfig{Default: "discover"},
+		Sources: map[string]config.Source{
+			"ticketsSource": {
+				Type:    "openapi",
+				URI:     filepath.ToSlash(filepath.Join(dir, "tickets.openapi.yaml")),
+				Enabled: true,
+			},
+		},
+		Services: map[string]config.Service{
+			"tickets": {
+				Source:   "ticketsSource",
+				Alias:    "tickets",
+				Overlays: []string{"./overlays/tickets.overlay.yaml"},
+				Skills:   []string{"./skills/tickets.skill.json"},
+			},
+		},
+	}
+
+	ntc, err := catalog.Build(context.Background(), catalog.BuildOptions{
+		Config:  cfg,
+		BaseDir: dir,
+	})
+	if err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+
+	data, err := json.Marshal(ntc)
+	if err != nil {
+		t.Fatalf("Marshal returned error: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal returned error: %v", err)
+	}
+
+	tools := decoded["tools"].([]any)
+	if len(tools) != 3 {
+		t.Fatalf("expected ignored tool to be removed, got %d tools", len(tools))
+	}
+
+	var createTool map[string]any
+	var listTool map[string]any
+	var archiveTool map[string]any
+	for _, item := range tools {
+		tool := item.(map[string]any)
+		switch tool["id"] {
+		case "tickets:createTicket":
+			createTool = tool
+		case "tickets:listTickets":
+			listTool = tool
+		case "tickets:archiveTickets":
+			archiveTool = tool
+		case "tickets:purgeTickets":
+			t.Fatalf("expected x-cli-ignore tool to be omitted, got %#v", tool)
+		}
+	}
+
+	if createTool == nil || listTool == nil || archiveTool == nil {
+		t.Fatalf("expected create/list/archive tools in catalog, got %#v", tools)
+	}
+	if createTool["description"] != "Create a ticket from structured JSON input." {
+		t.Fatalf("expected x-cli-description override, got %#v", createTool["description"])
+	}
+	aliases, _ := createTool["aliases"].([]any)
+	if len(aliases) != 1 || aliases[0] != "new-ticket" {
+		t.Fatalf("expected aliases to be preserved, got %#v", createTool["aliases"])
+	}
+	requestBody, _ := createTool["requestBody"].(map[string]any)
+	if requestBody == nil {
+		t.Fatalf("expected request body contract for create tool, got %#v", createTool)
+	}
+	if required, _ := requestBody["required"].(bool); !required {
+		t.Fatalf("expected request body to be marked required, got %#v", requestBody)
+	}
+	contentTypes, _ := requestBody["contentTypes"].([]any)
+	if len(contentTypes) != 1 {
+		t.Fatalf("expected one request body content type, got %#v", requestBody)
+	}
+	contentType := contentTypes[0].(map[string]any)
+	if contentType["mediaType"] != "application/json" {
+		t.Fatalf("expected json request body media type, got %#v", contentType)
+	}
+	schema, _ := contentType["schema"].(map[string]any)
+	if schema["type"] != "object" {
+		t.Fatalf("expected machine-readable request body schema, got %#v", contentType["schema"])
+	}
+	guidance, _ := createTool["guidance"].(map[string]any)
+	if guidance == nil {
+		t.Fatalf("expected guidance metadata on create tool")
+	}
+	examples, _ := guidance["examples"].([]any)
+	if len(examples) != 1 {
+		t.Fatalf("expected guidance examples, got %#v", guidance)
+	}
+	example := examples[0].(map[string]any)
+	if !strings.Contains(example["command"].(string), "--body @ticket.json") {
+		t.Fatalf("expected example command to preserve request body guidance, got %#v", example)
+	}
+
+	safety, _ := createTool["safety"].(map[string]any)
+	if idempotent, _ := safety["idempotent"].(bool); idempotent {
+		t.Fatalf("expected create tool to remain non-idempotent, got %#v", safety)
+	}
+	if hidden, _ := archiveTool["hidden"].(bool); !hidden {
+		t.Fatalf("expected archive tool to be hidden, got %#v", archiveTool)
+	}
+	if _, ok := listTool["pagination"].(map[string]any); !ok {
+		t.Fatalf("expected pagination hints on list tool, got %#v", listTool)
+	}
+	if _, ok := listTool["retry"].(map[string]any); !ok {
+		t.Fatalf("expected retry hints on list tool, got %#v", listTool)
+	}
+	if _, ok := createTool["output"].(map[string]any); !ok {
+		t.Fatalf("expected output hints on create tool, got %#v", createTool)
+	}
+}
+
+func TestBuildRejectsWorkflowReferencingIgnoredOperation(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Example Tickets API
+  version: "2026-03-01"
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List tickets
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: deleteTickets
+      tags: [tickets]
+      summary: Delete tickets
+      responses:
+        "204":
+          description: No Content
+`)
+	writeFile(t, dir, "overlays/tickets.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/tickets'].delete"
+    update:
+      x-cli-ignore: true
+`)
+	writeFile(t, dir, "workflows/tickets.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Ticket workflows
+  version: 1.0.0
+workflows:
+  - workflowId: deleteWorkflow
+    steps:
+      - stepId: delete
+        operationId: deleteTickets
+`)
+
+	cfg := config.Config{
+		CLI:  "1.0.0",
+		Mode: config.ModeConfig{Default: "discover"},
+		Sources: map[string]config.Source{
+			"ticketsSource": {
+				Type:    "openapi",
+				URI:     filepath.ToSlash(filepath.Join(dir, "tickets.openapi.yaml")),
+				Enabled: true,
+			},
+		},
+		Services: map[string]config.Service{
+			"tickets": {
+				Source:    "ticketsSource",
+				Alias:     "tickets",
+				Overlays:  []string{"./overlays/tickets.overlay.yaml"},
+				Workflows: []string{"./workflows/tickets.arazzo.yaml"},
+			},
+		},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{
+		Config:  cfg,
+		BaseDir: dir,
+	})
+	if err == nil {
+		t.Fatal("expected Build to fail when workflow references an ignored operation")
+	}
+	if !strings.Contains(err.Error(), `workflow "deleteWorkflow" step "delete" references operationId "deleteTickets"`) {
+		t.Fatalf("expected clear workflow reference error, got %v", err)
+	}
+}
+
+func TestBuildRejectsWorkflowReferencingIgnoredOperationPath(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Example Tickets API
+  version: "2026-03-01"
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /tickets:
+    delete:
+      operationId: deleteTickets
+      tags: [tickets]
+      summary: Delete tickets
+      responses:
+        "204":
+          description: No Content
+`)
+	writeFile(t, dir, "overlays/tickets.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/tickets'].delete"
+    update:
+      x-cli-ignore: true
+`)
+	writeFile(t, dir, "workflows/tickets.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Ticket workflows
+  version: 1.0.0
+workflows:
+  - workflowId: deleteWorkflow
+    steps:
+      - stepId: delete
+        operationPath: DELETE /tickets
+`)
+
+	cfg := config.Config{
+		CLI:  "1.0.0",
+		Mode: config.ModeConfig{Default: "discover"},
+		Sources: map[string]config.Source{
+			"ticketsSource": {
+				Type:    "openapi",
+				URI:     filepath.ToSlash(filepath.Join(dir, "tickets.openapi.yaml")),
+				Enabled: true,
+			},
+		},
+		Services: map[string]config.Service{
+			"tickets": {
+				Source:    "ticketsSource",
+				Alias:     "tickets",
+				Overlays:  []string{"./overlays/tickets.overlay.yaml"},
+				Workflows: []string{"./workflows/tickets.arazzo.yaml"},
+			},
+		},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{
+		Config:  cfg,
+		BaseDir: dir,
+	})
+	if err == nil {
+		t.Fatal("expected Build to fail when workflow references an ignored operation path")
+	}
+	if !strings.Contains(err.Error(), `workflow "deleteWorkflow" step "delete" references operationPath "DELETE /tickets"`) {
+		t.Fatalf("expected clear workflow path reference error, got %v", err)
+	}
+}
+
+func TestBuildRejectsWorkflowWhenAnyStepReferencesIgnoredOperation(t *testing.T) {
+	dir := t.TempDir()
+
+	writeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Example Tickets API
+  version: "2026-03-01"
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List tickets
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: createTicket
+      tags: [tickets]
+      summary: Create ticket
+      responses:
+        "201":
+          description: Created
+    delete:
+      operationId: deleteTickets
+      tags: [tickets]
+      summary: Delete tickets
+      responses:
+        "204":
+          description: No Content
+`)
+	writeFile(t, dir, "overlays/tickets.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/tickets'].delete"
+    update:
+      x-cli-ignore: true
+`)
+	writeFile(t, dir, "workflows/tickets.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Ticket workflows
+  version: 1.0.0
+workflows:
+  - workflowId: ticketLifecycle
+    steps:
+      - stepId: list
+        operationId: listTickets
+      - stepId: create
+        operationId: createTicket
+      - stepId: delete
+        operationId: deleteTickets
+`)
+
+	cfg := config.Config{
+		CLI:  "1.0.0",
+		Mode: config.ModeConfig{Default: "discover"},
+		Sources: map[string]config.Source{
+			"ticketsSource": {
+				Type:    "openapi",
+				URI:     filepath.ToSlash(filepath.Join(dir, "tickets.openapi.yaml")),
+				Enabled: true,
+			},
+		},
+		Services: map[string]config.Service{
+			"tickets": {
+				Source:    "ticketsSource",
+				Alias:     "tickets",
+				Overlays:  []string{"./overlays/tickets.overlay.yaml"},
+				Workflows: []string{"./workflows/tickets.arazzo.yaml"},
+			},
+		},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{
+		Config:  cfg,
+		BaseDir: dir,
+	})
+	if err == nil {
+		t.Fatal("expected Build to fail when any workflow step references an ignored operation")
+	}
+	if !strings.Contains(err.Error(), `workflow "ticketLifecycle" step "delete" references operationId "deleteTickets"`) {
+		t.Fatalf("expected error to point to the invalid step, got %v", err)
 	}
 }

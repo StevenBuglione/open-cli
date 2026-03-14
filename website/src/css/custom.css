@@ -1,0 +1,50 @@
+/**
+ * Shared theme adjustments for the oas-cli-go docs shell.
+ */
+
+:root {
+  --ifm-color-primary: #255fb0;
+  --ifm-color-primary-dark: #21559e;
+  --ifm-color-primary-darker: #1f5095;
+  --ifm-color-primary-darkest: #1a427a;
+  --ifm-color-primary-light: #2969c2;
+  --ifm-color-primary-lighter: #2b6ecb;
+  --ifm-color-primary-lightest: #4a86d9;
+  --ifm-code-font-size: 95%;
+  --ifm-global-radius: 12px;
+  --ifm-heading-color: #10233f;
+  --docusaurus-highlighted-code-line-bg: rgba(17, 24, 39, 0.08);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #7bb0ff;
+  --ifm-color-primary-dark: #61a1ff;
+  --ifm-color-primary-darker: #5399ff;
+  --ifm-color-primary-darkest: #2b82ff;
+  --ifm-color-primary-light: #95bfff;
+  --ifm-color-primary-lighter: #a3c7ff;
+  --ifm-color-primary-lightest: #cadfff;
+  --ifm-heading-color: #edf4ff;
+  --docusaurus-highlighted-code-line-bg: rgba(148, 163, 184, 0.16);
+}
+
+.hero--primary {
+  background: linear-gradient(180deg, #f7fbff 0%, #eef4fb 100%);
+  color: var(--ifm-font-color-base);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+[data-theme='dark'] .hero--primary {
+  background: linear-gradient(180deg, #13253f 0%, #102036 100%);
+  color: var(--ifm-color-white);
+  border-bottom-color: var(--ifm-color-emphasis-300);
+}
+
+.hero__subtitle {
+  color: inherit;
+  opacity: 0.88;
+}
+
+main {
+  background-color: var(--ifm-background-color);
+}

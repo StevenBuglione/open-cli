@@ -287,6 +287,9 @@ func loadWorkflows(baseDir string, refs []string, bindings map[string]string, fe
 				if toolID == "" {
 					toolID = bindings[step.OperationPath]
 				}
+				if toolID == "" {
+					return nil, nil, fmt.Errorf("workflow %q step %q references %s, but no matching tool is available in the catalog", workflow.WorkflowID, step.StepID, workflowReferenceLabel(step))
+				}
 				current.Steps = append(current.Steps, WorkflowStep{
 					StepID: step.StepID,
 					ToolID: toolID,
@@ -299,6 +302,17 @@ func loadWorkflows(baseDir string, refs []string, bindings map[string]string, fe
 		}
 	}
 	return workflows, fetches, nil
+}
+
+func workflowReferenceLabel(step workflowStepSpec) string {
+	switch {
+	case step.OperationID != "":
+		return fmt.Sprintf("operationId %q", step.OperationID)
+	case step.OperationPath != "":
+		return fmt.Sprintf("operationPath %q", step.OperationPath)
+	default:
+		return "an empty workflow reference"
+	}
 }
 
 func buildTools(service Service, document *openapi3.T, guidance map[string]Guidance, bindings map[string]string) ([]Tool, error) {
@@ -331,6 +345,9 @@ func buildTools(service Service, document *openapi3.T, guidance map[string]Guida
 				operationID = strings.ToLower(entry.method) + ":" + rawPath
 			}
 			toolID := service.ID + ":" + operationID
+			if operationBoolExtension(entry.op, "x-cli-ignore") {
+				continue
+			}
 			bindings[operationID] = toolID
 			bindings[entry.method+" "+rawPath] = toolID
 
@@ -355,20 +372,31 @@ func buildTools(service Service, document *openapi3.T, guidance map[string]Guida
 
 			pathParams, flags := extractParameters(item.Parameters, entry.op.Parameters)
 			safety := deriveSafety(entry.method, entry.op)
+			description := operationExtension(entry.op, "x-cli-description")
+			if description == "" {
+				description = entry.op.Description
+			}
 
 			tool := Tool{
 				ID:          toolID,
 				ServiceID:   service.ID,
-				OperationID: entry.op.OperationID,
+				OperationID: operationID,
 				Method:      entry.method,
 				Path:        rawPath,
 				Group:       group,
 				Command:     command,
+				Aliases:     operationStringSliceExtension(entry.op, "x-cli-aliases"),
 				Summary:     entry.op.Summary,
+				Description: description,
+				Hidden:      operationBoolExtension(entry.op, "x-cli-hidden"),
 				PathParams:  pathParams,
 				Flags:       flags,
+				RequestBody: extractRequestBody(entry.op),
 				Auth:        extractAuth(document, entry.op),
 				Safety:      safety,
+				Output:      operationStructExtension[OutputHints](entry.op, "x-cli-output"),
+				Pagination:  operationStructExtension[PaginationHints](entry.op, "x-cli-pagination"),
+				Retry:       operationStructExtension[RetryHints](entry.op, "x-cli-retry"),
 				Servers:     service.Servers,
 			}
 			if currentGuidance, ok := guidance[tool.ID]; ok {
@@ -698,6 +726,7 @@ func deriveSafety(method string, operation *openapi3.Operation) Safety {
 		ReadOnly:         method == "GET" || method == "HEAD" || method == "OPTIONS",
 		Destructive:      method == "DELETE",
 		RequiresApproval: false,
+		Idempotent:       method == "GET" || method == "HEAD" || method == "OPTIONS" || method == "PUT" || method == "DELETE",
 	}
 
 	if raw, ok := operation.Extensions["x-cli-safety"]; ok {
@@ -719,6 +748,44 @@ func operationExtension(operation *openapi3.Operation, key string) string {
 	return ""
 }
 
+func operationStringSliceExtension(operation *openapi3.Operation, key string) []string {
+	value, ok := decodeOperationExtension[[]string](operation, key)
+	if !ok {
+		return nil
+	}
+	return value
+}
+
+func operationBoolExtension(operation *openapi3.Operation, key string) bool {
+	value, ok := decodeOperationExtension[bool](operation, key)
+	return ok && value
+}
+
+func operationStructExtension[T any](operation *openapi3.Operation, key string) *T {
+	value, ok := decodeOperationExtension[T](operation, key)
+	if !ok {
+		return nil
+	}
+	return &value
+}
+
+func decodeOperationExtension[T any](operation *openapi3.Operation, key string) (T, bool) {
+	var zero T
+	raw, ok := operation.Extensions[key]
+	if !ok {
+		return zero, false
+	}
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return zero, false
+	}
+	var value T
+	if err := json.Unmarshal(data, &value); err != nil {
+		return zero, false
+	}
+	return value, true
+}
+
 func parameterExtension(parameter *openapi3.Parameter, key string) string {
 	if raw, ok := parameter.Extensions[key]; ok {
 		switch typed := raw.(type) {
@@ -727,6 +794,42 @@ func parameterExtension(parameter *openapi3.Parameter, key string) string {
 		}
 	}
 	return ""
+}
+
+func extractRequestBody(operation *openapi3.Operation) *RequestBody {
+	if operation.RequestBody == nil || operation.RequestBody.Value == nil {
+		return nil
+	}
+	body := &RequestBody{Required: operation.RequestBody.Value.Required}
+	contentTypes := make([]string, 0, len(operation.RequestBody.Value.Content))
+	for mediaType := range operation.RequestBody.Value.Content {
+		contentTypes = append(contentTypes, mediaType)
+	}
+	sort.Strings(contentTypes)
+	for _, mediaType := range contentTypes {
+		media := operation.RequestBody.Value.Content[mediaType]
+		content := RequestBodyContent{MediaType: mediaType}
+		if media != nil && media.Schema != nil {
+			content.Schema = marshalSchema(media.Schema)
+		}
+		body.ContentTypes = append(body.ContentTypes, content)
+	}
+	return body
+}
+
+func marshalSchema(ref *openapi3.SchemaRef) map[string]any {
+	if ref == nil {
+		return nil
+	}
+	data, err := json.Marshal(ref)
+	if err != nil {
+		return nil
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(data, &schema); err != nil {
+		return nil
+	}
+	return schema
 }
 
 func normalizeCommandName(value string) string {

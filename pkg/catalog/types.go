@@ -73,11 +73,43 @@ type Safety struct {
 	Destructive      bool `json:"destructive"`
 	ReadOnly         bool `json:"readOnly"`
 	RequiresApproval bool `json:"requiresApproval"`
+	Idempotent       bool `json:"idempotent"`
+}
+
+type GuidanceExample struct {
+	Goal    string `json:"goal"`
+	Command string `json:"command"`
 }
 
 type Guidance struct {
-	WhenToUse []string `json:"whenToUse,omitempty"`
-	AvoidWhen []string `json:"avoidWhen,omitempty"`
+	WhenToUse []string          `json:"whenToUse,omitempty"`
+	AvoidWhen []string          `json:"avoidWhen,omitempty"`
+	Examples  []GuidanceExample `json:"examples,omitempty"`
+}
+
+type RequestBodyContent struct {
+	MediaType string         `json:"mediaType"`
+	Schema    map[string]any `json:"schema,omitempty"`
+}
+
+type RequestBody struct {
+	Required     bool                 `json:"required"`
+	ContentTypes []RequestBodyContent `json:"contentTypes,omitempty"`
+}
+
+type OutputHints struct {
+	DefaultFields []string `json:"defaultFields,omitempty"`
+	Redactions    []string `json:"redactions,omitempty"`
+}
+
+type PaginationHints struct {
+	Style       string `json:"style,omitempty"`
+	CursorParam string `json:"cursorParam,omitempty"`
+}
+
+type RetryHints struct {
+	Recommended    bool `json:"recommended,omitempty"`
+	LocationHeader bool `json:"locationHeader,omitempty"`
 }
 
 type Tool struct {
@@ -88,11 +120,18 @@ type Tool struct {
 	Path        string            `json:"path"`
 	Group       string            `json:"group"`
 	Command     string            `json:"command"`
+	Aliases     []string          `json:"aliases,omitempty"`
 	Summary     string            `json:"summary,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Hidden      bool              `json:"hidden,omitempty"`
 	PathParams  []Parameter       `json:"pathParams,omitempty"`
 	Flags       []Parameter       `json:"flags,omitempty"`
+	RequestBody *RequestBody      `json:"requestBody,omitempty"`
 	Auth        []AuthRequirement `json:"auth,omitempty"`
 	Safety      Safety            `json:"safety"`
+	Output      *OutputHints      `json:"output,omitempty"`
+	Pagination  *PaginationHints  `json:"pagination,omitempty"`
+	Retry       *RetryHints       `json:"retry,omitempty"`
 	Guidance    *Guidance         `json:"guidance,omitempty"`
 	Servers     []string          `json:"servers,omitempty"`
 }

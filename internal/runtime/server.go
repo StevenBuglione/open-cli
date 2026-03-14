@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	stdruntime "runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/StevenBuglione/oas-cli-go/pkg/audit"
@@ -20,17 +22,21 @@ import (
 )
 
 type Options struct {
-	AuditPath  string
-	CacheDir   string
-	HTTPClient *http.Client
-	Observer   obs.Observer
+	AuditPath         string
+	CacheDir          string
+	DefaultConfigPath string
+	HTTPClient        *http.Client
+	Observer          obs.Observer
+	KeychainResolver  func(string) (string, error)
 }
 
 type Server struct {
-	auditStore *audit.FileStore
-	client     *http.Client
-	cacheDir   string
-	observer   obs.Observer
+	auditStore        *audit.FileStore
+	client            *http.Client
+	cacheDir          string
+	defaultConfigPath string
+	observer          obs.Observer
+	keychainResolver  func(string) (string, error)
 }
 
 type effectiveCatalogResponse struct {
@@ -94,10 +100,12 @@ func NewServer(options Options) *Server {
 		options.Observer = obs.NewNop()
 	}
 	return &Server{
-		auditStore: audit.NewFileStore(options.AuditPath),
-		client:     options.HTTPClient,
-		cacheDir:   options.CacheDir,
-		observer:   options.Observer,
+		auditStore:        audit.NewFileStore(options.AuditPath),
+		client:            options.HTTPClient,
+		cacheDir:          options.CacheDir,
+		defaultConfigPath: options.DefaultConfigPath,
+		observer:          options.Observer,
+		keychainResolver:  options.KeychainResolver,
 	}
 }
 
@@ -187,7 +195,7 @@ func (server *Server) handleExecuteTool(w http.ResponseWriter, r *http.Request) 
 		PathArgs: request.PathArgs,
 		Flags:    request.Flags,
 		Body:     request.Body,
-		Auth:     resolveAuth(cfg.Config, *tool),
+		Auth:     server.resolveAuth(cfg.Config, *tool),
 	})
 	if err != nil {
 		finishErr = err
@@ -332,6 +340,9 @@ func (server *Server) handleAuditEvents(w http.ResponseWriter, _ *http.Request) 
 
 func (server *Server) loadCatalog(ctx context.Context, configPath string, forceRefresh bool) (*config.EffectiveConfig, *catalog.NormalizedCatalog, error) {
 	if configPath == "" {
+		configPath = server.defaultConfigPath
+	}
+	if configPath == "" {
 		return nil, nil, fmt.Errorf("config query parameter is required")
 	}
 	if _, err := os.Stat(configPath); err != nil {
@@ -411,14 +422,14 @@ func requestID(request *http.Request) string {
 	return strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
 }
 
-func resolveAuth(cfg config.Config, tool catalog.Tool) []httpexec.AuthScheme {
+func (server *Server) resolveAuth(cfg config.Config, tool catalog.Tool) []httpexec.AuthScheme {
 	var auth []httpexec.AuthScheme
 	for _, requirement := range tool.Auth {
 		secret, ok := cfg.Secrets[requirement.Name]
 		if !ok {
 			continue
 		}
-		value, err := resolveSecret(cfg.Policy, secret)
+		value, err := resolveSecret(cfg.Policy, secret, server.keychainResolver)
 		if err != nil {
 			continue
 		}
@@ -433,13 +444,18 @@ func resolveAuth(cfg config.Config, tool catalog.Tool) []httpexec.AuthScheme {
 	return auth
 }
 
-func resolveSecret(policyConfig config.PolicyConfig, secret config.SecretRef) (string, error) {
+func resolveSecret(policyConfig config.PolicyConfig, secret config.SecretRef, keychainResolver func(string) (string, error)) (string, error) {
 	switch secret.Type {
 	case "env":
 		return os.Getenv(secret.Value), nil
 	case "file":
 		data, err := os.ReadFile(secret.Value)
 		return string(data), err
+	case "osKeychain":
+		if keychainResolver == nil {
+			keychainResolver = defaultKeychainResolver
+		}
+		return keychainResolver(secret.Value)
 	case "exec":
 		if !policyConfig.AllowExecSecrets {
 			return "", fmt.Errorf("exec secrets are disabled")
@@ -455,4 +471,33 @@ func resolveSecret(policyConfig config.PolicyConfig, secret config.SecretRef) (s
 	default:
 		return "", fmt.Errorf("unsupported secret type %q", secret.Type)
 	}
+}
+
+func defaultKeychainResolver(reference string) (string, error) {
+	service, account, err := splitKeychainReference(reference)
+	if err != nil {
+		return "", err
+	}
+	switch stdruntime.GOOS {
+	case "darwin":
+		output, err := exec.Command("security", "find-generic-password", "-s", service, "-a", account, "-w").Output()
+		return strings.TrimSpace(string(output)), err
+	case "linux":
+		output, err := exec.Command("secret-tool", "lookup", "service", service, "account", account).Output()
+		return strings.TrimSpace(string(output)), err
+	default:
+		return "", fmt.Errorf("osKeychain secrets are unsupported on %s", stdruntime.GOOS)
+	}
+}
+
+func splitKeychainReference(reference string) (string, string, error) {
+	for _, separator := range []string{"/", ":"} {
+		if strings.Contains(reference, separator) {
+			parts := strings.SplitN(reference, separator, 2)
+			if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+				return parts[0], parts[1], nil
+			}
+		}
+	}
+	return "", "", fmt.Errorf("osKeychain secret reference must be service/account")
 }

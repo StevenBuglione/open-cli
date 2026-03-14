@@ -1,54 +1,118 @@
 # oas-cli-go
 
-Go reference implementation for OAS-CLI, including:
+`oas-cli-go` is the Go reference implementation of OAS-CLI. It turns OpenAPI documents, discovery metadata, overlays, and policy into a local command surface that humans and agents can use safely.
 
-- `oascli`: the CLI surface that renders effective tool commands and delegates execution
-- `oasclird`: the local runtime that performs discovery, normalization, policy enforcement, auth resolution, and audit logging
+- **Full docs:** https://stevenbuglione.github.io/oas-cli-go/
+- **Getting started:** https://stevenbuglione.github.io/oas-cli-go/docs/getting-started/intro
+- **Development guide:** https://stevenbuglione.github.io/oas-cli-go/docs/development/overview
+- **Verification:** `make verify` for the Go implementation, plus `cd website && npm ci && npm run build` when docs change
 
-## Features
+## What this repository ships
 
-- `.cli.json` scope merging with deny-wins policy semantics
-- Managed/User/Project/Local scope file discovery
-- RFC 9727 API catalog discovery
-- RFC 8631 service discovery via `Link` headers
-- OpenAPI ingestion with overlay application
-- Normalized Tool Catalog generation with stable tool IDs
-- agent profiles, curated mode enforcement, and approval gates
-- audited HTTP execution with bearer, basic, and API key auth adapters
-- skill manifest guidance and Arazzo workflow loading
+The project is intentionally split into two binaries:
 
-## Quick Start
+| Binary | Purpose | Use it when |
+| --- | --- | --- |
+| `oascli` | Operator-facing CLI that renders the effective catalog, exposes dynamic commands, and forwards execution requests. | You want to inspect services, explain tools, render schemas, run workflows, or execute a tool. |
+| `oasclird` | Local runtime daemon that loads config, performs discovery, normalizes catalogs, resolves auth, enforces policy, executes upstream HTTP calls, and records audit events. | You want a reusable runtime process instead of starting one inside each CLI invocation. |
+
+The common flow looks like this:
+
+1. `oascli` resolves a runtime target or starts an embedded runtime.
+2. The runtime loads `.cli.json`, merges scopes, and validates the effective config.
+3. Discovery loads OpenAPI descriptions, overlays, workflows, and related metadata.
+4. `oascli` renders catalog-driven commands while `oasclird` remains the enforcement point for policy, auth, retries, cache state, and audit logging.
+
+If you want the deeper model, start with the docs site: https://stevenbuglione.github.io/oas-cli-go/
+
+## Install from source
+
+There are no packaged installers in this repository today; the documented path is to build from source.
+
+### Prerequisites
+
+- Go **1.25.1+**
+- Node.js **18+** only if you need to build the docs site under `website/`
+
+### Build the binaries
+
+From the repository root:
 
 ```bash
-make test
-go run ./cmd/oasclird --addr 127.0.0.1:8765
+go build -o ./bin/oascli ./cmd/oascli
+go build -o ./bin/oasclird ./cmd/oasclird
+```
+
+Or install them into your Go bin directory:
+
+```bash
+go install ./cmd/oascli
+go install ./cmd/oasclird
+```
+
+## Run it
+
+### Daemon mode
+
+Start the runtime:
+
+```bash
+go run ./cmd/oasclird --config /path/to/.cli.json --addr 127.0.0.1:8765
+```
+
+In another shell, point the CLI at that runtime:
+
+```bash
 go run ./cmd/oascli --runtime http://127.0.0.1:8765 --config /path/to/.cli.json catalog list --format pretty
 ```
 
-## Verification
+### Embedded mode
+
+For one-off inspection or local experimentation, run the runtime in-process:
+
+```bash
+go run ./cmd/oascli --embedded --config /path/to/.cli.json catalog list --format pretty
+```
+
+For a fuller walkthrough, see the quickstart: https://stevenbuglione.github.io/oas-cli-go/docs/getting-started/quickstart
+
+## Verify changes
+
+### Go implementation
 
 ```bash
 make verify
 ```
 
-## Layout
+That target formats Go code, runs `go test ./...`, and builds both binaries.
 
-- `cmd/oascli`: CLI entrypoint
-- `cmd/oasclird`: runtime entrypoint
-- `internal/runtime`: runtime HTTP API
-- `pkg/config`: config loading, merge, and validation
-- `pkg/discovery`: RFC 9727 and RFC 8631 discovery
-- `pkg/openapi`: OpenAPI document loading
-- `pkg/overlay`: overlay parsing and application
-- `pkg/catalog`: normalized catalog generation
-- `pkg/policy`: execution-time policy decisions
-- `pkg/exec`: HTTP request execution
-- `pkg/audit`: audit event persistence
+### Docs site
 
-## CLI Body Input
+When `README.md`, `website/`, or repo-facing docs change, also verify the Docusaurus site:
 
-`oascli` supports all v1 request body forms required by the profile:
+```bash
+cd website
+npm ci
+npm run build
+```
 
-- `--body '{"key":"value"}'`
-- `--body @request.json`
-- `--body -` to read the body from stdin
+## Where the full docs live
+
+The Docusaurus site is the long-form documentation for this repo:
+
+- Introduction: https://stevenbuglione.github.io/oas-cli-go/docs/getting-started/intro
+- Installation: https://stevenbuglione.github.io/oas-cli-go/docs/getting-started/installation
+- CLI and runtime behavior: https://stevenbuglione.github.io/oas-cli-go/docs/cli/overview
+- Configuration, discovery, and security: https://stevenbuglione.github.io/oas-cli-go/docs/configuration/overview
+- Contributor guidance: https://stevenbuglione.github.io/oas-cli-go/docs/development/overview
+
+## Repository guide
+
+- `cmd/oascli`: CLI entrypoint and runtime client
+- `cmd/oasclird`: daemon entrypoint
+- `internal/runtime`: runtime HTTP API and wiring
+- `pkg/`: reusable packages for config, discovery, catalog building, policy, execution, caching, audit, and observability
+- `website/`: Docusaurus site content, navigation, and landing page
+- `.github/workflows/`: CI and Pages automation
+
+If you change behavior, update the owning Go package tests and the relevant docs page in the same change whenever possible.

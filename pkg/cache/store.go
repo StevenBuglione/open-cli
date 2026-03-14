@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -73,10 +74,12 @@ func (store *FileStore) Save(key string, metadata Metadata, body []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(store.metadataPath(key), metadataBytes, 0o644); err != nil {
+	metadataPath := store.metadataPath(key)
+	bodyPath := store.bodyPath(key)
+	if err := writeAtomically(metadataPath, metadataBytes); err != nil {
 		return err
 	}
-	return os.WriteFile(store.bodyPath(key), body, 0o644)
+	return writeAtomically(bodyPath, body)
 }
 
 func (store *FileStore) Delete(key string) error {
@@ -99,4 +102,12 @@ func (store *FileStore) Clear() error {
 func digestKey(key string) string {
 	sum := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(sum[:])
+}
+
+func writeAtomically(path string, data []byte) error {
+	tempPath := fmt.Sprintf("%s.%d.tmp", path, os.Getpid())
+	if err := os.WriteFile(tempPath, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tempPath, path)
 }
