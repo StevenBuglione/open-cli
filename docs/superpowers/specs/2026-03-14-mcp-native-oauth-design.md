@@ -279,6 +279,15 @@ The transport client owns wire-level MCP concerns only. It does not know about O
 - `sse` and `streamable-http` may require auth before discovery. The transport client asks the auth engine for a transport application plan before `ListTools` and reapplies the same config on later `CallTool` requests.
 - Static non-Authorization headers from config are attached to both discovery and execution requests.
 
+**Timeout and remote-error rules:**
+
+- stdio startup timeout defaults to 10 seconds.
+- remote connect timeout defaults to 10 seconds.
+- `ListTools` timeout defaults to 30 seconds unless the caller context is sooner.
+- `CallTool` timeout follows the request context from runtime execution.
+- timeouts surface as typed discovery or execution timeout errors that name the transport and source.
+- broken remote sessions are treated as non-retryable within the current request in v1.
+
 ### 3. MCP-to-OpenAPI catalog adapter
 
 **Purpose:** Turn MCP tool schemas into synthetic OpenAPI so the existing catalog builder can keep doing the heavy lifting.
@@ -301,6 +310,16 @@ The transport client owns wire-level MCP concerns only. It does not know about O
 - Operation IDs are stable and derived as `<service>.<tool>` before slugification, so workflows and guidance can bind to a durable identifier.
 - If two generated operations would collide after normalization, the runtime appends a deterministic short hash of `<source-name>::<original-tool-name>` to the synthetic operation ID while preserving the unmodified MCP tool name in backend metadata.
 - The final post-collision operation ID is the externally visible tool ID used by workflows, guidance, policy, and audit records.
+
+**Adapter to catalog metadata handoff:**
+
+- Synthetic operations carry these vendor extensions:
+  - `x-oascli-backend-kind: "mcp"`
+  - `x-oascli-mcp-source: <source-name>`
+  - `x-oascli-mcp-tool: <original-tool-name>`
+  - `x-oascli-mcp-input-wrapper: true|false`
+- `pkg/catalog/build.go` copies those fields into normalized execution metadata without reinterpretation.
+- `pkg/exec/mcp.go` reads only the normalized execution metadata, never raw vendor extensions.
 
 **Schema-mapping contract:**
 
@@ -423,6 +442,14 @@ The implementation in this feature intentionally stops there. If an OpenAPI docu
 
 **OAuth field defaults and validation:**
 
+**OAuth mode validation matrix:**
+
+| Mode | Required fields | Optional fields | Notes |
+| --- | --- | --- | --- |
+| `authorizationCode` | `clientId` plus either `issuer` or `authorizationURL` + `tokenURL` | `clientSecret`, `scopes`, `audience`, `interactive`, `callbackPort`, `redirectURI`, `tokenStorage` | `clientSecret` is optional to allow PKCE public clients |
+| `clientCredentials` | `clientId`, `clientSecret`, plus either `issuer` or `tokenURL` | `scopes`, `audience`, `tokenStorage` | `interactive`, `callbackPort`, and `redirectURI` are invalid |
+| `openIdConnect` | not a direct mode; use `authorizationCode` or `clientCredentials` with `issuer` or scheme-provided `openIdConnectUrl` | same as the chosen concrete mode | OIDC discovery fills auth/token endpoints |
+
 - `redirectURI`
   - optional exact loopback redirect URI for `authorizationCode`
   - when present, it overrides `callbackPort`
@@ -457,6 +484,14 @@ The implementation in this feature intentionally stops there. If an OpenAPI docu
 - If the provider returns no refresh token, the runtime treats the token as non-refreshable and reacquires it interactively on expiry.
 - If an OpenAPI `oauth2` scheme declares multiple flows, the secret config must set `mode` explicitly and that mode must name one of the declared flows; otherwise execution fails with an ambiguous-flow error before token acquisition.
 
+**Refresh and reacquire failure behavior:**
+
+- `invalid_grant` or revoked consent clears the cached token for that provider.
+- If the affected provider is interactive and `interactive == true`, runtime reports reauthorization required and starts a fresh auth-code flow on the next attempt.
+- If the affected provider is non-interactive, runtime fails with a reauthorization-required error and does not prompt.
+- transient provider failures (timeouts, 5xx, network errors) do not clear the cached token; they surface as retryable auth errors at the request layer.
+- if both refresh and reacquire fail in one request, the final surfaced error prefers the reacquire failure and includes the refresh failure as context.
+
 **OAuth resolution matrix:**
 
 | Tool requirement | Runtime lookup key | Endpoint source | Effective scopes | Refresh behavior |
@@ -486,6 +521,7 @@ The documentation and examples must show both lookup shapes:
 - Token cache files live under the existing per-instance state directory.
 - Each cached token key is derived from the stable tuple `{auth-kind, issuer, client-id, sorted-scopes, audience, scheme-name-or-source-name}`.
 - The on-disk filename uses a readable slug prefix plus a hash suffix so collisions stay impossible while manual inspection remains practical.
+- The cache-key normalization uses lower-cased issuer URLs without trailing slashes, the exact client ID, sorted unique scopes, optional audience, and either the scheme name or source name.
 
 **Storage and isolation:**
 
@@ -551,6 +587,7 @@ The documentation and examples must show both lookup shapes:
 - Access tokens themselves are never part of a cache key.
 - `refresh` invalidates the generated MCP catalog snapshot and rebuilds it through fresh discovery.
 - Tool execution responses from MCP are never cached in v1.
+- The deterministic tool-collision hash is the first 10 lowercase hex characters of `sha256(<source-name>::<original-tool-name>)`.
 
 ## Testing Strategy
 
