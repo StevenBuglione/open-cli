@@ -24,28 +24,17 @@ import json
 import sys
 
 def read_message():
-    headers = {}
-    while True:
-        line = sys.stdin.buffer.readline()
-        if not line:
-            return None
-        if line in (b"\n", b"\r\n"):
-            break
-        key, value = line.decode("utf-8").split(":", 1)
-        headers[key.strip().lower()] = value.strip()
-    length = int(headers.get("content-length", "0"))
-    if length <= 0:
+    line = sys.stdin.readline()
+    if not line:
         return None
-    payload = sys.stdin.buffer.read(length)
-    if not payload:
+    line = line.strip()
+    if not line:
         return None
-    return json.loads(payload.decode("utf-8"))
+    return json.loads(line)
 
 def write_message(message):
-    encoded = json.dumps(message).encode("utf-8")
-    sys.stdout.buffer.write(f"Content-Length: {len(encoded)}\r\n\r\n".encode("utf-8"))
-    sys.stdout.buffer.write(encoded)
-    sys.stdout.buffer.flush()
+    sys.stdout.write(json.dumps(message) + "\n")
+    sys.stdout.flush()
 
 while True:
     message = read_message()
@@ -125,6 +114,35 @@ while True:
 	}
 	if structured["arguments"] != "hello" {
 		t.Fatalf("expected wrapped primitive input to be unwrapped to string, got %#v", structured["arguments"])
+	}
+}
+
+func TestExecuteMCPRejectsMalformedWrappedInput(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "scalar body", body: `"hello"`},
+		{name: "missing input field", body: `{}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := toolsexec.ExecuteMCP(context.Background(), toolsexec.MCPRequest{
+				Tool: catalog.Tool{
+					ID:          "docs:echo",
+					OperationID: "echo",
+					Backend: &catalog.ToolBackend{
+						Kind:         "mcp",
+						InputWrapped: true,
+					},
+				},
+				Body: []byte(tc.body),
+			})
+			if err == nil {
+				t.Fatalf("expected malformed wrapped input to be rejected")
+			}
+		})
 	}
 }
 

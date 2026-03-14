@@ -36,6 +36,7 @@ func main() {
 	server := runtime.NewServer(runtime.Options{
 		AuditPath:         *auditPath,
 		CacheDir:          *cacheDir,
+		StateDir:          paths.StateDir,
 		DefaultConfigPath: *configPath,
 	})
 	listenAddr := *addr

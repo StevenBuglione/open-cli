@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 	"sort"
@@ -77,7 +78,7 @@ func Build(ctx context.Context, options BuildOptions) (*NormalizedCatalog, error
 			continue
 		}
 		referencedSources[serviceConfig.Source] = true
-		fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, serviceID, serviceConfig, sourceConfig, fingerprint, fetcher, cachePolicyForSource(sourceConfig, options.ForceRefresh))
+		fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, serviceID, serviceConfig, sourceConfig, fingerprint, fetcher, cachePolicyForSource(sourceConfig, options.ForceRefresh), options.StateDir, options.HTTPClient)
 		if err != nil {
 			return nil, err
 		}
@@ -103,20 +104,20 @@ func Build(ctx context.Context, options BuildOptions) (*NormalizedCatalog, error
 					URI:     discoveredService.URL,
 					Enabled: true,
 					Refresh: sourceConfig.Refresh,
-				}, fingerprint, fetcher, policy)
+				}, fingerprint, fetcher, policy, options.StateDir, options.HTTPClient)
 				if err != nil {
 					return nil, err
 				}
 				recordSource(sourceRecords, sourceID, sourceConfig.Type, sourceConfig.URI, string(discovery.ProvenanceRFC9727), fetches)
 			}
 		case "serviceRoot":
-			fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", config.Service{Source: sourceID}, sourceConfig, fingerprint, fetcher, policy)
+			fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", config.Service{Source: sourceID}, sourceConfig, fingerprint, fetcher, policy, options.StateDir, options.HTTPClient)
 			if err != nil {
 				return nil, err
 			}
 			recordSource(sourceRecords, sourceID, sourceConfig.Type, sourceConfig.URI, string(discovery.ProvenanceRFC8631), fetches)
 		case "openapi":
-			fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", config.Service{Source: sourceID}, sourceConfig, fingerprint, fetcher, policy)
+			fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", config.Service{Source: sourceID}, sourceConfig, fingerprint, fetcher, policy, options.StateDir, options.HTTPClient)
 			if err != nil {
 				return nil, err
 			}
@@ -317,7 +318,7 @@ func workflowReferenceLabel(step workflowStepSpec) string {
 	}
 }
 
-func buildTools(service Service, document *openapi3.T, guidance map[string]Guidance, bindings map[string]string) ([]Tool, error) {
+func buildTools(service Service, document *openapi3.T, guidance map[string]Guidance, bindings map[string]string, allowBackendMetadata bool) ([]Tool, error) {
 	var tools []Tool
 	paths := document.Paths.Map()
 	sortedPaths := make([]string, 0, len(paths))
@@ -379,6 +380,10 @@ func buildTools(service Service, document *openapi3.T, guidance map[string]Guida
 				description = entry.op.Description
 			}
 
+			var backend *ToolBackend
+			if allowBackendMetadata {
+				backend = operationStructExtension[ToolBackend](entry.op, "x-oascli-backend")
+			}
 			tool := Tool{
 				ID:          toolID,
 				ServiceID:   service.ID,
@@ -400,6 +405,7 @@ func buildTools(service Service, document *openapi3.T, guidance map[string]Guida
 				Pagination:  operationStructExtension[PaginationHints](entry.op, "x-cli-pagination"),
 				Retry:       operationStructExtension[RetryHints](entry.op, "x-cli-retry"),
 				Servers:     service.Servers,
+				Backend:     backend,
 			}
 			if currentGuidance, ok := guidance[tool.ID]; ok {
 				tool.Guidance = &currentGuidance
@@ -411,10 +417,10 @@ func buildTools(service Service, document *openapi3.T, guidance map[string]Guida
 	return tools, nil
 }
 
-func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy) ([]SourceFetch, error) {
+func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy, stateDir string, httpClient *http.Client) ([]SourceFetch, error) {
 	method := provenanceMethodForSourceType(sourceConfig.Type)
 	if sourceConfig.Type == "mcp" {
-		return buildMCPServiceCatalog(ctx, ntc, cfg, baseDir, serviceID, serviceConfig, sourceConfig, fingerprint, fetcher, policy)
+		return buildMCPServiceCatalog(ctx, ntc, cfg, baseDir, serviceID, serviceConfig, sourceConfig, fingerprint, fetcher, policy, stateDir, httpClient)
 	}
 	openapiRef, metadataRefs, fetches, err := resolveServiceSource(ctx, baseDir, sourceConfig, fetcher, policy)
 	if err != nil {
@@ -456,7 +462,7 @@ func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *confi
 	ntc.Services = append(ntc.Services, service)
 
 	operationBindings := map[string]string{}
-	tools, err := buildTools(service, document.Document, guidance, operationBindings)
+	tools, err := buildTools(service, document.Document, guidance, operationBindings, false)
 	if err != nil {
 		return nil, err
 	}
@@ -471,8 +477,8 @@ func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *confi
 	return fetches, nil
 }
 
-func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy) ([]SourceFetch, error) {
-	client, err := mcpclient.Open(sourceConfig, ctx)
+func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy, stateDir string, httpClient *http.Client) ([]SourceFetch, error) {
+	client, err := mcpclient.Open(sourceConfig, cfg.Secrets, cfg.Policy, stateDir, httpClient, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -483,7 +489,7 @@ func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *co
 		return nil, err
 	}
 
-	document, err := mcpopenapi.BuildDocument(serviceID, descriptors, sourceConfig.DisabledTools)
+	document, err := mcpopenapi.BuildDocument(serviceID, serviceConfig.Source, sourceConfig.Transport.Type, descriptors, sourceConfig.DisabledTools)
 	if err != nil {
 		return nil, err
 	}
@@ -512,7 +518,7 @@ func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *co
 	ntc.Services = append(ntc.Services, service)
 
 	operationBindings := map[string]string{}
-	tools, err := buildTools(service, document, guidance, operationBindings)
+	tools, err := buildTools(service, document, guidance, operationBindings, true)
 	if err != nil {
 		return nil, err
 	}
@@ -673,15 +679,43 @@ func extractAuth(document *openapi3.T, operation *openapi3.Operation) []AuthRequ
 				continue
 			}
 			requirements = append(requirements, AuthRequirement{
-				Name:      schemeName,
-				Type:      schemeRef.Value.Type,
-				Scheme:    schemeRef.Value.Scheme,
-				In:        schemeRef.Value.In,
-				ParamName: schemeRef.Value.Name,
+				Name:             schemeName,
+				Type:             schemeRef.Value.Type,
+				Scheme:           schemeRef.Value.Scheme,
+				In:               schemeRef.Value.In,
+				ParamName:        schemeRef.Value.Name,
+				Scopes:           append([]string(nil), item[schemeName]...),
+				OAuthFlows:       extractOAuthFlows(schemeRef.Value),
+				OpenIDConnectURL: schemeRef.Value.OpenIdConnectUrl,
 			})
 		}
 	}
 	return requirements
+}
+
+func extractOAuthFlows(scheme *openapi3.SecurityScheme) []OAuthFlow {
+	if scheme == nil || scheme.Flows == nil {
+		return nil
+	}
+
+	var flows []OAuthFlow
+	appendFlow := func(mode string, flow *openapi3.OAuthFlow) {
+		if flow == nil {
+			return
+		}
+		flows = append(flows, OAuthFlow{
+			Mode:             mode,
+			AuthorizationURL: flow.AuthorizationURL,
+			TokenURL:         flow.TokenURL,
+			RefreshURL:       flow.RefreshURL,
+		})
+	}
+
+	appendFlow("authorizationCode", scheme.Flows.AuthorizationCode)
+	appendFlow("clientCredentials", scheme.Flows.ClientCredentials)
+	appendFlow("implicit", scheme.Flows.Implicit)
+	appendFlow("password", scheme.Flows.Password)
+	return flows
 }
 
 func extractServers(document *openapi3.T) []string {

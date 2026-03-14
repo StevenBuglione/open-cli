@@ -14,7 +14,7 @@ type rawConfig struct {
 	Curation   *rawCurationConfig      `json:"curation,omitempty"`
 	Agents     *rawAgentsConfig        `json:"agents,omitempty"`
 	Policy     *rawPolicyConfig        `json:"policy,omitempty"`
-	Secrets    map[string]SecretRef    `json:"secrets,omitempty"`
+	Secrets    map[string]Secret       `json:"secrets,omitempty"`
 }
 
 type rawSource struct {
@@ -67,7 +67,7 @@ func LoadEffective(options LoadOptions) (*EffectiveConfig, error) {
 			Services: map[string]Service{},
 			Curation: CurationConfig{ToolSets: map[string]ToolSet{}},
 			Agents:   AgentsConfig{Profiles: map[string]AgentProfile{}},
-			Secrets:  map[string]SecretRef{},
+			Secrets:  map[string]Secret{},
 		},
 		ScopePaths: map[Scope]string{},
 	}

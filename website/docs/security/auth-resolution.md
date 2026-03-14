@@ -11,14 +11,21 @@ Auth resolution happens inside the runtime just before tool execution.
 The catalog builder inspects operation-level or document-level security requirements and records entries such as:
 
 - scheme name (`bearerAuth`)
-- type (`http`, `apiKey`, ...)
+- type (`http`, `apiKey`, `oauth2`, `openIdConnect`)
 - scheme (`bearer`, `basic`, ...)
 - location (`header`, `query`, `cookie`)
 - parameter name for API keys
+- required scopes for OAuth-backed schemes
+- OAuth flow metadata such as token and authorization endpoints
 
 ## Step 2: match by security scheme name
 
 At execution time, the runtime looks up each auth requirement by name in `config.secrets`.
+
+Lookup order is:
+
+1. `secrets["<service>.<scheme>"]`
+2. `secrets["<scheme>"]`
 
 Example:
 
@@ -61,6 +68,7 @@ The current executor automatically applies:
 - HTTP basic auth
 - API keys in headers
 - API keys in query parameters
+- OAuth bearer tokens acquired through `oauth2` or `openIdConnect`
 
 ## Important limitations
 
@@ -68,9 +76,11 @@ The current executor automatically applies:
 
 `apiKey` security schemes with `in: cookie` are normalized into catalog metadata, but the execution layer does not currently apply them automatically as auth.
 
-### Other HTTP auth schemes are metadata only
+### Unsupported OAuth flows fail explicitly
 
-Only `bearer` and `basic` under `type: http` are actively applied.
+`authorizationCode` and `clientCredentials` are supported.
+
+`implicit` and `password` are intentionally rejected with runtime errors.
 
 ### Alternative security requirements are flattened
 

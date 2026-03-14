@@ -53,28 +53,17 @@ TOOLS = [
 ]
 
 def read_message():
-    headers = {}
-    while True:
-        line = sys.stdin.buffer.readline()
-        if not line:
-            return None
-        if line in (b"\n", b"\r\n"):
-            break
-        key, value = line.decode("utf-8").split(":", 1)
-        headers[key.strip().lower()] = value.strip()
-    length = int(headers.get("content-length", "0"))
-    if length <= 0:
+    line = sys.stdin.readline()
+    if not line:
         return None
-    payload = sys.stdin.buffer.read(length)
-    if not payload:
+    line = line.strip()
+    if not line:
         return None
-    return json.loads(payload.decode("utf-8"))
+    return json.loads(line)
 
 def write_message(message):
-    encoded = json.dumps(message).encode("utf-8")
-    sys.stdout.buffer.write(f"Content-Length: {len(encoded)}\r\n\r\n".encode("utf-8"))
-    sys.stdout.buffer.write(encoded)
-    sys.stdout.buffer.flush()
+    sys.stdout.write(json.dumps(message) + "\n")
+    sys.stdout.flush()
 
 while True:
     message = read_message()
@@ -153,6 +142,18 @@ while True:
 	echoTool := ntc.FindTool("docs:echo")
 	if echoTool == nil {
 		t.Fatalf("expected echo MCP tool to be present")
+	}
+	if echoTool.Backend == nil {
+		t.Fatalf("expected MCP backend metadata on synthetic tool")
+	}
+	if echoTool.Backend.Kind != "mcp" || echoTool.Backend.SourceID != "docs" || echoTool.Backend.ToolName != "echo" {
+		t.Fatalf("unexpected MCP backend metadata: %#v", echoTool.Backend)
+	}
+	if !echoTool.Backend.InputWrapped {
+		t.Fatalf("expected primitive MCP tool input to record wrapper metadata")
+	}
+	if echoTool.Backend.Transport != "stdio" {
+		t.Fatalf("expected stdio transport backend metadata, got %#v", echoTool.Backend)
 	}
 	if echoTool.RequestBody == nil || len(echoTool.RequestBody.ContentTypes) != 1 {
 		t.Fatalf("expected wrapped request body for primitive MCP tool input, got %#v", echoTool.RequestBody)

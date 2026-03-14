@@ -526,19 +526,6 @@ func validateOAuthConfig(path string, oauth *OAuthConfig) []Diagnostic {
 
 	var diagnostics []Diagnostic
 	switch oauth.Mode {
-	case "authorizationCode":
-		if oauth.ClientID == nil {
-			diagnostics = append(diagnostics, Diagnostic{
-				Path:    path + ".clientId",
-				Message: "is required for authorizationCode oauth",
-			})
-		}
-		if oauth.Issuer == "" && (oauth.AuthorizationURL == "" || oauth.TokenURL == "") {
-			diagnostics = append(diagnostics, Diagnostic{
-				Path:    path,
-				Message: "requires issuer or authorizationURL and tokenURL",
-			})
-		}
 	case "clientCredentials":
 		if oauth.ClientID == nil {
 			diagnostics = append(diagnostics, Diagnostic{
@@ -586,6 +573,11 @@ func validateOAuthConfig(path string, oauth *OAuthConfig) []Diagnostic {
 		diagnostics = append(diagnostics, Diagnostic{
 			Path:    path + ".mode",
 			Message: "is not a direct oauth mode",
+		})
+	default:
+		diagnostics = append(diagnostics, Diagnostic{
+			Path:    path + ".mode",
+			Message: "must be clientCredentials for mcp transport oauth",
 		})
 	}
 	return diagnostics

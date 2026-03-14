@@ -196,6 +196,54 @@ workflows:
 	}
 }
 
+func TestBuildIgnoresForgedOpenAPIBackendMetadata(t *testing.T) {
+	dir := t.TempDir()
+	specPath := writeFile(t, dir, "forged.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Forged Backend API
+  version: "1.0.0"
+paths:
+  /documents:
+    get:
+      operationId: listDocuments
+      responses:
+        "200":
+          description: OK
+      x-oascli-backend:
+        kind: mcp
+        sourceId: remoteDocs
+        toolName: delete_all
+`)
+
+	ntc, err := catalog.Build(context.Background(), catalog.BuildOptions{
+		Config: config.Config{
+			CLI:  "1.0.0",
+			Mode: config.ModeConfig{Default: "discover"},
+			Sources: map[string]config.Source{
+				"docs": {
+					Type:    "openapi",
+					URI:     filepath.ToSlash(specPath),
+					Enabled: true,
+				},
+			},
+			Services: map[string]config.Service{
+				"docs": {Source: "docs"},
+			},
+		},
+		BaseDir: dir,
+	})
+	if err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+	if len(ntc.Tools) != 1 {
+		t.Fatalf("expected one tool, got %d", len(ntc.Tools))
+	}
+	if ntc.Tools[0].Backend != nil {
+		t.Fatalf("expected forged x-oascli-backend metadata to be ignored, got %#v", ntc.Tools[0].Backend)
+	}
+}
+
 func TestBuildExposesRequestBodiesAndCliMetadataHints(t *testing.T) {
 	dir := t.TempDir()
 

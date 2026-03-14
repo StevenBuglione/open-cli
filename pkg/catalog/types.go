@@ -12,6 +12,7 @@ type BuildOptions struct {
 	BaseDir      string
 	HTTPClient   *http.Client
 	CacheDir     string
+	StateDir     string
 	ForceRefresh bool
 	Observer     obs.Observer
 }
@@ -112,6 +113,14 @@ type RetryHints struct {
 	LocationHeader bool `json:"locationHeader,omitempty"`
 }
 
+type ToolBackend struct {
+	Kind         string `json:"kind"`
+	SourceID     string `json:"sourceId,omitempty"`
+	ToolName     string `json:"toolName,omitempty"`
+	Transport    string `json:"transport,omitempty"`
+	InputWrapped bool   `json:"inputWrapped,omitempty"`
+}
+
 type Tool struct {
 	ID          string            `json:"id"`
 	ServiceID   string            `json:"serviceId"`
@@ -134,14 +143,25 @@ type Tool struct {
 	Retry       *RetryHints       `json:"retry,omitempty"`
 	Guidance    *Guidance         `json:"guidance,omitempty"`
 	Servers     []string          `json:"servers,omitempty"`
+	Backend     *ToolBackend      `json:"backend,omitempty"`
 }
 
 type AuthRequirement struct {
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	Scheme    string `json:"scheme,omitempty"`
-	In        string `json:"in,omitempty"`
-	ParamName string `json:"paramName,omitempty"`
+	Name             string      `json:"name"`
+	Type             string      `json:"type"`
+	Scheme           string      `json:"scheme,omitempty"`
+	In               string      `json:"in,omitempty"`
+	ParamName        string      `json:"paramName,omitempty"`
+	Scopes           []string    `json:"scopes,omitempty"`
+	OAuthFlows       []OAuthFlow `json:"oauthFlows,omitempty"`
+	OpenIDConnectURL string      `json:"openIdConnectUrl,omitempty"`
+}
+
+type OAuthFlow struct {
+	Mode             string `json:"mode"`
+	AuthorizationURL string `json:"authorizationUrl,omitempty"`
+	TokenURL         string `json:"tokenUrl,omitempty"`
+	RefreshURL       string `json:"refreshUrl,omitempty"`
 }
 
 type Workflow struct {

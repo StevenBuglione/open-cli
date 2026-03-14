@@ -11,6 +11,7 @@ title: Configuration Overview
 A config file answers these questions:
 
 - where discovery starts (`sources`)
+- how native MCP servers are registered (`sources.type="mcp"` or `mcpServers`)
 - which discovered or explicit APIs become named services (`services`)
 - how tools are filtered for different audiences (`curation` and `agents`)
 - which tools require approval or secret execution (`policy`)
@@ -94,8 +95,15 @@ Discovery starting points. Supported source types are:
 - `openapi`
 - `serviceRoot`
 - `apiCatalog`
+- `mcp`
 
-Each source can also define refresh behavior.
+`mcp` sources use `transport` instead of `uri` and support:
+
+- `stdio` for local MCP processes
+- legacy `sse` for older HTTP+SSE MCP servers
+- `streamable-http` for current MCP HTTP transports
+
+Each source can also define refresh behavior. For MCP sources, `disabledTools` can hide specific discovered MCP tools before normalization.
 
 ### `services`
 
@@ -123,6 +131,28 @@ Runtime execution gates that are independent from the dynamic command tree, such
 ### `secrets`
 
 Maps OpenAPI security scheme names to secret resolution instructions.
+
+Top-level `secrets` also carry `type: "oauth2"` entries for OpenAPI `oauth2` / `openIdConnect` execution and static values referenced from MCP `transport.headerSecrets`.
+
+## `mcpServers` compatibility
+
+If you already have `.mcp.json`-style config, use top-level `mcpServers` and let the loader normalize it into canonical `sources` + `services`.
+
+```json
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "mcpServers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+    }
+  }
+}
+```
+
+That compatibility form is great for migration, but the normalized runtime shape is still source-centric.
 
 ## Relative path resolution
 

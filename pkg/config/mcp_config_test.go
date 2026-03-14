@@ -51,15 +51,18 @@ func TestLoadEffectiveSupportsCanonicalMCPSources(t *testing.T) {
 	      },
 	      "disabledTools": ["admin.delete"],
 	      "oauth": {
-	        "mode": "authorizationCode",
+	        "mode": "clientCredentials",
 	        "issuer": "https://auth.example.com",
 	        "clientId": {
 	          "type": "env",
 	          "value": "REMOTE_MCP_CLIENT_ID"
 	        },
+	        "clientSecret": {
+	          "type": "env",
+	          "value": "REMOTE_MCP_CLIENT_SECRET"
+	        },
 	        "scopes": ["mcp.read"],
 	        "audience": "mcp.example.com",
-	        "callbackPort": 8790,
 	        "tokenStorage": "instance"
 	      }
 	    }
@@ -102,14 +105,14 @@ func TestLoadEffectiveSupportsCanonicalMCPSources(t *testing.T) {
 	if source.OAuth == nil {
 		t.Fatalf("expected oauth config to be populated")
 	}
-	if source.OAuth.Mode != "authorizationCode" {
-		t.Fatalf("expected oauth mode authorizationCode, got %q", source.OAuth.Mode)
+	if source.OAuth.Mode != "clientCredentials" {
+		t.Fatalf("expected oauth mode clientCredentials, got %q", source.OAuth.Mode)
 	}
 	if source.OAuth.ClientID == nil || source.OAuth.ClientID.Type != "env" || source.OAuth.ClientID.Value != "REMOTE_MCP_CLIENT_ID" {
 		t.Fatalf("expected oauth clientId to round-trip, got %#v", source.OAuth.ClientID)
 	}
-	if source.OAuth.CallbackPort == nil || *source.OAuth.CallbackPort != 8790 {
-		t.Fatalf("expected oauth callbackPort 8790, got %#v", source.OAuth.CallbackPort)
+	if source.OAuth.ClientSecret == nil || source.OAuth.ClientSecret.Type != "env" || source.OAuth.ClientSecret.Value != "REMOTE_MCP_CLIENT_SECRET" {
+		t.Fatalf("expected oauth clientSecret to round-trip, got %#v", source.OAuth.ClientSecret)
 	}
 	if effective.Config.Services["remoteDocs"].Source != "remoteDocs" {
 		t.Fatalf("expected service source remoteDocs, got %q", effective.Config.Services["remoteDocs"].Source)
@@ -410,11 +413,15 @@ func TestLoadEffectiveRejectsInvalidMCPTransportConfig(t *testing.T) {
 			      "type": "sse",
 			      "url": "https://mcp.example.com/sse",
 			      "oauth": {
-			        "mode": "authorizationCode",
+			        "mode": "clientCredentials",
 			        "issuer": "https://auth.example.com",
 			        "clientId": {
 			          "type": "env",
 			          "value": "REMOTE_MCP_CLIENT_ID"
+			        },
+			        "clientSecret": {
+			          "type": "env",
+			          "value": "REMOTE_MCP_CLIENT_SECRET"
 			        }
 			      }
 			    }
@@ -516,11 +523,15 @@ func TestLoadEffectiveRejectsInvalidMCPSourceRelationships(t *testing.T) {
 			        }
 			      },
 			      "oauth": {
-			        "mode": "authorizationCode",
+			        "mode": "clientCredentials",
 			        "issuer": "https://auth.example.com",
 			        "clientId": {
 			          "type": "env",
 			          "value": "REMOTE_MCP_CLIENT_ID"
+			        },
+			        "clientSecret": {
+			          "type": "env",
+			          "value": "REMOTE_MCP_CLIENT_SECRET"
 			        }
 			      }
 			    }
@@ -610,11 +621,15 @@ func TestLoadEffectiveClearsExclusiveFieldsWhenSourceTypeChanges(t *testing.T) {
 	      },
 	      "disabledTools": ["admin.delete"],
 	      "oauth": {
-	        "mode": "authorizationCode",
+	        "mode": "clientCredentials",
 	        "issuer": "https://auth.example.com",
 	        "clientId": {
 	          "type": "env",
 	          "value": "REMOTE_MCP_CLIENT_ID"
+	        },
+	        "clientSecret": {
+	          "type": "env",
+	          "value": "REMOTE_MCP_CLIENT_SECRET"
 	        }
 	      }
 	    }
@@ -728,11 +743,15 @@ func TestLoadEffectiveClearsExclusiveFieldsWhenMCPTransportTypeChanges(t *testin
 	        "url": "https://managed.example.com/mcp"
 	      },
 	      "oauth": {
-	        "mode": "authorizationCode",
+	        "mode": "clientCredentials",
 	        "issuer": "https://auth.example.com",
 	        "clientId": {
 	          "type": "env",
 	          "value": "DEMO_CLIENT_ID"
+	        },
+	        "clientSecret": {
+	          "type": "env",
+	          "value": "DEMO_CLIENT_SECRET"
 	        }
 	      }
 	    }
@@ -784,7 +803,7 @@ func TestLoadEffectiveRejectsInvalidMCPOAuthConfig(t *testing.T) {
 		message  string
 	}{
 		{
-			name: "authorizationCode requires clientId",
+			name: "authorizationCode is not allowed for mcp transport oauth",
 			document: `{
 			  "cli": "1.0.0",
 			  "mode": { "default": "discover" },
@@ -802,11 +821,11 @@ func TestLoadEffectiveRejectsInvalidMCPOAuthConfig(t *testing.T) {
 			    }
 			  }
 			}`,
-			path:    "sources.remoteDocs.oauth.clientId",
-			message: "required for authorizationCode oauth",
+			path:    "sources.remoteDocs.oauth.mode",
+			message: "must be clientCredentials for mcp transport oauth",
 		},
 		{
-			name: "authorizationCode requires issuer or endpoints",
+			name: "clientCredentials requires clientId",
 			document: `{
 			  "cli": "1.0.0",
 			  "mode": { "default": "discover" },
@@ -818,17 +837,18 @@ func TestLoadEffectiveRejectsInvalidMCPOAuthConfig(t *testing.T) {
 			        "url": "https://mcp.example.com/mcp"
 			      },
 			      "oauth": {
-			        "mode": "authorizationCode",
-			        "clientId": {
+			        "mode": "clientCredentials",
+			        "issuer": "https://auth.example.com",
+			        "clientSecret": {
 			          "type": "env",
-			          "value": "REMOTE_MCP_CLIENT_ID"
+			          "value": "REMOTE_MCP_CLIENT_SECRET"
 			        }
 			      }
 			    }
 			  }
 			}`,
-			path:    "sources.remoteDocs.oauth",
-			message: "requires issuer or authorizationURL and tokenURL",
+			path:    "sources.remoteDocs.oauth.clientId",
+			message: "required for clientCredentials oauth",
 		},
 		{
 			name: "clientCredentials requires clientSecret",

@@ -28,7 +28,12 @@ Upstream auth comes from three pieces working together:
 
 - OpenAPI security schemes normalized into tool auth requirements
 - `secrets` entries in config keyed by security scheme name
-- runtime secret resolution at execution time
+- runtime secret and OAuth resolution at execution time
+
+For MCP `streamable-http` sources there is a second auth layer:
+
+- source-local `oauth` authenticates the MCP transport itself with `clientCredentials`
+- `transport.headerSecrets` inject static header values resolved through top-level `secrets`
 
 See [Auth resolution](./auth-resolution) and [Secret sources](./secret-sources).
 
@@ -44,7 +49,9 @@ See [Policy and approval](./policy-and-approval).
 
 ## Current implementation caveats to know early
 
-- only a subset of auth schemes is applied automatically during execution
+- runtime execution supports static auth, `oauth2`, and `openIdConnect`
+- supported OAuth runtime modes are `clientCredentials` and `authorizationCode`
+- OpenAPI `implicit` and `password` flows are intentionally rejected at runtime
 - missing secrets usually cause auth to be skipped rather than raising an immediate config error
 - `exec` secrets are disabled unless explicitly allowed by policy
 - only managed-scope deny rules are enforced directly as hard denies today

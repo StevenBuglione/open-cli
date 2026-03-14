@@ -10,7 +10,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-func BuildDocument(serviceID string, tools []mcpclient.ToolDescriptor, disabledTools []string) (*openapi3.T, error) {
+func BuildDocument(serviceID, sourceID, transport string, tools []mcpclient.ToolDescriptor, disabledTools []string) (*openapi3.T, error) {
 	disabled := map[string]struct{}{}
 	for _, name := range disabledTools {
 		disabled[name] = struct{}{}
@@ -47,7 +47,7 @@ func BuildDocument(serviceID string, tools []mcpclient.ToolDescriptor, disabledT
 		}
 		pathValue := uniqueValue(pathSlug, usedPaths, tool.Name)
 
-		schemaRef, err := schemaForToolInput(tool.InputSchema)
+		schemaRef, inputWrapped, err := schemaForToolInput(tool.InputSchema)
 		if err != nil {
 			return nil, fmt.Errorf("mcp tool %q: %w", tool.Name, err)
 		}
@@ -57,6 +57,15 @@ func BuildDocument(serviceID string, tools []mcpclient.ToolDescriptor, disabledT
 			Summary:     tool.Description,
 			Description: tool.Description,
 			Tags:        []string{serviceID},
+			Extensions: map[string]any{
+				"x-oascli-backend": map[string]any{
+					"kind":         "mcp",
+					"sourceId":     sourceID,
+					"toolName":     tool.Name,
+					"transport":    transport,
+					"inputWrapped": inputWrapped,
+				},
+			},
 			RequestBody: &openapi3.RequestBodyRef{
 				Value: &openapi3.RequestBody{
 					Required: schemaRef != nil,
@@ -72,31 +81,31 @@ func BuildDocument(serviceID string, tools []mcpclient.ToolDescriptor, disabledT
 	return document, nil
 }
 
-func schemaForToolInput(raw map[string]any) (*openapi3.SchemaRef, error) {
+func schemaForToolInput(raw map[string]any) (*openapi3.SchemaRef, bool, error) {
 	if len(raw) == 0 {
-		return openapi3.NewObjectSchema().NewRef(), nil
+		return openapi3.NewObjectSchema().NewRef(), false, nil
 	}
 
 	data, err := json.Marshal(raw)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	var schemaRef openapi3.SchemaRef
 	if err := json.Unmarshal(data, &schemaRef); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if schemaRef.Value == nil {
-		return openapi3.NewObjectSchema().NewRef(), nil
+		return openapi3.NewObjectSchema().NewRef(), false, nil
 	}
 	if schemaRef.Value.Type != nil && schemaRef.Value.Type.Is("object") {
-		return &schemaRef, nil
+		return &schemaRef, false, nil
 	}
 
 	wrapper := openapi3.NewObjectSchema().
 		WithPropertyRef("input", &schemaRef).
 		WithRequired([]string{"input"})
-	return wrapper.NewRef(), nil
+	return wrapper.NewRef(), true, nil
 }
 
 func uniqueValue(base string, used map[string]string, toolName string) string {

@@ -1,6 +1,6 @@
 # oas-cli-go
 
-`oas-cli-go` is the Go reference implementation of OAS-CLI. It turns OpenAPI documents, discovery metadata, overlays, and policy into a local command surface that humans and agents can use safely.
+`oas-cli-go` is the Go reference implementation of OAS-CLI. It turns OpenAPI documents, discovery metadata, native MCP servers, overlays, and policy into a local command surface that humans and agents can use safely.
 
 - **Full docs:** https://stevenbuglione.github.io/oas-cli-go/
 - **Getting started:** https://stevenbuglione.github.io/oas-cli-go/docs/getting-started/intro
@@ -24,6 +24,54 @@ The common flow looks like this:
 4. `oascli` renders catalog-driven commands while `oasclird` remains the enforcement point for policy, auth, retries, cache state, and audit logging.
 
 If you want the deeper model, start with the docs site: https://stevenbuglione.github.io/oas-cli-go/
+
+## Native MCP and OAuth support
+
+The current implementation supports both traditional OpenAPI sources and native MCP sources.
+
+- MCP transports: `stdio`, legacy `sse`, and `streamable-http`
+- `.mcp.json`-style compatibility through top-level `mcpServers`
+- OpenAPI `oauth2` and `openIdConnect` runtime auth
+- MCP `streamable-http` transport auth with `clientCredentials` `oauth` and `transport.headerSecrets`
+- per-instance OAuth token caching under the runtime state directory
+
+Example:
+
+```json
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "filesystem": {
+      "type": "mcp",
+      "transport": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+      }
+    },
+    "remoteDocs": {
+      "type": "mcp",
+      "transport": {
+        "type": "streamable-http",
+        "url": "https://mcp.example.com/mcp",
+        "headerSecrets": {
+          "X-API-Key": "mcp.apiKey"
+        }
+      },
+      "oauth": {
+        "mode": "clientCredentials",
+        "tokenURL": "https://auth.example.com/oauth/token",
+        "clientId": { "type": "env", "value": "MCP_CLIENT_ID" },
+        "clientSecret": { "type": "env", "value": "MCP_CLIENT_SECRET" }
+      }
+    }
+  },
+  "secrets": {
+    "mcp.apiKey": { "type": "env", "value": "MCP_API_KEY" }
+  }
+}
+```
 
 ## Install from source
 

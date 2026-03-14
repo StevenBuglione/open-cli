@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -44,14 +44,21 @@ type rpcError struct {
 	Message string `json:"message"`
 }
 
-func Open(source config.Source, ctx context.Context) (Client, error) {
+func Open(source config.Source, secrets map[string]config.Secret, policy config.PolicyConfig, stateDir string, httpClient *http.Client, ctx context.Context) (Client, error) {
 	if source.Transport == nil {
 		return nil, fmt.Errorf("mcp source requires transport configuration")
+	}
+	if httpClient == nil {
+		httpClient = http.DefaultClient
 	}
 
 	switch source.Transport.Type {
 	case "stdio":
 		return openStdio(source, ctx)
+	case "sse":
+		return openSSE(source, secrets, policy, stateDir, httpClient, ctx)
+	case "streamable-http":
+		return openStreamableHTTP(source, secrets, policy, stateDir, httpClient, ctx)
 	default:
 		return nil, fmt.Errorf("mcp transport %q not implemented", source.Transport.Type)
 	}
@@ -198,44 +205,16 @@ func (client *stdioClient) writeMessage(message any) error {
 	if err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(client.stdin, "Content-Length: %d\r\n\r\n", len(data)); err != nil {
-		return err
-	}
-	_, err = client.stdin.Write(data)
+	_, err = client.stdin.Write(append(data, '\n'))
 	return err
 }
 
 func (client *stdioClient) readResponse() (*rpcResponse, error) {
-	headers := map[string]string{}
-	for {
-		line, err := client.stdout.ReadString('\n')
-		if err != nil {
-			return nil, err
-		}
-		line = strings.TrimRight(line, "\r\n")
-		if line == "" {
-			break
-		}
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid mcp header line %q", line)
-		}
-		headers[strings.ToLower(strings.TrimSpace(parts[0]))] = strings.TrimSpace(parts[1])
-	}
-
-	lengthValue := headers["content-length"]
-	if lengthValue == "" {
-		return nil, fmt.Errorf("missing content-length header")
-	}
-	length, err := strconv.Atoi(lengthValue)
+	line, err := client.stdout.ReadString('\n')
 	if err != nil {
 		return nil, err
 	}
-	payload := make([]byte, length)
-	if _, err := io.ReadFull(client.stdout, payload); err != nil {
-		return nil, err
-	}
-
+	payload := []byte(strings.TrimSpace(line))
 	var response rpcResponse
 	if err := json.Unmarshal(payload, &response); err != nil {
 		return nil, err

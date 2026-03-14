@@ -35,7 +35,7 @@ type MCPTransport struct {
 }
 
 type OAuthConfig struct {
-	Mode             string     `json:"mode"`
+	Mode             string     `json:"mode,omitempty"`
 	Issuer           string     `json:"issuer,omitempty"`
 	AuthorizationURL string     `json:"authorizationURL,omitempty"`
 	TokenURL         string     `json:"tokenURL,omitempty"`
@@ -83,6 +83,13 @@ type PolicyConfig struct {
 	AllowExecSecrets bool     `json:"allowExecSecrets,omitempty"`
 }
 
+type Secret struct {
+	Type    string   `json:"type"`
+	Value   string   `json:"value,omitempty"`
+	Command []string `json:"command,omitempty"`
+	OAuthConfig
+}
+
 type SecretRef struct {
 	Type    string   `json:"type"`
 	Value   string   `json:"value,omitempty"`
@@ -97,7 +104,7 @@ type Config struct {
 	Curation CurationConfig       `json:"curation,omitempty"`
 	Agents   AgentsConfig         `json:"agents,omitempty"`
 	Policy   PolicyConfig         `json:"policy,omitempty"`
-	Secrets  map[string]SecretRef `json:"secrets,omitempty"`
+	Secrets  map[string]Secret    `json:"secrets,omitempty"`
 }
 
 type LoadOptions struct {

@@ -3,6 +3,7 @@ package exec
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
@@ -11,24 +12,31 @@ import (
 )
 
 type MCPRequest struct {
-	Tool   catalog.Tool
-	Source config.Source
-	Body   []byte
+	Tool       catalog.Tool
+	Source     config.Source
+	Secrets    map[string]config.Secret
+	Policy     config.PolicyConfig
+	StateDir   string
+	HTTPClient *http.Client
+	Body       []byte
 }
 
 func ExecuteMCP(ctx context.Context, request MCPRequest) (*Result, error) {
-	client, err := mcpclient.Open(request.Source, ctx)
+	args, err := decodeMCPArguments(request.Tool, request.Body)
+	if err != nil {
+		return nil, err
+	}
+	client, err := mcpclient.Open(request.Source, request.Secrets, request.Policy, request.StateDir, request.HTTPClient, ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer client.Close()
 
-	args, err := decodeMCPArguments(request.Tool, request.Body)
-	if err != nil {
-		return nil, err
+	toolName := request.Tool.OperationID
+	if request.Tool.Backend != nil && request.Tool.Backend.ToolName != "" {
+		toolName = request.Tool.Backend.ToolName
 	}
-
-	result, err := client.CallTool(ctx, request.Tool.OperationID, args)
+	result, err := client.CallTool(ctx, toolName, args)
 	if err != nil {
 		return nil, err
 	}
@@ -55,12 +63,23 @@ func decodeMCPArguments(tool catalog.Tool, body []byte) (any, error) {
 		return nil, err
 	}
 	if shouldUnwrapMCPInput(tool, args) {
-		return args.(map[string]any)["input"], nil
+		objectArgs, ok := args.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("wrapped MCP input must be an object containing input")
+		}
+		input, ok := objectArgs["input"]
+		if !ok {
+			return nil, fmt.Errorf("wrapped MCP input must include input")
+		}
+		return input, nil
 	}
 	return args, nil
 }
 
 func shouldUnwrapMCPInput(tool catalog.Tool, args any) bool {
+	if tool.Backend != nil {
+		return tool.Backend.InputWrapped
+	}
 	objectArgs, ok := args.(map[string]any)
 	if !ok {
 		return false
