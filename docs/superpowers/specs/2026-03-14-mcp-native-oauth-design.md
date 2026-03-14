@@ -14,7 +14,7 @@ The design must solve both gaps without forcing users into an external wrapper o
 - Add real runtime support for OpenAPI `oauth2` and `openIdConnect` schemes, including token acquisition and refresh.
 - Preserve multi-instance isolation by storing MCP runtime state and OAuth token state under existing per-instance paths.
 - Update implementation, spec, conformance, and docs together.
-- Keep this spec focused on the first implementation target: `stdio` + `streamable-http` MCP support and shared OAuth/OIDC runtime support.
+- Keep this spec focused on the first implementation target: `stdio`, `sse`, and `streamable-http` MCP support plus shared OAuth/OIDC runtime support.
 
 ## Non-Goals
 
@@ -83,7 +83,7 @@ The feature is split into five units with clear boundaries.
 
 **Canonical `sources.<name>` MCP fields:**
 
-- `transport.type` (`stdio`, `streamable-http`)
+- `transport.type` (`stdio`, `sse`, `streamable-http`)
 - `transport.command`
 - `transport.args`
 - `transport.env`
@@ -98,9 +98,12 @@ The feature is split into five units with clear boundaries.
 | Transport | Required fields | Optional fields | Invalid fields |
 | --- | --- | --- | --- |
 | `stdio` | `transport.command` | `transport.args`, `transport.env`, `disabledTools` | `transport.url`, `transport.headers`, `transport.headerSecrets`, `oauth` |
+| `sse` | `transport.url` | `transport.headers`, `transport.headerSecrets`, `disabledTools` | `transport.command`, `transport.args`, `transport.env`, `oauth` |
 | `streamable-http` | `transport.url` | `transport.headers`, `transport.headerSecrets`, `disabledTools`, `oauth` | `transport.command`, `transport.args`, `transport.env` |
 
 `oauth` is transport-level authentication for the MCP server itself. It is distinct from per-tool OpenAPI security requirements. Transport OAuth is used when the runtime must authenticate before `ListTools` or `CallTool` can succeed.
+
+For the initial implementation target, transport OAuth is supported only for `streamable-http`. `sse` transport uses literal headers and `headerSecrets` only.
 
 The canonical `sources.<name>` shape is nested:
 
@@ -252,6 +255,7 @@ This gives users a near drop-in migration path while keeping internal config uni
 
 - new `pkg/mcp/client/`
 - new `pkg/mcp/client/stdio.go`
+- new `pkg/mcp/client/sse.go`
 - new `pkg/mcp/client/streamablehttp.go`
 
 **Interface:**
@@ -276,22 +280,33 @@ This gives users a near drop-in migration path while keeping internal config uni
 **Transport coverage for this spec:**
 
 - `stdio`
+- `sse`
 - `streamable-http`
-
-`sse` is explicitly deferred to a follow-up spec once the native MCP foundation is merged.
 
 The transport client owns wire-level MCP concerns only. It does not know about OpenAPI normalization, policy, or workflow binding.
 
 **Discovery-time auth:**
 
 - `stdio` uses no transport auth; discovery starts the subprocess and calls `ListTools`.
+- `sse` uses literal headers and `headerSecrets` only; those values are applied to the initial SSE connect request and to the derived message endpoint requests.
 - `streamable-http` may require auth before discovery. The transport client asks the auth engine for a transport application plan before `ListTools` and reapplies the same config on later `CallTool` requests.
 - Static non-Authorization headers from config are attached to both discovery and execution requests.
+
+**SSE session semantics:**
+
+- `transport.url` is the SSE endpoint.
+- The client opens the event stream, follows the MCP SSE handshake, and captures the message endpoint advertised by the server.
+- If the server does not provide a usable message endpoint, discovery or execution fails with an SSE-handshake error.
+- A reconnect may occur only once within a single request context.
+- `ListTools` may be replayed once after reconnect because it is read-only.
+- `CallTool` is not replayed automatically after reconnect; if the stream drops during a tool call, that request fails.
+- If the stream drops again after one reconnect, the request fails.
 
 **Timeout and remote-error rules:**
 
 - stdio startup timeout defaults to 10 seconds.
 - remote connect timeout defaults to 10 seconds.
+- SSE handshake timeout defaults to 10 seconds and SSE read-idle timeout defaults to 60 seconds unless the caller context is sooner.
 - `ListTools` timeout defaults to 30 seconds unless the caller context is sooner.
 - `CallTool` timeout follows the request context from runtime execution.
 - timeouts surface as typed discovery or execution timeout errors that name the transport and source.
@@ -641,6 +656,7 @@ For MCP catalog caching, the normalized auth identity inputs are exactly:
 ### Integration tests
 
 - Fake stdio MCP server
+- Fake SSE MCP server
 - Fake streamable-http MCP server
 - Fake OAuth issuer covering authorization-code, client-credentials, and OIDC discovery
 - Runtime execution tests that prove MCP-backed and HTTP-backed tools can coexist in one catalog
@@ -674,6 +690,7 @@ The implementation plan derived from this spec covers exactly:
 
 - config normalization for `mcpServers` and canonical `type: "mcp"`
 - stdio MCP discovery and execution
+- SSE MCP discovery and execution
 - streamable-http MCP discovery and execution
 - MCP-to-OpenAPI adapter and execution metadata
 - OAuth `authorizationCode`, `clientCredentials`, and `openIdConnect`
@@ -681,4 +698,8 @@ The implementation plan derived from this spec covers exactly:
 
 ## Follow-up Work
 
-SSE transport support is intentionally excluded from this spec and should be handled by a separate follow-up spec once the native MCP foundation is merged and verified.
+Potential follow-up work after this implementation:
+
+- transport connection pooling and reuse
+- broader remote-transport auth support beyond streamable-http OAuth
+- additional OAuth/OpenAPI auth surfaces beyond the first implementation target
