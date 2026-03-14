@@ -33,7 +33,11 @@
           "testapi:updateItem",
           "testapi:deleteItem",
           "testapi:createOperation",
-          "testapi:getOperation"
+          "testapi:getOperation",
+          "testapi:triggerUnauthorized",
+          "testapi:triggerForbidden",
+          "testapi:triggerRateLimited",
+          "testapi:triggerInternalError"
         ],
         "deny": ["**"]
       }
