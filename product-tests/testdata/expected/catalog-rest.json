@@ -1,0 +1,106 @@
+{
+  "catalogVersion": "1.0.0",
+  "sources": [
+    {
+      "id": "testapiSource",
+      "type": "openapi"
+    }
+  ],
+  "services": [
+    {
+      "id": "testapi",
+      "alias": "testapi",
+      "sourceId": "testapiSource"
+    }
+  ],
+  "tools": [
+    {
+      "id": "testapi:createItem",
+      "serviceId": "testapi",
+      "method": "POST",
+      "path": "/items",
+      "group": "items",
+      "command": "create-item"
+    },
+    {
+      "id": "testapi:createOperation",
+      "serviceId": "testapi",
+      "method": "POST",
+      "path": "/operations",
+      "group": "operations",
+      "command": "create-operation"
+    },
+    {
+      "id": "testapi:deleteItem",
+      "serviceId": "testapi",
+      "method": "DELETE",
+      "path": "/items/{id}",
+      "group": "items",
+      "command": "delete-item"
+    },
+    {
+      "id": "testapi:getItem",
+      "serviceId": "testapi",
+      "method": "GET",
+      "path": "/items/{id}",
+      "group": "items",
+      "command": "get-item"
+    },
+    {
+      "id": "testapi:getOperation",
+      "serviceId": "testapi",
+      "method": "GET",
+      "path": "/operations/{id}",
+      "group": "operations",
+      "command": "get-operation"
+    },
+    {
+      "id": "testapi:listItems",
+      "serviceId": "testapi",
+      "method": "GET",
+      "path": "/items",
+      "group": "items",
+      "command": "list-items"
+    },
+    {
+      "id": "testapi:triggerForbidden",
+      "serviceId": "testapi",
+      "method": "GET",
+      "path": "/errors/forbidden",
+      "group": "errors",
+      "command": "trigger-forbidden"
+    },
+    {
+      "id": "testapi:triggerInternalError",
+      "serviceId": "testapi",
+      "method": "GET",
+      "path": "/errors/internal",
+      "group": "errors",
+      "command": "trigger-internal-error"
+    },
+    {
+      "id": "testapi:triggerRateLimited",
+      "serviceId": "testapi",
+      "method": "GET",
+      "path": "/errors/rate-limited",
+      "group": "errors",
+      "command": "trigger-rate-limited"
+    },
+    {
+      "id": "testapi:triggerUnauthorized",
+      "serviceId": "testapi",
+      "method": "GET",
+      "path": "/errors/unauthorized",
+      "group": "errors",
+      "command": "trigger-unauthorized"
+    },
+    {
+      "id": "testapi:updateItem",
+      "serviceId": "testapi",
+      "method": "PUT",
+      "path": "/items/{id}",
+      "group": "items",
+      "command": "update-item"
+    }
+  ]
+}
