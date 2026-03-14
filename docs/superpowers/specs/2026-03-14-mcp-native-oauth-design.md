@@ -88,6 +88,7 @@ The feature is split into five units with clear boundaries.
 - `transport.env`
 - `transport.url`
 - `transport.headers`
+- `transport.headerSecrets`
 - `disabledTools`
 - `oauth`
 
@@ -103,6 +104,9 @@ The canonical `sources.<name>` shape is nested:
     "url": "https://mcp.example.com/mcp",
     "headers": {
       "X-Tenant": "docs"
+    },
+    "headerSecrets": {
+      "X-API-Key": "remote_docs_api_key"
     }
   },
   "disabledTools": ["admin.delete"],
@@ -136,6 +140,7 @@ The compatibility `mcpServers` shape stays flat for migration, and normalization
 - `env` → normalized to `transport.env`
 - `url` → normalized to `transport.url`
 - `headers` → normalized to `transport.headers`
+- `headerSecrets` → normalized to `transport.headerSecrets`
 - `disabledTools` → preserved as `disabledTools`
 - `oauth` → preserved as `oauth`
 
@@ -222,6 +227,7 @@ This gives users a near drop-in migration path while keeping internal config uni
 - `oauth` authenticates the MCP transport itself and is consulted before discovery or execution.
 - MCP-generated operations in v1 do not synthesize additional per-tool `security` requirements; MCP auth is transport-level only in this feature set.
 - When `oauth` is configured, it owns the `Authorization` header for the transport. User-supplied `headers.Authorization` is rejected as a configuration error to avoid ambiguous precedence.
+- `transport.headerSecrets` resolves through the existing `secrets` map and is merged after literal headers. A literal header and a secret-backed header may not target the same header name.
 
 **Service cardinality in v1:**
 
@@ -246,6 +252,19 @@ This gives users a near drop-in migration path while keeping internal config uni
 - `ListTools(ctx) ([]ToolDescriptor, error)`
 - `CallTool(ctx, name string, args any) (ToolResult, error)`
 - `Close() error`
+
+`ToolDescriptor` is the transport-facing discovery shape:
+
+- `name`: original MCP tool name
+- `description`: human-readable summary
+- `inputSchema`: MCP-declared JSON Schema for arguments
+- `annotations`: optional MCP annotations preserved for future overlays or docs
+
+`ToolResult` is the transport-facing execution shape:
+
+- `structuredContent`: optional machine-readable result payload
+- `content`: ordered MCP content array
+- `isError`: whether the MCP server marked the result as an error payload
 
 **Transport coverage by phase:**
 
@@ -281,6 +300,7 @@ The transport client owns wire-level MCP concerns only. It does not know about O
   - disabled-tools filtering outcome
 - Operation IDs are stable and derived as `<service>.<tool>` before slugification, so workflows and guidance can bind to a durable identifier.
 - If two generated operations would collide after normalization, the runtime appends a deterministic short hash of `<source-name>::<original-tool-name>` to the synthetic operation ID while preserving the unmodified MCP tool name in backend metadata.
+- The final post-collision operation ID is the externally visible tool ID used by workflows, guidance, policy, and audit records.
 
 **Schema-mapping contract:**
 
@@ -358,6 +378,12 @@ This keeps MCP normalization predictable and avoids inventing fake REST path/que
   - refresh URL
   - OIDC discovery URL
   - required scopes for the tool
+- Catalog build also stores normalized security alternatives on each HTTP-backed tool as:
+  - `securityAlternatives[]`
+  - each alternative has ordered `requirements[]`
+  - each requirement carries scheme name, scheme type, application target (`header`, `query`, `cookie`, `tls`), and any OAuth flow metadata needed by runtime resolution
+
+The runtime auth engine consumes that normalized contract directly; executors never re-parse raw OpenAPI security definitions.
 
 **`secrets` example for OpenAPI OAuth:**
 
@@ -582,6 +608,6 @@ The work is one feature set, but the implementation plan must phase it explicitl
 ### Phase 2: transport completion
 
 - SSE MCP transport on the same discovery/execution interfaces
-- additional integration coverage for remote MCP auth and retry behavior
+- additional integration coverage for remote MCP auth, cancellation cleanup, and reconnect behavior
 
 Phase 1 is the minimum bar for the first implementation push. Phase 2 follows on the same branch before declaring the full MCP transport surface complete.
