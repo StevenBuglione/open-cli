@@ -1,4 +1,4 @@
-.PHONY: check-prereqs services-up services-down smoke full
+.PHONY: check-prereqs services-up services-down mcp-remote-up mcp-remote-down smoke full test-mcp-stdio test-mcp-remote
 
 check-prereqs:
 	@bash scripts/check-prereqs.sh
@@ -8,6 +8,22 @@ services-up: check-prereqs
 
 services-down:
 	@bash scripts/services-down.sh
+
+mcp-remote-up:
+	docker compose -f mcp/remote/docker-compose.yml up -d
+
+mcp-remote-down:
+	docker compose -f mcp/remote/docker-compose.yml down
+
+test-mcp-stdio:
+	go test ../... -run TestCapabilityExecuteMCPStdio -count=1 -v -timeout 180s
+
+test-mcp-remote: mcp-remote-up
+	@echo "==> Waiting for remote MCP service..."
+	@sleep 8
+	go test ../... -run TestCapabilityExecuteMCPRemote -count=1 -v -timeout 60s; \
+	  $(MAKE) mcp-remote-down; \
+	  exit $$?
 
 smoke: check-prereqs
 	@echo "==> Validating compose configs..."
