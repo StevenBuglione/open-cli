@@ -4,11 +4,11 @@ title: Config Schema
 
 # Config Schema
 
-The published JSON Schema for external validators lives in the companion spec repository:
+The published JSON Schema for external validators lives in the in-repo spec subproject:
 
-- `oas-cli-spec/schemas/cli.schema.json`
+- `spec/schemas/cli.schema.json`
 
-This implementation also carries a local copy at `pkg/config/cli.schema.json`, and the loader embeds that copy for runtime validation. In practice, keep both in sync and treat the spec repository version as the public contract.
+This implementation also carries a local copy at `pkg/config/cli.schema.json`, and the loader embeds that copy for runtime validation. In practice, keep both in sync and treat the `spec/schemas/` version as the public contract.
 
 ## Top-level fields
 

@@ -2,6 +2,8 @@
 
 Normative specification and JSON schemas for OAS-CLI.
 
+> **Monorepo note:** This directory is a first-class subproject of [oas-cli-go](../../README.md). It is the single source of truth for the OAS-CLI public contract. The Go implementation and the conformance suite both consume the schemas from this directory.
+
 ## Contents
 
 - `spec/core.md`: discovery, normalization, runtime, and governance requirements
@@ -13,9 +15,17 @@ Normative specification and JSON schemas for OAS-CLI.
 
 ## Validation
 
+From this directory:
+
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 python scripts/validate_examples.py
+```
+
+Or from the repository root using the convenience target:
+
+```bash
+make verify-spec
 ```

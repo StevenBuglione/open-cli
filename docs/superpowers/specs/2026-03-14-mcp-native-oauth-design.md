@@ -13,7 +13,7 @@ The design must solve both gaps without forcing users into an external wrapper o
 - Keep the canonical internal model aligned with existing `sources` and `services`, rather than inventing a second runtime model.
 - Add real runtime support for OpenAPI `oauth2` and `openIdConnect` schemes, including token acquisition and refresh.
 - Preserve multi-instance isolation by storing MCP runtime state and OAuth token state under existing per-instance paths.
-- Update implementation, spec, conformance, and docs together.
+- Update implementation, spec, conformance, and docs together. `spec/` and `conformance/` are first-class subprojects inside this repository, so all three move in the same commit.
 - Keep this spec focused on the first implementation target: `stdio`, `sse`, and `streamable-http` MCP support plus shared OAuth/OIDC runtime support.
 
 ## Non-Goals

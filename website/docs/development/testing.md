@@ -42,17 +42,19 @@ npm run build
 
 That verifies Markdown, sidebars, generated routes, and Docusaurus config. CI runs this build alongside root `make verify`, but `make verify` itself remains Go-only.
 
-## Cross-repository compatibility verification
+## Cross-project contract verification
 
-If you change config semantics, catalog output, schema-facing behavior, or anything else that affects the public contract, also run the conformance suite from the companion repositories:
+`spec/` and `conformance/` live in this repository as first-class subprojects, so contract verification runs in-repo without checking out external repositories:
 
 ```bash
-python3 /path/to/oas-cli-conformance/scripts/run_conformance.py \
-  --schema-root /path/to/oas-cli-spec/schemas \
-  --candidate /path/to/generated.ntc.json
+make verify-spec          # validate spec examples against schemas in spec/schemas/
+make verify-conformance   # run conformance fixtures; uses spec/schemas/ automatically
+make verify-all           # fmt + test + build + verify-spec + verify-conformance
 ```
 
-At minimum, contributors should know that `make verify` proves the Go implementation is healthy, but it does **not** by itself prove that the generated artifacts still match the published OAS-CLI contract.
+`verify-conformance` uses `spec/schemas/` as the default schema root via the `OASCLI_SCHEMA_ROOT` fallback in `conformance/scripts/run_conformance.py`. You can override that with an explicit `--schema-root` flag if needed.
+
+If you change config semantics, catalog output, schema-facing behavior, or anything else that affects the public contract, run `make verify-all` to confirm the Go implementation, the spec examples, and the conformance fixtures all agree.
 
 ## Useful targeted test entry points
 

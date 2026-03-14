@@ -11,7 +11,7 @@ The main implementation lives in a compact set of directories.
 ```text
 .github/
   workflows/
-    ci.yml              Go verification plus docs build validation
+    ci.yml              Go verification, spec/conformance validation, docs build
     docs-pages.yml      GitHub Pages deployment for website/
 cmd/
   oascli/               CLI entrypoint and runtime client
@@ -30,6 +30,16 @@ pkg/
   openapi/              document loading, overlay application, reference resolution
   overlay/              overlay document model and JSONPath-based patch engine
   policy/               execution-time policy decisions
+spec/                   normative OAS-CLI specification and JSON schemas
+  spec/                 prose specifications (core, config, profiles)
+  schemas/              machine-readable JSON schemas for published artifacts
+  examples/             example documents validated in spec CI
+  scripts/              spec validation scripts
+conformance/            language-neutral conformance fixtures and expected outputs
+  fixtures/             discovery, OpenAPI, overlay, workflow, and config inputs
+  expected/             expected normalized outputs
+  scripts/              conformance runner
+  compatibility-matrix.json  machine-readable suite/spec/implementation compatibility
 website/
   docs/                 Docusaurus content
   src/pages/            docs landing page and any custom React pages
@@ -37,6 +47,7 @@ website/
   sidebars.ts           documentation navigation
   docusaurus.config.ts  site URL, baseUrl, navbar, footer, and docs settings
   package.json          docs scripts and Node dependency entrypoint
+Makefile                verify, verify-spec, verify-conformance, verify-all targets
 README.md               repository front door and install/verify summary
 ```
 
@@ -54,6 +65,8 @@ README.md               repository front door and install/verify summary
 | cache behavior | `pkg/cache/` |
 | audit storage | `pkg/audit/store.go` |
 | instance paths and registry files | `pkg/instance/instance.go` |
+| normative spec or JSON schemas | `spec/` |
+| conformance fixtures or expected outputs | `conformance/` |
 | docs content | `website/docs/` |
 | docs navigation and site metadata | `website/sidebars.ts` and `website/docusaurus.config.ts` |
 | CI or Pages deployment | `.github/workflows/ci.yml` and `.github/workflows/docs-pages.yml` |
