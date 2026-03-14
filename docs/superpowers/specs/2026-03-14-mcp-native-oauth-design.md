@@ -80,7 +80,7 @@ The feature is split into five units with clear boundaries.
 - Auto-generated services are created only when `services.<name>` does not already exist. Explicit services always own overlays, workflows, aliases, and future service-level options.
 - If `services.<name>` exists, matches an MCP source name, and omits `source`, normalization injects `source: "<name>"` before schema validation. If it sets a different `source`, config load fails.
 
-**Supported MCP server fields:**
+**Canonical `sources.<name>` MCP fields:**
 
 - `transport.type` (`stdio`, `sse`, `streamable-http`)
 - `transport.command`
@@ -127,6 +127,17 @@ The canonical `sources.<name>` shape is nested:
 ```
 
 The compatibility `mcpServers` shape stays flat for migration, and normalization rewrites it into the nested canonical source shape before any later validation or catalog work.
+
+**Compatibility `mcpServers.<name>` fields:**
+
+- `type` → normalized to `transport.type`
+- `command` → normalized to `transport.command`
+- `args` → normalized to `transport.args`
+- `env` → normalized to `transport.env`
+- `url` → normalized to `transport.url`
+- `headers` → normalized to `transport.headers`
+- `disabledTools` → preserved as `disabledTools`
+- `oauth` → preserved as `oauth`
 
 **Canonical `.cli.json` example:**
 
@@ -375,6 +386,30 @@ This keeps MCP normalization predictable and avoids inventing fake REST path/que
 
 The implementation in this feature intentionally stops there. If an OpenAPI document declares `implicit` or `password`, catalog build records that metadata but runtime execution fails with a clear unsupported-flow error that points the user at the supported OAuth modes. This keeps the feature focused on the flows that are safe and still common in current deployments.
 
+**OAuth field defaults and validation:**
+
+- `callbackPort`
+  - valid for `authorizationCode` only
+  - default: first free port in the inclusive range `8787-8899`
+  - if the configured port is busy, runtime falls back to the next free port in that range when discovery is allowed to prompt; otherwise it fails with a port-in-use error that names the provider
+- `tokenStorage`
+  - valid values: `instance`, `memory`
+  - default: `instance`
+  - `instance` writes tokens under the per-instance state directory
+  - `memory` keeps tokens only in process memory and requires re-authentication after runtime restart
+- `audience`
+  - optional string
+  - default: empty
+  - included in token cache key derivation only when present
+
+**Authorization-code flow behavior:**
+
+- The runtime opens the system browser by default.
+- If browser launch fails or the runtime is headless, it prints the authorization URL and waits for loopback completion instead of silently failing.
+- Loopback callbacks bind to `127.0.0.1` only.
+- If no loopback port can be acquired in the allowed range, auth fails before any token request is attempted.
+- If the provider returns no refresh token, the runtime treats the token as non-refreshable and reacquires it interactively on expiry.
+
 **OAuth resolution matrix:**
 
 | Tool requirement | Runtime lookup key | Endpoint source | Effective scopes | Refresh behavior |
@@ -427,10 +462,11 @@ The implementation in this feature intentionally stops there. If an OpenAPI docu
 
 **MCP result normalization:**
 
-- If the MCP response contains structured JSON content, that value becomes the primary result payload for machine-readable CLI formats.
-- If the MCP response contains only text content, the text becomes the primary result payload and the pretty formatter renders it directly.
+- If the MCP response contains `structuredContent`, that value becomes `primary`.
+- Otherwise, if the response contains exactly one text item, that text becomes `primary`.
+- Otherwise, if the response contains only text items, `primary` is the newline-joined text sequence in response order.
 - If the MCP response contains mixed content, the runtime returns a JSON object with:
-  - `primary`: the best-effort primary text or structured payload
+  - `primary`: the value selected by the rules above, or `null` when no stable primary representation exists
   - `content`: the ordered raw MCP content array
 - MCP tool errors are surfaced as execution failures with the MCP error code, message, and attached data when present.
 
@@ -490,3 +526,23 @@ The implementation in this feature intentionally stops there. If an OpenAPI docu
 - Existing OpenAPI users keep working unchanged.
 - MCP and OAuth state is per-instance from day one to preserve multi-terminal safety.
 - The implementation should start from `origin/main` and land as one coordinated feature set across `oas-cli-go`, `oas-cli-spec`, and `oas-cli-conformance`.
+
+## Implementation Phasing
+
+The work is one feature set, but the implementation plan must phase it explicitly:
+
+### Phase 1: foundations and core coverage
+
+- config normalization for `mcpServers` and canonical `type: "mcp"`
+- stdio MCP discovery and execution
+- streamable-http MCP discovery and execution
+- MCP-to-OpenAPI adapter and execution metadata
+- OAuth `authorizationCode`, `clientCredentials`, and `openIdConnect`
+- docs, spec, and conformance updates for the above
+
+### Phase 2: transport completion
+
+- SSE MCP transport on the same discovery/execution interfaces
+- additional integration coverage for remote MCP auth and retry behavior
+
+Phase 1 is the minimum bar for the first implementation push. Phase 2 follows on the same branch before declaring the full MCP transport surface complete.
