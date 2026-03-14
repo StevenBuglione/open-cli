@@ -1,0 +1,3 @@
+# Core product-test services
+# Placeholder — REST API and OAuth servers will be defined here in later tasks.
+services: {}

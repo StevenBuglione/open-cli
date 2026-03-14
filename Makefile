@@ -18,3 +18,9 @@ verify-conformance:
 	cd conformance && python3 -m pip install -q -r requirements.txt && python3 scripts/run_conformance.py --schema-root ../spec/schemas
 
 verify-all: verify verify-spec verify-conformance
+
+product-test-smoke:
+	cd product-tests && $(MAKE) smoke
+
+product-test-full:
+	cd product-tests && $(MAKE) full

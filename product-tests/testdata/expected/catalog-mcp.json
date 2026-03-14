@@ -1,0 +1,130 @@
+{
+  "catalogVersion": "1.0.0",
+  "sources": [
+    {
+      "id": "filesystem",
+      "type": "mcp"
+    }
+  ],
+  "services": [
+    {
+      "id": "filesystem",
+      "alias": "filesystem",
+      "sourceId": "filesystem"
+    }
+  ],
+  "tools": [
+    {
+      "id": "filesystem:create_directory",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/create-directory",
+      "group": "filesystem",
+      "command": "create-directory"
+    },
+    {
+      "id": "filesystem:directory_tree",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/directory-tree",
+      "group": "filesystem",
+      "command": "directory-tree"
+    },
+    {
+      "id": "filesystem:edit_file",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/edit-file",
+      "group": "filesystem",
+      "command": "edit-file"
+    },
+    {
+      "id": "filesystem:get_file_info",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/get-file-info",
+      "group": "filesystem",
+      "command": "get-file-info"
+    },
+    {
+      "id": "filesystem:list_allowed_directories",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/list-allowed-directories",
+      "group": "filesystem",
+      "command": "list-allowed-directories"
+    },
+    {
+      "id": "filesystem:list_directory",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/list-directory",
+      "group": "filesystem",
+      "command": "list-directory"
+    },
+    {
+      "id": "filesystem:list_directory_with_sizes",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/list-directory-with-sizes",
+      "group": "filesystem",
+      "command": "list-directory-with-sizes"
+    },
+    {
+      "id": "filesystem:move_file",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/move-file",
+      "group": "filesystem",
+      "command": "move-file"
+    },
+    {
+      "id": "filesystem:read_file",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/read-file",
+      "group": "filesystem",
+      "command": "read-file"
+    },
+    {
+      "id": "filesystem:read_media_file",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/read-media-file",
+      "group": "filesystem",
+      "command": "read-media-file"
+    },
+    {
+      "id": "filesystem:read_multiple_files",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/read-multiple-files",
+      "group": "filesystem",
+      "command": "read-multiple-files"
+    },
+    {
+      "id": "filesystem:read_text_file",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/read-text-file",
+      "group": "filesystem",
+      "command": "read-text-file"
+    },
+    {
+      "id": "filesystem:search_files",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/search-files",
+      "group": "filesystem",
+      "command": "search-files"
+    },
+    {
+      "id": "filesystem:write_file",
+      "serviceId": "filesystem",
+      "method": "POST",
+      "path": "/_mcp/filesystem/write-file",
+      "group": "filesystem",
+      "command": "write-file"
+    }
+  ]
+}

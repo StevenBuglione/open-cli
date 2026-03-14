@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/StevenBuglione/oas-cli-go/product-tests/testdata/expected/agent-rubric.schema.json",
+  "title": "CampaignRubric",
+  "description": "Structured output emitted by every agent/operator campaign run. Contains scored rubric criteria plus freeform findings.",
+  "type": "object",
+  "required": ["campaign", "runAt", "pass", "criteria", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional self-reference to this schema."
+    },
+    "campaign": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name of the campaign run (e.g. 'operator-crud-rest-auth')."
+    },
+    "runAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp when the campaign started."
+    },
+    "pass": {
+      "type": "boolean",
+      "description": "True if and only if every criterion in 'criteria' passed."
+    },
+    "criteria": {
+      "type": "array",
+      "description": "Ordered list of rubric checkpoints evaluated during the campaign.",
+      "items": {
+        "$ref": "#/$defs/RubricCriterion"
+      }
+    },
+    "knownGaps": {
+      "type": "array",
+      "description": "Optional list of documented feature gaps that are expected to not yet pass.",
+      "items": {
+        "$ref": "#/$defs/KnownGapEntry"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Freeform observations collected during the campaign run.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "RubricCriterion": {
+      "type": "object",
+      "required": ["id", "description", "expected", "pass"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short unique identifier for this criterion (e.g. 'catalog-tool-count')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what is being checked."
+        },
+        "expected": {
+          "type": "string",
+          "description": "The expected value or condition expressed as a string."
+        },
+        "actual": {
+          "type": "string",
+          "description": "The observed value at the time of the check (omitted on pass when not needed)."
+        },
+        "pass": {
+          "type": "boolean",
+          "description": "Whether this criterion was satisfied."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional free-text note providing additional context."
+        }
+      }
+    },
+    "KnownGapEntry": {
+      "type": "object",
+      "required": ["id", "description", "reason", "stillFails"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short unique identifier for the gap (e.g. 'gap-streaming-responses')."
+        },
+        "description": {
+          "type": "string",
+          "description": "What capability or scenario is not yet supported."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why this is a known gap (missing feature, design decision, etc.)."
+        },
+        "stillFails": {
+          "type": "boolean",
+          "description": "True if the gap still exists; false means the gap has been resolved."
+        }
+      }
+    }
+  }
+}

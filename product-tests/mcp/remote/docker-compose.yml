@@ -1,0 +1,14 @@
+# MCP remote-mode servers
+# Runs @modelcontextprotocol/server-everything over the streamable-http transport.
+# Start: docker compose -f mcp/remote/docker-compose.yml up -d
+# Stop:  docker compose -f mcp/remote/docker-compose.yml down
+#
+# Requires outbound npm access on the first run to pull the package.
+services:
+  mcp-everything:
+    image: node:22-alpine
+    command: sh -c "npx -y @modelcontextprotocol/server-everything streamableHttp"
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: "3001"

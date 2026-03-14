@@ -42,6 +42,16 @@ jobs:
       - name: Run conformance checks
         run: cd conformance && python3 scripts/run_conformance.py --schema-root ../spec/schemas
 
+  product-test-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Product-test smoke (validate infra configs)
+        run: make product-test-smoke
+
   docs-build:
     runs-on: ubuntu-latest
     defaults:

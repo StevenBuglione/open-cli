@@ -1,0 +1,46 @@
+{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "testapiSource": {
+      "type": "openapi",
+      "uri": "../openapi/testapi.openapi.yaml",
+      "enabled": true
+    }
+  },
+  "services": {
+    "testapi": {
+      "source": "testapiSource",
+      "alias": "testapi"
+    }
+  },
+  "agents": {
+    "profiles": {
+      "default": {
+        "mode": "curated",
+        "toolSet": "rest-default"
+      }
+    },
+    "defaultProfile": "default"
+  },
+  "curation": {
+    "toolSets": {
+      "rest-default": {
+        "allow": [
+          "testapi:listItems",
+          "testapi:getItem",
+          "testapi:createItem",
+          "testapi:updateItem",
+          "testapi:deleteItem",
+          "testapi:createOperation",
+          "testapi:getOperation",
+          "testapi:triggerUnauthorized",
+          "testapi:triggerForbidden",
+          "testapi:triggerRateLimited",
+          "testapi:triggerInternalError"
+        ],
+        "deny": ["**"]
+      }
+    }
+  }
+}
