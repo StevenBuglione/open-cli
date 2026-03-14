@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
@@ -444,6 +445,293 @@ func TestCapabilityAuthAndPolicy(t *testing.T) {
 		// The inline stub returns 400 for invalid scope since the scope doesn't match validScope
 		if resp.StatusCode == http.StatusOK {
 			t.Fatal("expected non-200 for invalid scope")
+		}
+	})
+
+	// ---- approval-required lane ----
+
+	t.Run("ApprovalRequiredToolIsBlockedWithoutApproval", func(t *testing.T) {
+		if err := os.Setenv("TEST_CLIENT_ID", validClientID); err != nil {
+			t.Fatalf("setenv: %v", err)
+		}
+		if err := os.Setenv("TEST_CLIENT_SECRET", validSecret); err != nil {
+			t.Fatalf("setenv: %v", err)
+		}
+		t.Cleanup(func() {
+			_ = os.Unsetenv("TEST_CLIENT_ID")
+			_ = os.Unsetenv("TEST_CLIENT_SECRET")
+		})
+
+		oauthAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/oauth/token":
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"access_token": issuedToken,
+					"token_type":   "Bearer",
+					"expires_in":   3600,
+				})
+			case "/items":
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "total": 0})
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		t.Cleanup(oauthAPI.Close)
+
+		dir := t.TempDir()
+		openapiPath := writeFile(t, dir, "protected.openapi.yaml",
+			oauthOpenAPIYAML(oauthAPI.URL, oauthAPI.URL+"/oauth/token"))
+		configPath := writeFile(t, dir, ".cli.json", `{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "protectedSource": {
+      "type": "openapi",
+      "uri": "`+openapiPath+`",
+      "enabled": true
+    }
+  },
+  "services": {
+    "protected": {
+      "source": "protectedSource",
+      "alias": "protected"
+    }
+  },
+  "policy": {
+    "approvalRequired": ["protected:listItems"]
+  },
+  "secrets": {
+    "protected.testapi_oauth": {
+      "type": "oauth2",
+      "mode": "clientCredentials",
+      "clientId": { "type": "env", "value": "TEST_CLIENT_ID" },
+      "clientSecret": { "type": "env", "value": "TEST_CLIENT_SECRET" }
+    }
+  }
+}`)
+
+		srv := runtime.NewServer(runtime.Options{AuditPath: filepath.Join(dir, "audit.log")})
+		runtimeSrv := httptest.NewServer(srv.Handler())
+		t.Cleanup(runtimeSrv.Close)
+
+		// Without approval: must be blocked
+		b, _ := json.Marshal(map[string]any{
+			"configPath": configPath,
+			"toolId":     "protected:listItems",
+			"approval":   false,
+		})
+		resp, err := http.Post(runtimeSrv.URL+"/v1/tools/execute", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("execute (no approval): %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("expected 403 without approval, got %d", resp.StatusCode)
+		}
+
+		// With approval: must execute successfully
+		result := executeTool(t, runtimeSrv.URL, configPath, "protected:listItems",
+			map[string]any{"approval": true})
+		if got, ok := result["statusCode"].(float64); !ok || got != 200 {
+			t.Fatalf("expected statusCode 200 with approval, got %v", result)
+		}
+	})
+
+	// ---- denied-tool lane ----
+
+	t.Run("DeniedToolViaExplicitCuratedDeny", func(t *testing.T) {
+		if err := os.Setenv("TEST_CLIENT_ID", validClientID); err != nil {
+			t.Fatalf("setenv: %v", err)
+		}
+		if err := os.Setenv("TEST_CLIENT_SECRET", validSecret); err != nil {
+			t.Fatalf("setenv: %v", err)
+		}
+		t.Cleanup(func() {
+			_ = os.Unsetenv("TEST_CLIENT_ID")
+			_ = os.Unsetenv("TEST_CLIENT_SECRET")
+		})
+
+		oauthAPI := httptest.NewServer(newOAuthStubHandler(t, validClientID, validSecret, validScope))
+		t.Cleanup(oauthAPI.Close)
+
+		dir := t.TempDir()
+		openapiPath := writeFile(t, dir, "protected.openapi.yaml",
+			oauthOpenAPIYAML(oauthAPI.URL, oauthAPI.URL+"/oauth/token"))
+		// Agent profile allows nothing; explicit deny list names the tool
+		configPath := writeFile(t, dir, ".cli.json", `{
+  "cli": "1.0.0",
+  "mode": { "default": "curated" },
+  "sources": {
+    "protectedSource": {
+      "type": "openapi",
+      "uri": "`+openapiPath+`",
+      "enabled": true
+    }
+  },
+  "services": {
+    "protected": {
+      "source": "protectedSource",
+      "alias": "protected"
+    }
+  },
+  "agents": {
+    "profiles": {
+      "locked": {
+        "mode": "curated",
+        "toolSet": "no-write"
+      }
+    },
+    "defaultProfile": "locked"
+  },
+  "curation": {
+    "toolSets": {
+      "no-write": {
+        "allow": [],
+        "deny": ["protected:listItems"]
+      }
+    }
+  }
+}`)
+
+		srv := runtime.NewServer(runtime.Options{AuditPath: filepath.Join(dir, "audit.log")})
+		runtimeSrv := httptest.NewServer(srv.Handler())
+		t.Cleanup(runtimeSrv.Close)
+
+		b, _ := json.Marshal(map[string]any{
+			"configPath":   configPath,
+			"toolId":       "protected:listItems",
+			"agentProfile": "locked",
+		})
+		resp, err := http.Post(runtimeSrv.URL+"/v1/tools/execute", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("expected 403 for denied tool, got %d", resp.StatusCode)
+		}
+	})
+
+	// ---- missing-secret lane ----
+
+	t.Run("MissingSecretResolutionFailsGracefully", func(t *testing.T) {
+		// Ensure the env vars referenced in the config are NOT set
+		_ = os.Unsetenv("ABSENT_CLIENT_ID")
+		_ = os.Unsetenv("ABSENT_CLIENT_SECRET")
+
+		oauthAPI := httptest.NewServer(newOAuthStubHandler(t, validClientID, validSecret, validScope))
+		t.Cleanup(oauthAPI.Close)
+
+		dir := t.TempDir()
+		openapiPath := writeFile(t, dir, "protected.openapi.yaml",
+			oauthOpenAPIYAML(oauthAPI.URL, oauthAPI.URL+"/oauth/token"))
+		// Secrets reference env vars that are absent → empty clientId/secret
+		configPath := writeFile(t, dir, ".cli.json", `{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "protectedSource": {
+      "type": "openapi",
+      "uri": "`+openapiPath+`",
+      "enabled": true
+    }
+  },
+  "services": {
+    "protected": {
+      "source": "protectedSource",
+      "alias": "protected"
+    }
+  },
+  "secrets": {
+    "protected.testapi_oauth": {
+      "type": "oauth2",
+      "mode": "clientCredentials",
+      "clientId":     { "type": "env", "value": "ABSENT_CLIENT_ID" },
+      "clientSecret": { "type": "env", "value": "ABSENT_CLIENT_SECRET" }
+    }
+  }
+}`)
+
+		srv := runtime.NewServer(runtime.Options{AuditPath: filepath.Join(dir, "audit.log")})
+		runtimeSrv := httptest.NewServer(srv.Handler())
+		t.Cleanup(runtimeSrv.Close)
+
+		b, _ := json.Marshal(map[string]any{
+			"configPath": configPath,
+			"toolId":     "protected:listItems",
+		})
+		resp, err := http.Post(runtimeSrv.URL+"/v1/tools/execute", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+		resp.Body.Close()
+		// Empty credentials → token endpoint rejects → runtime returns 502
+		if resp.StatusCode != http.StatusBadGateway {
+			t.Fatalf("expected 502 for missing secret, got %d", resp.StatusCode)
+		}
+	})
+
+	// ---- auth retry / recovery lane ----
+
+	t.Run("AuthRetryOnTransientAPIFailure", func(t *testing.T) {
+		if err := os.Setenv("TEST_CLIENT_ID", validClientID); err != nil {
+			t.Fatalf("setenv: %v", err)
+		}
+		if err := os.Setenv("TEST_CLIENT_SECRET", validSecret); err != nil {
+			t.Fatalf("setenv: %v", err)
+		}
+		t.Cleanup(func() {
+			_ = os.Unsetenv("TEST_CLIENT_ID")
+			_ = os.Unsetenv("TEST_CLIENT_SECRET")
+		})
+
+		var apiCalls atomic.Int32
+		oauthAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/oauth/token":
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"access_token": issuedToken,
+					"token_type":   "Bearer",
+					"expires_in":   3600,
+				})
+			case "/items":
+				n := int(apiCalls.Add(1))
+				if n <= 2 {
+					// First two calls return 429 to trigger exec-layer retry
+					w.Header().Set("Content-Type", "application/json")
+					w.Header().Set("Retry-After", "0")
+					w.WriteHeader(http.StatusTooManyRequests)
+					_ = json.NewEncoder(w).Encode(map[string]string{"error": "rate_limited"})
+					return
+				}
+				// Third call succeeds
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "total": 0})
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		t.Cleanup(oauthAPI.Close)
+
+		dir := t.TempDir()
+		openapiPath := writeFile(t, dir, "protected.openapi.yaml",
+			oauthOpenAPIYAML(oauthAPI.URL, oauthAPI.URL+"/oauth/token"))
+		configPath := writeFile(t, dir, ".cli.json",
+			oauthCLIConfig(openapiPath, validClientID, validSecret))
+
+		srv := runtime.NewServer(runtime.Options{AuditPath: filepath.Join(dir, "audit.log")})
+		runtimeSrv := httptest.NewServer(srv.Handler())
+		t.Cleanup(runtimeSrv.Close)
+
+		result := executeTool(t, runtimeSrv.URL, configPath, "protected:listItems", nil)
+		if got, ok := result["statusCode"].(float64); !ok || got != 200 {
+			t.Fatalf("expected 200 after retries, got %v", result)
+		}
+		if n := int(apiCalls.Load()); n != 3 {
+			t.Fatalf("expected 3 API calls (2 retries + 1 success), got %d", n)
 		}
 	})
 }
