@@ -88,6 +88,8 @@ The feature is split into five units with clear boundaries.
 - `disabledTools`
 - `oauth`
 
+`oauth` is transport-level authentication for the MCP server itself. It is distinct from per-tool OpenAPI security requirements. Transport OAuth is used when the runtime must authenticate before `ListTools` or `CallTool` can succeed.
+
 **Canonical `.cli.json` example:**
 
 ```json
@@ -136,6 +138,42 @@ The feature is split into five units with clear boundaries.
 
 This gives users a near drop-in migration path while keeping internal config uniform.
 
+**MCP transport OAuth example:**
+
+```json
+{
+  "mcpServers": {
+    "remoteDocs": {
+      "type": "streamable-http",
+      "url": "https://mcp.example.com/mcp",
+      "oauth": {
+        "mode": "authorizationCode",
+        "issuer": "https://auth.example.com",
+        "clientId": {
+          "type": "env",
+          "value": "REMOTE_MCP_CLIENT_ID"
+        },
+        "clientSecret": {
+          "type": "osKeychain",
+          "service": "oas-cli",
+          "account": "remote-mcp-client-secret"
+        },
+        "scopes": ["mcp.read"],
+        "callbackPort": 8790,
+        "tokenStorage": "instance"
+      }
+    }
+  }
+}
+```
+
+**Precedence rules:**
+
+- `oauth` authenticates the MCP transport itself and is consulted before discovery or execution.
+- Per-tool OpenAPI `security` requirements are still resolved through `secrets`.
+- If a tool requires both transport OAuth and tool-level auth, both are applied; transport auth gets the MCP session established, and tool-level auth is applied to the synthesized tool execution metadata.
+- When `oauth` is configured, it owns the `Authorization` header for the transport. User-supplied `headers.Authorization` is rejected as a configuration error to avoid ambiguous precedence.
+
 ### 2. MCP transport client
 
 **Purpose:** Speak MCP over supported transports and expose a stable Go interface for discovery and execution.
@@ -161,6 +199,12 @@ This gives users a near drop-in migration path while keeping internal config uni
 
 The transport client owns wire-level MCP concerns only. It does not know about OpenAPI normalization, policy, or workflow binding.
 
+**Discovery-time auth:**
+
+- `stdio` uses no transport auth; discovery starts the subprocess and calls `ListTools`.
+- `sse` and `streamable-http` may require OAuth before discovery. The transport client asks the OAuth engine for a transport token before `ListTools` and reuses the same provider for later `CallTool` requests.
+- Static non-Authorization headers from config are attached to both discovery and execution requests.
+
 ### 3. MCP-to-OpenAPI catalog adapter
 
 **Purpose:** Turn MCP tool schemas into synthetic OpenAPI so the existing catalog builder can keep doing the heavy lifting.
@@ -181,6 +225,7 @@ The transport client owns wire-level MCP concerns only. It does not know about O
   - original MCP tool name
   - disabled-tools filtering outcome
 - Operation IDs are stable and derived as `<service>.<tool>` before slugification, so workflows and guidance can bind to a durable identifier.
+- If two generated operations would collide after normalization, the runtime appends a deterministic short hash of `<source-name>::<original-tool-name>` to the synthetic operation ID while preserving the unmodified MCP tool name in backend metadata.
 
 **Important constraint:** the generated OpenAPI is for **catalog normalization**, not for HTTP execution. The runtime must still know that these tools are MCP-backed.
 
@@ -237,7 +282,7 @@ The transport client owns wire-level MCP concerns only. It does not know about O
   "secrets": {
     "petstore_oauth": {
       "type": "oauth2",
-      "flow": "authorizationCode",
+      "mode": "authorizationCode",
       "issuer": "https://auth.example.com",
       "clientId": {
         "type": "env",
@@ -258,18 +303,17 @@ The transport client owns wire-level MCP concerns only. It does not know about O
 
 **Supported OAuth behaviors:**
 
-- `oauth2.authorizationCode`: browser-based login with PKCE and token refresh
-- `oauth2.clientCredentials`: direct token exchange with cached refresh/renewal behavior when applicable
-- `oauth2.password`: supported only when username and password secret refs are explicitly configured, with documentation warning that the flow is legacy
-- `oauth2.implicit`: supported via explicit interactive mode, with documentation warning that the flow is legacy and does not provide refresh semantics
-- `openIdConnect`: issuer discovery via `.well-known/openid-configuration`, then treated as an OAuth authorization-code or client-credentials provider based on config
+- `authorizationCode`: browser-based login with PKCE and token refresh
+- `clientCredentials`: direct token exchange with renewal behavior based on token expiry
+- `openIdConnect`: issuer discovery via `.well-known/openid-configuration`, then treated as either `authorizationCode` or `clientCredentials` based on explicit config
 
-**Adjacent auth closures included in the same work:**
+The implementation in this feature intentionally stops there. If an OpenAPI document declares `implicit` or `password`, catalog build records that metadata but runtime execution fails with a clear unsupported-flow error that points the user at the supported OAuth modes. This keeps the feature focused on the flows that are safe and still common in current deployments.
 
-- `apiKey` in `cookie`
-- `mutualTLS` transport material via config-backed client certificate references
+**Token-key derivation:**
 
-This keeps the auth engine aligned with the OpenAPI security scheme surface instead of handling only the largest gap.
+- Token cache files live under the existing per-instance state directory.
+- Each cached token key is derived from the stable tuple `{auth-kind, issuer, client-id, sorted-scopes, audience, scheme-name-or-source-name}`.
+- The on-disk filename uses a readable slug prefix plus a hash suffix so collisions stay impossible while manual inspection remains practical.
 
 **Storage and isolation:**
 
@@ -283,11 +327,12 @@ This keeps the auth engine aligned with the OpenAPI security scheme surface inst
 
 1. Config loader merges scopes and normalizes `mcpServers` into canonical `sources` / `services`.
 2. Catalog builder sees a source with `type: "mcp"`.
-3. MCP discovery connects to the server and lists tools.
-4. Disabled tools are filtered before normalization.
-5. MCP tool schemas are converted into synthetic OpenAPI.
-6. Existing catalog normalization extracts parameters, request bodies, command names, guidance hooks, and workflow bindings.
-7. Each normalized tool retains MCP execution metadata so runtime dispatch stays correct.
+3. If the source has transport `oauth`, the OAuth engine acquires or refreshes the transport token before discovery.
+4. MCP discovery connects to the server and lists tools.
+5. Disabled tools are filtered before normalization.
+6. MCP tool schemas are converted into synthetic OpenAPI.
+7. Existing catalog normalization extracts parameters, request bodies, command names, guidance hooks, and workflow bindings.
+8. Each normalized tool retains MCP execution metadata so runtime dispatch stays correct.
 
 ### MCP tool execution
 
@@ -295,9 +340,10 @@ This keeps the auth engine aligned with the OpenAPI security scheme surface inst
 2. Runtime resolves the normalized tool and its auth requirements.
 3. Policy and curation checks run as usual.
 4. The execution router sees `backend.kind == "mcp"`.
-5. The MCP executor connects or reuses a connection for the configured source.
-6. The original MCP tool name is called with validated arguments.
-7. Result content is normalized back into the existing CLI response model.
+5. If the source has transport `oauth`, the OAuth engine acquires or refreshes the transport token before the connection is opened.
+6. The MCP executor connects or reuses a connection for the configured source.
+7. The original MCP tool name is called with validated arguments.
+8. Result content is normalized back into the existing CLI response model.
 
 ### OAuth-backed HTTP or MCP auth
 
