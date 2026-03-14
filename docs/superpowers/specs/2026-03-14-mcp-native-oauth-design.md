@@ -75,7 +75,9 @@ The feature is split into five units with clear boundaries.
   - `sources.<name>` with `type: "mcp"`
   - `services.<name>` if the user did not define one explicitly
 - Explicit `services.<name>` entries may attach overlays, skills, workflows, aliases, or policy-related metadata to an MCP-backed service.
-- If both canonical `sources.<name>` and `mcpServers.<name>` exist, canonical `sources` win and loader validation rejects contradictory definitions.
+- `mcpServers` normalization only runs for names that are not already present in `sources`.
+- If the same name appears in both `sources` and `mcpServers`, config load fails with an ambiguity error even if the values appear equivalent. The user must keep exactly one owner for each source name.
+- Auto-generated services are created only when `services.<name>` does not already exist. Explicit services always own overlays, workflows, aliases, and future service-level options.
 
 **Supported MCP server fields:**
 
@@ -274,6 +276,15 @@ The transport client owns wire-level MCP concerns only. It does not know about O
 - Keep static secret types (`env`, `file`, `exec`, `osKeychain`).
 - Add a new secret type: `oauth2`.
 - Add MCP-server-local `oauth` config for `.mcp.json` compatibility under MCP sources or `mcpServers`.
+- Catalog build stores OAuth scheme metadata for each tool, including:
+  - scheme name
+  - scheme type (`oauth2` or `openIdConnect`)
+  - declared flow type
+  - authorization URL
+  - token URL
+  - refresh URL
+  - OIDC discovery URL
+  - required scopes for the tool
 
 **`secrets` example for OpenAPI OAuth:**
 
@@ -308,6 +319,14 @@ The transport client owns wire-level MCP concerns only. It does not know about O
 - `openIdConnect`: issuer discovery via `.well-known/openid-configuration`, then treated as either `authorizationCode` or `clientCredentials` based on explicit config
 
 The implementation in this feature intentionally stops there. If an OpenAPI document declares `implicit` or `password`, catalog build records that metadata but runtime execution fails with a clear unsupported-flow error that points the user at the supported OAuth modes. This keeps the feature focused on the flows that are safe and still common in current deployments.
+
+**OAuth resolution matrix:**
+
+| Tool requirement | Runtime lookup key | Endpoint source | Effective scopes | Refresh behavior |
+| --- | --- | --- | --- | --- |
+| `oauth2` | `secrets[scheme-name]` | explicit values in the secret first, then OpenAPI scheme metadata | union of secret default scopes and tool-required scopes | refresh token if present, otherwise reacquire by configured mode |
+| `openIdConnect` | `secrets[scheme-name]` | explicit issuer in the secret first, then `openIdConnectUrl` from scheme metadata, then OIDC discovery | union of secret default scopes and tool-required scopes | refresh token if present, otherwise reacquire by configured mode |
+| MCP transport `oauth` | source-local `oauth` block | explicit values in the MCP source config | exactly the scopes declared in the source-local block | refresh token if present, otherwise reacquire by configured mode |
 
 **Token-key derivation:**
 
@@ -345,6 +364,15 @@ The implementation in this feature intentionally stops there. If an OpenAPI docu
 7. The original MCP tool name is called with validated arguments.
 8. Result content is normalized back into the existing CLI response model.
 
+**MCP result normalization:**
+
+- If the MCP response contains structured JSON content, that value becomes the primary result payload for machine-readable CLI formats.
+- If the MCP response contains only text content, the text becomes the primary result payload and the pretty formatter renders it directly.
+- If the MCP response contains mixed content, the runtime returns a JSON object with:
+  - `primary`: the best-effort primary text or structured payload
+  - `content`: the ordered raw MCP content array
+- MCP tool errors are surfaced as execution failures with the MCP error code, message, and attached data when present.
+
 ### OAuth-backed HTTP or MCP auth
 
 1. Catalog build records the security requirements for a tool.
@@ -359,7 +387,7 @@ The implementation in this feature intentionally stops there. If an OpenAPI docu
 - Unreachable MCP sources fail catalog build the same way unreachable OpenAPI sources do today; the failure names the source and transport.
 - Invalid MCP tool schemas fail normalization with the tool name and server name.
 - OAuth acquisition failures are surfaced explicitly with provider, flow, and endpoint context; no silent fallback to unauthenticated execution.
-- Legacy OAuth flows (`password`, `implicit`) require explicit config and emit clear warnings in docs and runtime messages.
+- OpenAPI `implicit` and `password` flows fail with an explicit unsupported-flow error that names the scheme and the supported replacement modes.
 - Token cache corruption triggers a cache-reset-and-reauthorize path for only the affected provider, not the entire runtime.
 
 ## Testing Strategy
@@ -382,7 +410,7 @@ The implementation in this feature intentionally stops there. If an OpenAPI docu
 ### Cross-repo verification
 
 - `oas-cli-go`: Go tests, builds, docs build, and MCP/OAuth integration tests
-- `oas-cli-spec`: schema and prose updates for `mcpServers`, `type: "mcp"`, OAuth secrets, cookie API keys, and mTLS config
+- `oas-cli-spec`: schema and prose updates for `mcpServers`, `type: "mcp"`, transport OAuth, and OAuth-backed tool auth
 - `oas-cli-conformance`: fixtures and expected outputs for MCP sources, generated services, OAuth-backed tools, and auth scheme coverage
 
 ## Documentation Changes
@@ -391,7 +419,7 @@ The implementation in this feature intentionally stops there. If an OpenAPI docu
 - Docusaurus docs:
   - configuration reference for `mcpServers`, `sources.type = mcp`, and OAuth secrets
   - runtime docs for MCP discovery and execution
-  - security docs for OAuth, OIDC, cookie API keys, and mTLS
+  - security docs for OAuth, OIDC, and MCP transport auth
   - migration guide for moving from `.mcp.json` to `.cli.json`
 
 ## Rollout Notes
