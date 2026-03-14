@@ -1,0 +1,27 @@
+{
+  "$comment": "Reference configuration for a multi-instance oasclird deployment.  Each instance is started with its own --state-dir, --cache-dir, and --audit so that filesystem state never crosses instance boundaries.  Adjust 'uri' values to point at your real API spec locations.",
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "sources": {
+    "testapiSource": {
+      "type": "openapi",
+      "uri": "../openapi/testapi.openapi.yaml",
+      "enabled": true
+    }
+  },
+  "services": {
+    "testapi": {
+      "source": "testapiSource",
+      "alias": "testapi"
+    }
+  },
+  "agents": {
+    "profiles": {
+      "default": {
+        "mode": "discover",
+        "toolSet": "all"
+      }
+    },
+    "defaultProfile": "default"
+  }
+}

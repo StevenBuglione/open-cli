@@ -12,7 +12,7 @@
 //
 // The remote server address can be overridden with the MCP_REMOTE_HOST env var
 // (default: localhost:3001).
-package capability_test
+package tests_test
 
 import (
 	"context"
