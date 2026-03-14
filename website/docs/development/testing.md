@@ -56,6 +56,55 @@ make verify-all           # fmt + test + build + verify-spec + verify-conformanc
 
 If you change config semantics, catalog output, schema-facing behavior, or anything else that affects the public contract, run `make verify-all` to confirm the Go implementation, the spec examples, and the conformance fixtures all agree.
 
+## Product tests
+
+`product-tests/` holds end-to-end tests that exercise the CLI against real infrastructure (REST API, OAuth stub, MCP servers). They are separate from `go test ./...` because they require Docker and `npx`.
+
+### Smoke vs full harness
+
+| Mode | Command | What it does | When to run |
+| --- | --- | --- | --- |
+| Smoke | `make product-test-smoke` | Checks prerequisites (Go, Docker, npx) and validates all `docker compose` config files without starting services | Every PR; runs in CI automatically |
+| Full | `make product-test-full` | Validates smoke prerequisites/configs, starts services, then tears them down (capability test runs are a placeholder — no test targets execute yet) | Before merging changes that touch product behaviour or infra configs |
+
+### Running product tests locally
+
+```bash
+# Quick sanity check — no services started
+make product-test-smoke
+
+# Full suite — requires Docker and outbound npm access on first run
+make product-test-full
+```
+
+From inside `product-tests/` you can also target individual capability groups:
+
+```bash
+cd product-tests
+
+# MCP stdio transport (uses npx, no Docker service needed)
+make test-mcp-stdio
+
+# MCP remote / streamable-http transport (starts a Docker container)
+make test-mcp-remote
+
+# Explicit control
+make check-prereqs
+make services-up
+go test ./tests/... -run TestCapabilityCatalog -count=1 -v
+make services-down
+```
+
+### What smoke validates in CI
+
+CI runs `make product-test-smoke` on every push and pull request. That target:
+
+1. Checks that Go, Docker, and `npx` are available in the runner.
+2. Runs `docker compose config --quiet` against `product-tests/docker-compose.yml`.
+3. Runs `docker compose config --quiet` against `product-tests/mcp/remote/docker-compose.yml`.
+
+No containers are started and no network traffic occurs. If either compose file is malformed the job fails immediately.
+
 ## Useful targeted test entry points
 
 - config merge/validation: `go test ./pkg/config -run TestLoadEffective`

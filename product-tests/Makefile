@@ -16,12 +16,12 @@ mcp-remote-down:
 	docker compose -f mcp/remote/docker-compose.yml down
 
 test-mcp-stdio:
-	go test ../... -run TestCapabilityExecuteMCPStdio -count=1 -v -timeout 180s
+	go test ./tests/... -run TestCapabilityExecuteMCPStdio -count=1 -v -timeout 180s
 
 test-mcp-remote: mcp-remote-up
 	@echo "==> Waiting for remote MCP service..."
 	@sleep 8
-	go test ../... -run TestCapabilityExecuteMCPRemote -count=1 -v -timeout 60s; \
+	go test ./tests/... -run TestCapabilityExecuteMCPRemote -count=1 -v -timeout 60s; \
 	  $(MAKE) mcp-remote-down; \
 	  exit $$?
 
@@ -31,6 +31,6 @@ smoke: check-prereqs
 	docker compose -f mcp/remote/docker-compose.yml config --quiet
 	@echo "==> Smoke OK (infrastructure configs valid)"
 
-full: services-up smoke
+full: smoke services-up
 	@echo "==> Full suite placeholder — add test targets here"
 	$(MAKE) services-down

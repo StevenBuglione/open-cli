@@ -146,6 +146,19 @@ make verify-all           # verify + verify-spec + verify-conformance
 
 Both targets install their own Python dependencies via `pip install -q -r requirements.txt` before running.
 
+### Product tests
+
+`product-tests/` runs end-to-end capability tests against live infrastructure. Two entry points:
+
+```bash
+make product-test-smoke   # validate infra configs only — no services started
+make product-test-full    # bring up services and run all capability tests
+```
+
+The smoke target runs automatically in CI on every push and PR. The full suite requires Docker and outbound npm access; run it locally before merging changes that touch product behaviour or infra configs.
+
+See [`product-tests/README.md`](product-tests/README.md) for the full list of targets and per-capability test commands.
+
 ### Docs site
 
 When `README.md`, `website/`, or repo-facing docs change, also verify the Docusaurus site:
