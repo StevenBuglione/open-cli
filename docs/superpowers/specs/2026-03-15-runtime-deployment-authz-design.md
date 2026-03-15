@@ -139,6 +139,18 @@ This makes cleanup deterministic and prevents a second terminal from accidentall
 
 This preserves low latency for agent tool execution while preventing orphaned daemons from accumulating after sessions die.
 
+Supported local session scopes for phase 1:
+
+- `terminal`: a runtime owned by one terminal session
+- `agent`: a runtime owned by one agent process or agent VM session
+- `shared-group`: a runtime attachable by clients that present the same `shareKey`
+
+Manual shutdown semantics:
+
+- `shutdown=when-owner-exits` means the daemon terminates on lease expiry for the owning session or group owner
+- `shutdown=manual` means the daemon remains running until an explicit stop command or administrator cleanup occurs
+- `shutdown=manual` does not disable heartbeats; it changes cleanup policy after lease expiry from automatic terminate to detached/manual retention
+
 ### 3. Remote runtime authorization model
 
 Remote `oasclird` is treated as the execution boundary and policy enforcement point.
@@ -194,6 +206,7 @@ Resolution rules:
 - deny rules always win
 - scopes can only expose tools that already exist in effective config
 - catalog filtering and execution authorization must use the same resolved authorization envelope
+- if only explicit `tool:` scopes are present, the authorization envelope is the matching configured tool set after deny rules are applied
 
 #### Remote token lifecycle
 
@@ -274,6 +287,15 @@ Planning-level field expectations:
 - `runtime.local.share` must validate against a closed enum such as `exclusive` or `group`
 - `runtime.local.shareKey` is forbidden unless `share=group`
 - `runtime.local.shutdown` must validate against a closed enum such as `when-owner-exits` or `manual`
+- `runtime.local.sessionScope` must validate against the closed enum `terminal`, `agent`, or `shared-group`
+
+Merge rules:
+
+- runtime objects deep-merge across managed, user, project, and local scopes
+- scalar fields are overridden by the narrowest scope that defines them
+- arrays are replaced by the narrowest scope that defines them unless a future field explicitly declares additive behavior
+- `runtime.mode` from a narrower scope overrides wider-scope defaults without discarding sibling `local` or `remote` objects that still apply
+- validation runs on the final merged runtime block
 
 ### 6. Catalog and execution semantics
 
@@ -320,6 +342,7 @@ The contract must include:
 - catalog responses that carry the effective authorization envelope version used to filter results
 - execute responses and failures that use structured error categories such as `runtime_start_failed`, `runtime_attach_mismatch`, `runtime_unreachable`, `authn_failed`, `authz_denied`, and `contract_mismatch`
 - version negotiation rules where unsupported required capabilities fail closed instead of silently degrading behavior
+- heartbeat renewal, lease-state reporting, and explicit session-close operations for managed local and remote sessions
 
 The client must validate handshake metadata before attaching to a local managed runtime or trusting a remote daemon for catalog and execution.
 
@@ -329,6 +352,16 @@ Compatibility rules:
 - attach or connect is allowed only when the major contract version matches
 - minor-version differences are allowed only when every client-required capability is advertised by the daemon
 - otherwise the client fails with `contract_mismatch`
+
+Error taxonomy meanings:
+
+- `runtime_start_failed`: daemon could not be launched or initialized
+- `runtime_attach_mismatch`: runtime metadata did not match fingerprint, share mode, or contract requirements
+- `runtime_attach_conflict`: caller attempted to attach to an exclusive runtime owned by another session
+- `runtime_unreachable`: expected runtime endpoint could not be contacted
+- `authn_failed`: authentication missing, expired, revoked, or refresh failed
+- `authz_denied`: caller authenticated but lacks authorization for the requested tool or catalog entry
+- `contract_mismatch`: runtime and client protocol versions or capabilities are incompatible
 
 ### 9. Failure and recovery behavior
 
