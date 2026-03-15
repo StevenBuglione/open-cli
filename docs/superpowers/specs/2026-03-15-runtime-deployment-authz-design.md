@@ -63,7 +63,14 @@ Resolution semantics:
 - `local` always uses a managed local `oasclird`.
 - `remote` always delegates discovery and execution to a configured remote `oasclird`.
 
-CLI flags may still exist as explicit escape hatches, but `.cli.json` becomes the primary source of truth for runtime behavior.
+Runtime selection must follow a deterministic precedence order:
+
+1. explicit CLI runtime flags
+2. effective merged `.cli.json` `runtime` block
+3. legacy environment-variable runtime hints
+4. default `auto`
+
+Flags remain explicit escape hatches for debugging and emergency override, but normal operation should flow from `.cli.json`. Environment variables remain a compatibility layer rather than the preferred control plane.
 
 ### 2. Local managed runtime behavior
 
@@ -74,10 +81,27 @@ Local managed runtime requirements:
 - local MCP servers remain warm between tool calls
 - `oasclird` supervises the MCP processes and transports it launched
 - ownership is session-scoped, not merely machine-scoped
-- the runtime records an owner identity plus a lease or heartbeat
-- if the owning terminal/session exits, the managed runtime shuts down and cleans up its MCP children
+- the runtime records an owner identity, session ID, and lease or heartbeat
+- if the owning terminal/session exits or heartbeats expire, the managed runtime shuts down and cleans up its MCP children
 - accidental sharing is not allowed
 - shared local runtimes must be explicitly requested by configuration or instance identity
+
+Default local ownership model:
+
+- every terminal or agent session gets its own managed local runtime by default
+- the runtime identity is derived from the effective config fingerprint plus session identity
+- a heartbeat is renewed by the client while the session is alive
+- after a small missed-heartbeat threshold, the daemon transitions to shutdown
+
+Attach and sharing rules:
+
+- `share=exclusive` is the default
+- in `exclusive` mode, a client may only attach to the runtime it created for that session
+- a second terminal with the same config gets a distinct managed runtime rather than silently attaching
+- `share=group` allows attach only when an explicit share key matches
+- attach must fail closed when runtime metadata does not match the caller's expected config fingerprint, share mode, or owner rules
+
+This makes cleanup deterministic and prevents a second terminal from accidentally keeping a stale daemon alive.
 
 This preserves low latency for agent tool execution while preventing orphaned daemons from accumulating after sessions die.
 
@@ -114,6 +138,15 @@ Example mental model:
 
 A remote token may include one or more of these, but the daemon must still intersect them with server policy and effective config before exposing tools.
 
+Scope evaluation rules:
+
+- the remote daemon is the authority that computes the final authorization envelope
+- scope filtering occurs server-side during catalog materialization and is re-checked again at execution time
+- scope strings are typed by prefix such as `bundle:`, `tool:`, and `profile:`
+- bundle and profile scopes are expanded server-side into concrete tool grants according to policy
+- clients must not pre-expand or self-authorize based on scope names alone
+- if a scope grants access to a bundle but server policy removes a tool from that bundle, the tool remains hidden and unexecutable
+
 ### 4. Ephemeral remote session state
 
 Per-agent remote session state must be ephemeral.
@@ -130,17 +163,18 @@ Where practical, tools outside the authorized envelope should be absent from cat
 
 ### 5. Configuration shape
 
-The exact schema can evolve during implementation, but the intended configuration direction is:
+The exact schema can evolve during implementation, but the interface should be stable enough for planning. The intended configuration direction is:
 
 ```json
 {
   "runtime": {
     "mode": "auto",
     "local": {
-      "managed": true,
       "sessionScope": "terminal",
+      "heartbeatSeconds": 15,
+      "missedHeartbeatLimit": 3,
       "shutdown": "when-owner-exits",
-      "share": "explicit"
+      "share": "exclusive"
     },
     "remote": {
       "url": "https://runtime.example.com",
@@ -163,6 +197,15 @@ Design constraints for this block:
 - explicit enough for operators to set org-level defaults
 - narrowable by project or local overrides
 - compatible with current instance derivation and state isolation logic
+
+Planning-level field expectations:
+
+- `runtime.mode` is required only when overriding `auto`
+- `runtime.local` is optional and only applies to `auto` or `local`
+- `runtime.remote.url` is required when `mode=remote`
+- `runtime.remote.oauth.scopes` is optional but strongly expected for least-privilege remote deployments
+- `runtime.local.share` must validate against a closed enum such as `exclusive` or `group`
+- `runtime.local.shutdown` must validate against a closed enum such as `when-owner-exits` or `manual`
 
 ### 6. Catalog and execution semantics
 
@@ -192,6 +235,34 @@ At minimum, the design should extend auditing to record:
 
 This makes future compliance and operator debugging materially easier.
 
+Audit destinations:
+
+- embedded and local-daemon modes continue to emit per-instance local audit records
+- remote mode emits server-side audit records keyed by remote session principal and instance identity
+- client-side connection failures should still produce local diagnostic events even when execution never reaches the remote daemon
+
+### 8. Failure and recovery behavior
+
+Failure behavior must be explicit because agents need deterministic outcomes.
+
+Local runtime failures:
+
+- if `local` mode or `auto` promotion requires a daemon and startup fails, the command fails with a runtime-start error
+- if attach metadata does not match the expected config fingerprint or share rules, the client must fail closed rather than attach to the wrong daemon
+- if a managed daemon crashes mid-session, the next client command may attempt a single clean restart for the same owner session before surfacing an error
+
+Remote runtime failures:
+
+- if the remote daemon is unreachable, return a runtime-unreachable error rather than silently falling back to local execution
+- if the remote token is expired or revoked, return an authn error and require token refresh or re-issuance
+- if the remote token is valid but lacks sufficient scope, return an authz error and do not leak unauthorized tool details beyond what policy allows
+- remote mode must never silently downgrade to embedded or local execution
+
+Version and contract mismatches:
+
+- if the client and daemon disagree on runtime contract version or required capabilities, fail with a clear compatibility error
+- catalog filtering and execution authorization must use the same effective authorization envelope to avoid discover/execute drift
+
 ## Operational defaults
 
 The intended defaults are:
@@ -203,6 +274,7 @@ The intended defaults are:
 - explicit `remote`: use the configured remote runtime and enforce remote authz
 - local managed runtimes are owner-scoped and cleaned up when the owner exits
 - remote session state is ephemeral and isolated per agent/session
+- remote mode never falls back to local or embedded execution on failure
 
 ## Testing expectations
 
@@ -213,9 +285,13 @@ Implementation should be considered complete only when product tests cover:
 - local daemon warm MCP reuse across repeated tool calls
 - owner-session teardown and cleanup of managed local daemons
 - explicit shared-vs-exclusive local runtime behavior
+- attach rejection on config fingerprint or share-rule mismatch
+- single-restart behavior after managed-daemon crash
 - remote catalog filtering by bundle, tool, and profile scopes
 - remote execution denial outside granted scopes
 - ephemeral remote auth cache wipe on session end
+- remote token expiry and revocation handling
+- version-skew and contract-mismatch behavior
 - audit output reflecting runtime mode and principal context
 
 ## Open implementation notes
