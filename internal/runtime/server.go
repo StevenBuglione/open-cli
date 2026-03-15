@@ -34,6 +34,9 @@ type Options struct {
 	HeartbeatSeconds     int
 	MissedHeartbeatLimit int
 	ShutdownMode         string
+	SessionScope         string
+	ShareMode            string
+	ConfigFingerprint    string
 	HTTPClient           *http.Client
 	Observer             obs.Observer
 	KeychainResolver     func(string) (string, error)
@@ -51,6 +54,9 @@ type Server struct {
 	heartbeatSeconds     int
 	missedHeartbeatLimit int
 	shutdownMode         string
+	sessionScope         string
+	shareMode            string
+	configFingerprint    string
 	observer             obs.Observer
 	keychainResolver     func(string) (string, error)
 	shutdown             func() error
@@ -162,6 +168,9 @@ func NewServer(options Options) *Server {
 		heartbeatSeconds:     options.HeartbeatSeconds,
 		missedHeartbeatLimit: options.MissedHeartbeatLimit,
 		shutdownMode:         options.ShutdownMode,
+		sessionScope:         options.SessionScope,
+		shareMode:            options.ShareMode,
+		configFingerprint:    options.ConfigFingerprint,
 		observer:             options.Observer,
 		keychainResolver:     options.KeychainResolver,
 		shutdown:             options.Shutdown,
@@ -205,7 +214,7 @@ func (server *Server) handleEffectiveCatalog(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		finishErr = err
 		if authErr, ok := err.(*runtimeAuthError); ok {
-			server.recordCatalogEvent("", authErr.Code)
+			server.recordRuntimeEvent("authn_failure", "", "", "denied", authErr.Code, authErr.StatusCode)
 			http.Error(w, authErr.Code, authErr.StatusCode)
 			return
 		}
@@ -217,6 +226,7 @@ func (server *Server) handleEffectiveCatalog(w http.ResponseWriter, r *http.Requ
 	agentProfile := r.URL.Query().Get("agentProfile")
 	filteredCatalog := ntc
 	if authz.Enabled {
+		server.recordRuntimeEvent("authenticated_connect", authz.Principal, "", "allowed", "authenticated_connect", http.StatusOK)
 		filteredCatalog = filterCatalog(ntc, authz.AllowedTools)
 		server.recordCatalogEvent(authz.Principal, "catalog_filtered")
 	}
@@ -460,9 +470,11 @@ func (server *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if _, err := server.authenticateRequest(ctx, r, cfg.Config); err != nil {
+	authz, err := server.authenticateRequest(ctx, r, cfg.Config)
+	if err != nil {
 		finishErr = err
 		if authErr, ok := err.(*runtimeAuthError); ok {
+			server.recordRuntimeEvent("authn_failure", "", "", "denied", authErr.Code, authErr.StatusCode)
 			http.Error(w, authErr.Code, authErr.StatusCode)
 			return
 		}
@@ -485,6 +497,9 @@ func (server *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		response.Sources = append(response.Sources, item)
 	}
 
+	if authz.Enabled {
+		server.recordRuntimeEvent("token_refresh", authz.Principal, "", "allowed", "token_refresh", http.StatusOK)
+	}
 	server.observer.Emit(ctx, obs.Event{Name: "runtime.refresh", Operation: "refresh", StatusCode: http.StatusOK, Duration: time.Since(start), RequestID: requestID})
 	writeJSON(w, http.StatusOK, response)
 }
@@ -561,6 +576,9 @@ func (server *Server) handleRuntimeInfo(w http.ResponseWriter, r *http.Request) 
 			"heartbeatSeconds":     server.heartbeatSeconds,
 			"missedHeartbeatLimit": server.missedHeartbeatLimit,
 			"shutdown":             server.shutdownMode,
+			"sessionScope":         server.sessionScope,
+			"shareMode":            server.shareMode,
+			"configFingerprint":    server.configFingerprint,
 			"activeSessions":       server.activeLeaseCount(),
 		}
 	}
@@ -572,7 +590,8 @@ func (server *Server) handleRuntimeHeartbeat(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var request struct {
-		SessionID string `json:"sessionId"`
+		SessionID         string `json:"sessionId"`
+		ConfigFingerprint string `json:"configFingerprint,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -582,10 +601,19 @@ func (server *Server) handleRuntimeHeartbeat(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "sessionId is required", http.StatusBadRequest)
 		return
 	}
-	server.renewLease(strings.TrimSpace(request.SessionID))
+	sessionID := strings.TrimSpace(request.SessionID)
+	if server.configFingerprint != "" && request.ConfigFingerprint != "" && request.ConfigFingerprint != server.configFingerprint {
+		http.Error(w, "runtime_attach_mismatch", http.StatusConflict)
+		return
+	}
+	if !server.canAttachSession(sessionID) {
+		http.Error(w, "runtime_attach_conflict", http.StatusConflict)
+		return
+	}
+	server.renewLease(sessionID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"renewed":        true,
-		"sessionId":      strings.TrimSpace(request.SessionID),
+		"sessionId":      sessionID,
 		"activeSessions": server.activeLeaseCount(),
 	})
 }
@@ -620,6 +648,7 @@ func (server *Server) handleRuntimeSessionClose(w http.ResponseWriter, r *http.R
 	}
 	if strings.TrimSpace(request.SessionID) != "" {
 		server.removeLease(strings.TrimSpace(request.SessionID))
+		server.recordRuntimeEvent("session_close", "", strings.TrimSpace(request.SessionID), "allowed", "session_close", http.StatusOK)
 	}
 	if err := os.RemoveAll(filepath.Join(server.stateDir, "oauth")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -865,13 +894,31 @@ func filterCatalog(ntc *catalog.NormalizedCatalog, allowed map[string]struct{}) 
 	return &filtered
 }
 
-func (server *Server) recordCatalogEvent(agentProfile, reason string) {
+func (server *Server) recordCatalogEvent(principal, reason string) {
 	_ = server.auditStore.Append(audit.Event{
-		Timestamp:    time.Now().UTC(),
-		AgentProfile: agentProfile,
-		ToolID:       "catalog.effective",
-		Decision:     "allowed",
-		ReasonCode:   reason,
+		Timestamp:  time.Now().UTC(),
+		EventType:  "catalog_filtered",
+		Principal:  principal,
+		ToolID:     "catalog.effective",
+		Decision:   "allowed",
+		ReasonCode: reason,
+	})
+}
+
+func (server *Server) recordRuntimeEvent(eventType, principal, sessionID, decision, reason string, statusCode int) {
+	toolID := "runtime." + eventType
+	if eventType == "session_close" || eventType == "session_expiry" {
+		toolID = "runtime.session"
+	}
+	_ = server.auditStore.Append(audit.Event{
+		Timestamp:  time.Now().UTC(),
+		EventType:  eventType,
+		Principal:  principal,
+		SessionID:  sessionID,
+		ToolID:     toolID,
+		Decision:   decision,
+		ReasonCode: reason,
+		StatusCode: statusCode,
 	})
 }
 
@@ -928,8 +975,13 @@ func selectView(cfg config.Config, ntc *catalog.NormalizedCatalog, mode, agentPr
 }
 
 func (server *Server) recordEvent(tool catalog.Tool, agentProfile string, decision policy.Decision, statusCode, retryCount int, latency time.Duration) {
+	eventType := "tool_execution"
+	if !decision.Allowed {
+		eventType = "authz_denial"
+	}
 	_ = server.auditStore.Append(audit.Event{
 		Timestamp:     time.Now().UTC(),
+		EventType:     eventType,
 		AgentProfile:  agentProfile,
 		ToolID:        tool.ID,
 		ServiceID:     tool.ServiceID,
@@ -1041,6 +1093,20 @@ func (server *Server) activeLeaseCount() int {
 	return len(server.leases)
 }
 
+func (server *Server) canAttachSession(sessionID string) bool {
+	if server.shareMode == "group" || sessionID == "" {
+		return true
+	}
+	server.leaseMu.Lock()
+	defer server.leaseMu.Unlock()
+	for existingSessionID := range server.leases {
+		if existingSessionID != sessionID {
+			return false
+		}
+	}
+	return true
+}
+
 func (server *Server) renewLease(sessionID string) {
 	if !server.lifecycleEnabled() {
 		return
@@ -1069,6 +1135,7 @@ func (server *Server) expireLease(sessionID string, expiresAt time.Time) {
 	delete(server.leases, sessionID)
 	remaining := len(server.leases)
 	server.leaseMu.Unlock()
+	server.recordRuntimeEvent("session_expiry", "", sessionID, "allowed", "session_expiry", 0)
 	if remaining == 0 && server.shutdownMode == "when-owner-exits" && server.shutdown != nil {
 		_ = server.shutdown()
 	}

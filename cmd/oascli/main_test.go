@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
+	configpkg "github.com/StevenBuglione/oas-cli-go/pkg/config"
 	"github.com/StevenBuglione/oas-cli-go/pkg/instance"
 )
 
@@ -506,8 +507,9 @@ func TestResolveCommandOptionsStartsManagedLocalRuntimeWhenRegistryMissing(t *te
 	localSessionHandshake = func(options CommandOptions) (CommandOptions, error) { return options, nil }
 
 	resolved, err := resolveCommandOptions(CommandOptions{
-		ConfigPath: configPath,
-		StateDir:   filepath.Join(dir, "state"),
+		ConfigPath:        configPath,
+		RuntimeDeployment: "local",
+		StateDir:          filepath.Join(dir, "state"),
 	})
 	if err != nil {
 		t.Fatalf("resolveCommandOptions: %v", err)
@@ -593,6 +595,65 @@ func TestResolveCommandOptionsRegistersLocalSessionLease(t *testing.T) {
 	}
 	if heartbeatBody["sessionId"] != resolved.SessionID {
 		t.Fatalf("expected heartbeat registration for %q, got %#v", resolved.SessionID, heartbeatBody)
+	}
+	if got := heartbeatBody["configFingerprint"]; got == nil || got == "" {
+		t.Fatalf("expected config fingerprint to be sent during heartbeat, got %#v", got)
+	}
+}
+
+func TestResolveCommandOptionsFailsOnLifecycleFingerprintMismatch(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(configPath, []byte(`{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local",
+	    "local": {
+	      "sessionScope": "terminal",
+	      "heartbeatSeconds": 15,
+	      "missedHeartbeatLimit": 3,
+	      "shutdown": "when-owner-exits",
+	      "share": "exclusive"
+	    }
+	  },
+	  "mcpServers": {
+	    "filesystem": {
+	      "type": "stdio",
+	      "command": "npx"
+	    }
+	  }
+	}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	runtimeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/runtime/info":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"lifecycle": map[string]any{
+					"capabilities":      []string{"heartbeat"},
+					"configFingerprint": "server-fingerprint",
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer runtimeServer.Close()
+
+	previousHandshake := localSessionHandshake
+	t.Cleanup(func() { localSessionHandshake = previousHandshake })
+	localSessionHandshake = performLocalSessionHandshake
+
+	_, err := resolveCommandOptions(CommandOptions{
+		ConfigPath:        configPath,
+		RuntimeDeployment: "local",
+		RuntimeURL:        runtimeServer.URL,
+		StateDir:          filepath.Join(dir, "state"),
+	})
+	if err == nil || !strings.Contains(err.Error(), "runtime_attach_mismatch") {
+		t.Fatalf("expected runtime_attach_mismatch error, got %v", err)
 	}
 }
 
@@ -974,8 +1035,9 @@ func TestResolveCommandOptionsUsesTerminalScopedLocalInstanceID(t *testing.T) {
 	localSessionHandshake = func(options CommandOptions) (CommandOptions, error) { return options, nil }
 
 	resolved, err := resolveCommandOptions(CommandOptions{
-		ConfigPath: configPath,
-		StateDir:   filepath.Join(dir, "state"),
+		ConfigPath:        configPath,
+		RuntimeDeployment: "local",
+		StateDir:          filepath.Join(dir, "state"),
 	})
 	if err != nil {
 		t.Fatalf("resolveCommandOptions: %v", err)
@@ -1066,6 +1128,48 @@ func TestConfigureManagedRuntimeCommandSetsParentDeathSignalOnLinux(t *testing.T
 	}
 	if cmd.SysProcAttr.Pdeathsig != syscall.SIGTERM {
 		t.Fatalf("expected parent death signal SIGTERM, got %v", cmd.SysProcAttr.Pdeathsig)
+	}
+}
+
+func TestManagedRuntimeArgsIncludeLifecycleFlags(t *testing.T) {
+	args := managedRuntimeArgs(CommandOptions{
+		ConfigPath:        "/tmp/project/.cli.json",
+		InstanceID:        "runtime-1",
+		StateDir:          "/tmp/state",
+		ConfigFingerprint: "fp-1",
+	}, &configpkg.RuntimeConfig{
+		Local: &configpkg.LocalRuntimeConfig{
+			SessionScope:         "shared-group",
+			HeartbeatSeconds:     15,
+			MissedHeartbeatLimit: 3,
+			Shutdown:             "manual",
+			Share:                "group",
+			ShareKey:             "team-a",
+		},
+	})
+
+	expected := []string{
+		"--config", "/tmp/project/.cli.json",
+		"--instance-id", "runtime-1",
+		"--state-dir", "/tmp/state",
+		"--heartbeat-seconds", "15",
+		"--missed-heartbeat-limit", "3",
+		"--shutdown", "manual",
+		"--session-scope", "shared-group",
+		"--share", "group",
+		"--config-fingerprint", "fp-1",
+	}
+	for i := 0; i < len(expected); i += 2 {
+		found := false
+		for j := 0; j < len(args)-1; j++ {
+			if args[j] == expected[i] && args[j+1] == expected[i+1] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected managed runtime args to include %q %q, got %#v", expected[i], expected[i+1], args)
+		}
 	}
 }
 

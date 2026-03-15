@@ -9,6 +9,61 @@ type ModeConfig struct {
 	Default string `json:"default"`
 }
 
+type RuntimeConfig struct {
+	Mode   string               `json:"mode,omitempty"`
+	Local  *LocalRuntimeConfig  `json:"local,omitempty"`
+	Remote *RemoteRuntimeConfig `json:"remote,omitempty"`
+	Server *RuntimeServerConfig `json:"server,omitempty"`
+}
+
+type LocalRuntimeConfig struct {
+	SessionScope         string `json:"sessionScope,omitempty"`
+	HeartbeatSeconds     int    `json:"heartbeatSeconds,omitempty"`
+	MissedHeartbeatLimit int    `json:"missedHeartbeatLimit,omitempty"`
+	Shutdown             string `json:"shutdown,omitempty"`
+	Share                string `json:"share,omitempty"`
+	ShareKey             string `json:"shareKey,omitempty"`
+}
+
+type RemoteRuntimeConfig struct {
+	URL   string             `json:"url,omitempty"`
+	OAuth *RemoteOAuthConfig `json:"oauth,omitempty"`
+}
+
+type RemoteOAuthConfig struct {
+	Mode         string                   `json:"mode,omitempty"`
+	Audience     string                   `json:"audience,omitempty"`
+	Scopes       []string                 `json:"scopes,omitempty"`
+	TokenRef     string                   `json:"tokenRef,omitempty"`
+	Client       *RemoteOAuthClientConfig `json:"client,omitempty"`
+	BrowserLogin *BrowserLoginConfig      `json:"browserLogin,omitempty"`
+}
+
+type RemoteOAuthClientConfig struct {
+	TokenURL     string     `json:"tokenURL,omitempty"`
+	ClientID     *SecretRef `json:"clientId,omitempty"`
+	ClientSecret *SecretRef `json:"clientSecret,omitempty"`
+}
+
+type BrowserLoginConfig struct {
+	CallbackPort int `json:"callbackPort,omitempty"`
+}
+
+type RuntimeServerConfig struct {
+	Auth *RuntimeServerAuthConfig `json:"auth,omitempty"`
+}
+
+type RuntimeServerAuthConfig struct {
+	Mode             string     `json:"mode,omitempty"`
+	Audience         string     `json:"audience,omitempty"`
+	IntrospectionURL string     `json:"introspectionURL,omitempty"`
+	AuthorizationURL string     `json:"authorizationURL,omitempty"`
+	TokenURL         string     `json:"tokenURL,omitempty"`
+	BrowserClientID  string     `json:"browserClientId,omitempty"`
+	ClientID         *SecretRef `json:"clientId,omitempty"`
+	ClientSecret     *SecretRef `json:"clientSecret,omitempty"`
+}
+
 type Source struct {
 	Type          string         `json:"type"`
 	URI           string         `json:"uri,omitempty"`
@@ -99,6 +154,7 @@ type SecretRef struct {
 type Config struct {
 	CLI      string             `json:"cli"`
 	Mode     ModeConfig         `json:"mode"`
+	Runtime  *RuntimeConfig     `json:"runtime,omitempty"`
 	Sources  map[string]Source  `json:"sources"`
 	Services map[string]Service `json:"services,omitempty"`
 	Curation CurationConfig     `json:"curation,omitempty"`

@@ -8,6 +8,8 @@ title: Runtime Overview
 
 Even when you use embedded mode, the same runtime server implementation is doing the work behind the scenes.
 
+The CLI can now pick that runtime path from `.cli.json` through `runtime.mode`, not just from CLI flags and environment variables.
+
 ## Responsibilities
 
 The runtime owns these concerns:
@@ -71,3 +73,15 @@ A normal `oascli` request looks like this:
 6. return output to the caller
 
 Because catalog resolution happens so early, runtime availability affects even CLI help and schema inspection.
+
+For remote runtimes, `oascli` can also attach runtime-level bearer auth before those HTTP calls. The current client supports:
+
+- forwarding an operator-provided token (`runtime.remote.oauth.mode: "providedToken"`)
+- acquiring a client-credentials token (`runtime.remote.oauth.mode: "oauthClient"`)
+- browser login against runtime-hosted metadata (`runtime.remote.oauth.mode: "browserLogin"`)
+
+When `runtime.server.auth` is enabled on `oasclird`, the daemon itself now becomes the authorization boundary for remote callers:
+
+- bearer auth is required on runtime HTTP requests
+- the effective catalog is filtered by runtime scopes
+- execution is denied outside the resolved authorization envelope

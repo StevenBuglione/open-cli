@@ -4,7 +4,7 @@ title: Audit Logging
 
 # Audit Logging
 
-Most `POST /v1/tools/execute` requests are written to an append-only audit file after the runtime successfully loads the catalog and resolves the target tool.
+Runtime activity is written to an append-only audit file. Execution events still make up most records, but the runtime also records auth and session lifecycle transitions.
 
 ## Default location
 
@@ -29,6 +29,7 @@ Example event:
 ```json
 {
   "timestamp": "2026-03-14T12:00:00Z",
+  "eventType": "tool_execution",
   "agentProfile": "support",
   "toolId": "tickets:createTicket",
   "serviceId": "tickets",
@@ -48,14 +49,28 @@ Example event:
 - successful tool executions
 - denied tool executions
 - execution failures after policy allowed the call
+- authenticated catalog connects when runtime bearer auth is enabled
+- authn failures on protected runtime HTTP surfaces
+- refresh requests that completed under authenticated runtime access
+- local `session-close` requests
+- local lease expiry events
+
+The `eventType` field distinguishes the main runtime categories:
+
+- `tool_execution`
+- `authz_denial`
+- `catalog_filtered`
+- `authenticated_connect`
+- `authn_failure`
+- `token_refresh`
+- `session_close`
+- `session_expiry`
 
 ## What does not get audited
 
 - malformed execute requests that fail JSON decoding
 - catalog-load failures before a tool is resolved
 - unknown tool IDs that fail before policy/execution handling
-- catalog fetches
-- refresh requests
 - workflow validation requests
 
 ## Caveats
@@ -64,6 +79,7 @@ Example event:
 - there is no built-in rotation or retention policy
 - there is no explicit `fsync`, so crash durability is best-effort
 - `authScheme` and `requestSize` fields exist but are not meaningfully populated today
+- there is still no server-side filtering, paging, or query language on `GET /v1/audit/events`
 
 ## Access methods
 

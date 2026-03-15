@@ -12,7 +12,9 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
 	"github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
 )
 
@@ -265,5 +267,94 @@ func TestMultiInstance_FilesystemStateDoesNotLeak(t *testing.T) {
 	// B's state dir must be on a completely different path.
 	if instB.StateDir == instA.StateDir {
 		t.Error("instances share the same StateDir path")
+	}
+}
+
+func TestCapabilityLocalLifecycleExclusiveConflict(t *testing.T) {
+	inst := helpers.NewLifecycleInstance(t, runtime.Options{
+		HeartbeatSeconds:     15,
+		MissedHeartbeatLimit: 3,
+		ShutdownMode:         "when-owner-exits",
+		SessionScope:         "terminal",
+		ShareMode:            "exclusive",
+		ConfigFingerprint:    "fp-1",
+	})
+
+	status, _, body := inst.Heartbeat(t, "sess-1", "fp-1")
+	if status != http.StatusOK {
+		t.Fatalf("expected first heartbeat 200, got %d (%s)", status, body)
+	}
+	status, _, body = inst.Heartbeat(t, "sess-2", "fp-1")
+	if status != http.StatusConflict {
+		t.Fatalf("expected conflicting heartbeat 409, got %d (%s)", status, body)
+	}
+	if body != "runtime_attach_conflict" {
+		t.Fatalf("expected runtime_attach_conflict body, got %q", body)
+	}
+}
+
+func TestCapabilityLocalLifecycleSharedGroupAllowsMultipleSessions(t *testing.T) {
+	inst := helpers.NewLifecycleInstance(t, runtime.Options{
+		HeartbeatSeconds:     15,
+		MissedHeartbeatLimit: 3,
+		ShutdownMode:         "manual",
+		SessionScope:         "shared-group",
+		ShareMode:            "group",
+		ConfigFingerprint:    "fp-1",
+	})
+
+	status, payload, body := inst.Heartbeat(t, "sess-1", "fp-1")
+	if status != http.StatusOK {
+		t.Fatalf("expected first heartbeat 200, got %d (%s)", status, body)
+	}
+	if payload["activeSessions"] != float64(1) {
+		t.Fatalf("expected one active session after first heartbeat, got %#v", payload)
+	}
+	status, payload, body = inst.Heartbeat(t, "sess-2", "fp-1")
+	if status != http.StatusOK {
+		t.Fatalf("expected second heartbeat 200, got %d (%s)", status, body)
+	}
+	if payload["activeSessions"] != float64(2) {
+		t.Fatalf("expected two active sessions after second heartbeat, got %#v", payload)
+	}
+}
+
+func TestCapabilityLocalLifecycleFingerprintMismatch(t *testing.T) {
+	inst := helpers.NewLifecycleInstance(t, runtime.Options{
+		HeartbeatSeconds:     15,
+		MissedHeartbeatLimit: 3,
+		ShutdownMode:         "when-owner-exits",
+		SessionScope:         "terminal",
+		ShareMode:            "exclusive",
+		ConfigFingerprint:    "fp-1",
+	})
+
+	status, _, body := inst.Heartbeat(t, "sess-1", "fp-2")
+	if status != http.StatusConflict {
+		t.Fatalf("expected mismatched heartbeat 409, got %d (%s)", status, body)
+	}
+	if body != "runtime_attach_mismatch" {
+		t.Fatalf("expected runtime_attach_mismatch body, got %q", body)
+	}
+}
+
+func TestCapabilityLocalLifecycleManualRetentionAfterExpiry(t *testing.T) {
+	inst := helpers.NewLifecycleInstance(t, runtime.Options{
+		HeartbeatSeconds:     1,
+		MissedHeartbeatLimit: 1,
+		ShutdownMode:         "manual",
+		SessionScope:         "shared-group",
+		ShareMode:            "group",
+		ConfigFingerprint:    "fp-1",
+	})
+
+	status, _, body := inst.Heartbeat(t, "sess-1", "fp-1")
+	if status != http.StatusOK {
+		t.Fatalf("expected heartbeat 200, got %d (%s)", status, body)
+	}
+	select {
+	case <-inst.ShutdownSignal:
+		t.Fatalf("expected manual runtime retention after lease expiry")
+	case <-time.After(1500 * time.Millisecond):
 	}
 }

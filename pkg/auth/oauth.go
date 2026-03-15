@@ -619,6 +619,8 @@ func resolveSecretRef(policy config.PolicyConfig, secret *config.SecretRef, keyc
 		return "", fmt.Errorf("missing secret reference")
 	}
 	switch secret.Type {
+	case "literal":
+		return secret.Value, nil
 	case "env":
 		return os.Getenv(secret.Value), nil
 	case "file":

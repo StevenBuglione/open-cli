@@ -223,6 +223,11 @@ func TestCapabilityAuditSuccessfulExecution(t *testing.T) {
 			t.Errorf("serviceId missing in audit event: %v", found)
 		}
 	})
+	t.Run("event_type_is_tool_execution", func(t *testing.T) {
+		if found["eventType"] != "tool_execution" {
+			t.Errorf("eventType = %v, want tool_execution", found["eventType"])
+		}
+	})
 	t.Run("timestamp_present", func(t *testing.T) {
 		if found["timestamp"] == "" || found["timestamp"] == nil {
 			t.Errorf("timestamp missing in audit event: %v", found)
@@ -302,6 +307,11 @@ func TestCapabilityAuditDeniedExecution(t *testing.T) {
 			t.Errorf("reasonCode missing in denied audit event: %v", found)
 		}
 		t.Logf("deny reasonCode: %v", found["reasonCode"])
+	})
+	t.Run("event_type_is_authz_denial", func(t *testing.T) {
+		if found["eventType"] != "authz_denial" {
+			t.Errorf("eventType = %v, want authz_denial", found["eventType"])
+		}
 	})
 	t.Run("status_code_is_zero_for_denied", func(t *testing.T) {
 		// Denied tools never reach the backend, so statusCode should be 0.

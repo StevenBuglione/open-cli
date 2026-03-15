@@ -27,6 +27,7 @@
       "properties": {
         "type": {
           "enum": [
+            "literal",
             "env",
             "file",
             "osKeychain",
@@ -171,6 +172,181 @@
       },
       "additionalProperties": false
     },
+    "localRuntime": {
+      "type": "object",
+      "properties": {
+        "sessionScope": {
+          "enum": [
+            "terminal",
+            "agent",
+            "shared-group"
+          ]
+        },
+        "heartbeatSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "missedHeartbeatLimit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "shutdown": {
+          "enum": [
+            "when-owner-exits",
+            "manual"
+          ]
+        },
+        "share": {
+          "enum": [
+            "exclusive",
+            "group"
+          ]
+        },
+        "shareKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "browserLogin": {
+      "type": "object",
+      "properties": {
+        "callbackPort": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtimeServerAuth": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "oauth2Introspection"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "introspectionURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorizationURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tokenURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "browserClientId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientId": {
+          "$ref": "#/$defs/secretRef"
+        },
+        "clientSecret": {
+          "$ref": "#/$defs/secretRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtimeServer": {
+      "type": "object",
+      "properties": {
+        "auth": {
+          "$ref": "#/$defs/runtimeServerAuth"
+        }
+      },
+      "additionalProperties": false
+    },
+    "remoteOAuthClient": {
+      "type": "object",
+      "properties": {
+        "tokenURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientId": {
+          "$ref": "#/$defs/secretRef"
+        },
+        "clientSecret": {
+          "$ref": "#/$defs/secretRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "remoteOAuth": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "providedToken",
+            "oauthClient",
+            "browserLogin"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tokenRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "client": {
+          "$ref": "#/$defs/remoteOAuthClient"
+        },
+        "browserLogin": {
+          "$ref": "#/$defs/browserLogin"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "auto",
+            "embedded",
+            "local",
+            "remote"
+          ]
+        },
+        "local": {
+          "$ref": "#/$defs/localRuntime"
+        },
+        "remote": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "oauth": {
+              "$ref": "#/$defs/remoteOAuth"
+            }
+          },
+          "additionalProperties": false
+        },
+        "server": {
+          "$ref": "#/$defs/runtimeServer"
+        }
+      },
+      "additionalProperties": false
+    },
     "mcpTransport": {
       "type": "object",
       "required": [
@@ -217,117 +393,7 @@
           }
         }
       },
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "const": "stdio"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "command"
-            ],
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "url"
-                  ]
-                },
-                {
-                  "required": [
-                    "headers"
-                  ]
-                },
-                {
-                  "required": [
-                    "headerSecrets"
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "const": "sse"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "url"
-            ],
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "command"
-                  ]
-                },
-                {
-                  "required": [
-                    "args"
-                  ]
-                },
-                {
-                  "required": [
-                    "env"
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "const": "streamable-http"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "url"
-            ],
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "command"
-                  ]
-                },
-                {
-                  "required": [
-                    "args"
-                  ]
-                },
-                {
-                  "required": [
-                    "env"
-                  ]
-                }
-              ]
-            }
-          }
-        }
-      ]
+      "additionalProperties": false
     },
     "source": {
       "type": "object",
@@ -363,7 +429,7 @@
           }
         },
         "oauth": {
-          "$ref": "#/$defs/mcpOAuthConfig"
+          "$ref": "#/$defs/oauthConfig"
         }
       },
       "allOf": [
@@ -403,84 +469,6 @@
             "required": [
               "uri"
             ]
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "oauth"
-            ]
-          },
-          "then": {
-            "properties": {
-              "transport": {
-                "type": "object",
-                "required": [
-                  "type"
-                ],
-                "properties": {
-                  "type": {
-                    "const": "streamable-http"
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "const": "mcp"
-              }
-            }
-          },
-          "then": {
-            "not": {
-              "required": [
-                "uri"
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "enum": [
-                  "apiCatalog",
-                  "serviceRoot",
-                  "openapi"
-                ]
-              }
-            }
-          },
-          "then": {
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "transport"
-                  ]
-                },
-                {
-                  "required": [
-                    "disabledTools"
-                  ]
-                },
-                {
-                  "required": [
-                    "oauth"
-                  ]
-                }
-              ]
-            }
           }
         }
       ],
@@ -573,199 +561,9 @@
           }
         },
         "oauth": {
-          "$ref": "#/$defs/mcpOAuthConfig"
+          "$ref": "#/$defs/oauthConfig"
         }
       },
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "const": "stdio"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "command"
-            ],
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "url"
-                  ]
-                },
-                {
-                  "required": [
-                    "headers"
-                  ]
-                },
-                {
-                  "required": [
-                    "headerSecrets"
-                  ]
-                },
-                {
-                  "required": [
-                    "oauth"
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "const": "sse"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "url"
-            ],
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "command"
-                  ]
-                },
-                {
-                  "required": [
-                    "args"
-                  ]
-                },
-                {
-                  "required": [
-                    "env"
-                  ]
-                },
-                {
-                  "required": [
-                    "oauth"
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "oauth"
-            ]
-          },
-          "then": {
-            "properties": {
-              "type": {
-                "const": "streamable-http"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "const": "streamable-http"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "url"
-            ],
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "command"
-                  ]
-                },
-                {
-                  "required": [
-                    "args"
-                  ]
-                },
-                {
-                  "required": [
-                    "env"
-                  ]
-                }
-              ]
-            }
-          }
-        }
-      ]
-    },
-    "mcpOAuthConfig": {
-      "type": "object",
-      "required": [
-        "mode",
-        "clientId",
-        "clientSecret"
-      ],
-      "properties": {
-        "mode": {
-          "const": "clientCredentials"
-        },
-        "issuer": {
-          "type": "string",
-          "minLength": 1
-        },
-        "tokenURL": {
-          "type": "string",
-          "minLength": 1
-        },
-        "clientId": {
-          "$ref": "#/$defs/secretRef"
-        },
-        "clientSecret": {
-          "$ref": "#/$defs/secretRef"
-        },
-        "scopes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "audience": {
-          "type": "string",
-          "minLength": 1
-        },
-        "tokenStorage": {
-          "enum": [
-            "instance",
-            "memory"
-          ]
-        }
-      },
-      "anyOf": [
-        {
-          "required": [
-            "issuer"
-          ]
-        },
-        {
-          "required": [
-            "tokenURL"
-          ]
-        }
-      ],
       "additionalProperties": false
     }
   },
@@ -801,6 +599,9 @@
       "additionalProperties": {
         "$ref": "#/$defs/mcpServer"
       }
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtime"
     },
     "services": {
       "type": "object",
@@ -911,7 +712,5 @@
       ]
     }
   ],
-  "additionalProperties": false,
-  "$id": "https://stevenbuglione.github.io/oas-cli-spec/schemas/cli.schema.json",
-  "title": "OAS-CLI Config"
+  "additionalProperties": false
 }

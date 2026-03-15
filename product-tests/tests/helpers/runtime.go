@@ -5,6 +5,7 @@ package helpers
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -17,10 +18,11 @@ import (
 // Instance wraps a runtime.Server backed by an httptest.Server with fully
 // isolated filesystem directories for audit logs, state, and HTTP cache.
 type Instance struct {
-	URL       string
-	AuditPath string
-	StateDir  string
-	CacheDir  string
+	URL            string
+	AuditPath      string
+	StateDir       string
+	CacheDir       string
+	ShutdownSignal <-chan struct{}
 }
 
 // NewIsolatedInstance creates a runtime.Server with a unique temp dir hierarchy
@@ -47,6 +49,40 @@ func NewIsolatedInstance(t *testing.T) *Instance {
 		AuditPath: auditPath,
 		StateDir:  stateDir,
 		CacheDir:  cacheDir,
+	}
+}
+
+func NewLifecycleInstance(t *testing.T, options runtime.Options) *Instance {
+	t.Helper()
+
+	root := t.TempDir()
+	auditPath := filepath.Join(root, "audit.log")
+	stateDir := filepath.Join(root, "state")
+	cacheDir := filepath.Join(root, "cache")
+	shutdownSignal := make(chan struct{}, 1)
+	options.AuditPath = auditPath
+	options.StateDir = stateDir
+	options.CacheDir = cacheDir
+	if options.Shutdown == nil {
+		options.Shutdown = func() error {
+			select {
+			case shutdownSignal <- struct{}{}:
+			default:
+			}
+			return nil
+		}
+	}
+
+	srv := runtime.NewServer(options)
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	return &Instance{
+		URL:            ts.URL,
+		AuditPath:      auditPath,
+		StateDir:       stateDir,
+		CacheDir:       cacheDir,
+		ShutdownSignal: shutdownSignal,
 	}
 }
 
@@ -91,4 +127,32 @@ func (inst *Instance) AuditEvents(t *testing.T) []audit.Event {
 func (inst *Instance) AuditEventCount(t *testing.T) int {
 	t.Helper()
 	return len(inst.AuditEvents(t))
+}
+
+func (inst *Instance) Heartbeat(t *testing.T, sessionID, configFingerprint string) (int, map[string]any, string) {
+	t.Helper()
+
+	payload := map[string]any{"sessionId": sessionID}
+	if configFingerprint != "" {
+		payload["configFingerprint"] = configFingerprint
+	}
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(inst.URL+"/v1/runtime/heartbeat", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("heartbeat %s on %s: %v", sessionID, inst.URL, err)
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read heartbeat response: %v", err)
+	}
+	if resp.StatusCode >= 400 {
+		return resp.StatusCode, nil, string(bytes.TrimSpace(data))
+	}
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("decode heartbeat response: %v", err)
+	}
+	return resp.StatusCode, result, ""
 }

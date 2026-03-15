@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,6 +43,7 @@ type CommandOptions struct {
 	InstanceID        string
 	SessionID         string
 	HeartbeatEnabled  bool
+	ConfigFingerprint string
 	StateDir          string
 	Embedded          bool
 	Stdin             io.Reader
@@ -96,14 +99,16 @@ type runtimeClient interface {
 }
 
 type httpRuntimeClient struct {
-	baseURL   string
-	token     string
-	sessionID string
+	baseURL           string
+	token             string
+	sessionID         string
+	configFingerprint string
 }
 
 type embeddedRuntimeClient struct {
-	handler   http.Handler
-	sessionID string
+	handler           http.Handler
+	sessionID         string
+	configFingerprint string
 }
 
 const defaultRuntimeURL = "http://127.0.0.1:8765"
@@ -473,7 +478,11 @@ func (client httpRuntimeClient) RuntimeInfo() (map[string]any, error) {
 }
 
 func (client httpRuntimeClient) Heartbeat(sessionID string) (map[string]any, error) {
-	return postJSON[map[string]any](client.baseURL+"/v1/runtime/heartbeat", map[string]any{"sessionId": sessionID}, client.token)
+	payload := map[string]any{"sessionId": sessionID}
+	if client.configFingerprint != "" {
+		payload["configFingerprint"] = client.configFingerprint
+	}
+	return postJSON[map[string]any](client.baseURL+"/v1/runtime/heartbeat", payload, client.token)
 }
 
 func (client httpRuntimeClient) Stop() (map[string]any, error) {
@@ -522,7 +531,11 @@ func (client embeddedRuntimeClient) RuntimeInfo() (map[string]any, error) {
 
 func (client embeddedRuntimeClient) Heartbeat(sessionID string) (map[string]any, error) {
 	var response map[string]any
-	err := client.do(http.MethodPost, "/v1/runtime/heartbeat", map[string]any{"sessionId": sessionID}, &response)
+	payload := map[string]any{"sessionId": sessionID}
+	if client.configFingerprint != "" {
+		payload["configFingerprint"] = client.configFingerprint
+	}
+	err := client.do(http.MethodPost, "/v1/runtime/heartbeat", payload, &response)
 	return response, err
 }
 
@@ -985,6 +998,9 @@ func resolveLocalSessionID(options CommandOptions, local configpkg.LocalRuntimeC
 }
 
 func performLocalSessionHandshake(options CommandOptions) (CommandOptions, error) {
+	if options.ConfigFingerprint == "" {
+		options.ConfigFingerprint = localRuntimeConfigFingerprint(options)
+	}
 	client, err := newRuntimeClient(options)
 	if err != nil {
 		return options, err
@@ -997,6 +1013,9 @@ func performLocalSessionHandshake(options CommandOptions) (CommandOptions, error
 	if !lifecycleCapabilityEnabled(lifecycle, "heartbeat") {
 		options.HeartbeatEnabled = false
 		return options, nil
+	}
+	if fingerprint, _ := lifecycle["configFingerprint"].(string); fingerprint != "" && options.ConfigFingerprint != "" && fingerprint != options.ConfigFingerprint {
+		return options, fmt.Errorf("runtime_attach_mismatch")
 	}
 	if options.SessionID == "" {
 		options.SessionID = options.InstanceID
@@ -1027,6 +1046,49 @@ func lifecycleCapabilityEnabled(lifecycle map[string]any, capability string) boo
 		}
 	}
 	return false
+}
+
+func localRuntimeConfigFingerprint(options CommandOptions) string {
+	if options.ConfigPath == "" {
+		return ""
+	}
+	effective, err := configpkg.LoadEffective(configpkg.LoadOptions{
+		ProjectPath: options.ConfigPath,
+		WorkingDir:  filepath.Dir(options.ConfigPath),
+	})
+	if err != nil || effective.Config.Runtime == nil || effective.Config.Runtime.Local == nil {
+		return ""
+	}
+	localSources := map[string]configpkg.Source{}
+	for sourceID, source := range effective.Config.Sources {
+		if source.Type == "mcp" && source.Transport != nil && source.Transport.Type == "stdio" {
+			localSources[sourceID] = source
+		}
+	}
+	localServices := map[string]configpkg.Service{}
+	for serviceID, service := range effective.Config.Services {
+		if _, ok := localSources[service.Source]; ok {
+			localServices[serviceID] = service
+		}
+	}
+	data, err := json.Marshal(struct {
+		RuntimeMode string                        `json:"runtimeMode"`
+		Local       *configpkg.LocalRuntimeConfig `json:"local"`
+		Sources     map[string]configpkg.Source   `json:"sources,omitempty"`
+		Services    map[string]configpkg.Service  `json:"services,omitempty"`
+		Policy      configpkg.PolicyConfig        `json:"policy,omitempty"`
+	}{
+		RuntimeMode: effective.Config.Runtime.Mode,
+		Local:       effective.Config.Runtime.Local,
+		Sources:     localSources,
+		Services:    localServices,
+		Policy:      effective.Config.Policy,
+	})
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 func fetchRuntimeBrowserLoginMetadata(baseURL string) (runtimeBrowserLoginMetadata, error) {
@@ -1100,22 +1162,11 @@ func startManagedRuntime(options CommandOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	args := []string{"--config", options.ConfigPath}
-	if options.InstanceID != "" {
-		args = append(args, "--instance-id", options.InstanceID)
+	var runtimeCfg *configpkg.RuntimeConfig
+	if loaded, ok := loadRuntimeConfig(options); ok {
+		runtimeCfg = loaded
 	}
-	if options.StateDir != "" {
-		args = append(args, "--state-dir", options.StateDir)
-	}
-	if runtimeCfg, ok := loadRuntimeConfig(options); ok && runtimeCfg.Local != nil {
-		args = append(args,
-			"--heartbeat-seconds", strconv.Itoa(runtimeCfg.Local.HeartbeatSeconds),
-			"--missed-heartbeat-limit", strconv.Itoa(runtimeCfg.Local.MissedHeartbeatLimit),
-		)
-		if runtimeCfg.Local.Shutdown != "" {
-			args = append(args, "--shutdown", runtimeCfg.Local.Shutdown)
-		}
-	}
+	args := managedRuntimeArgs(options, runtimeCfg)
 	cmd := exec.Command(binary, args...)
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
@@ -1135,6 +1186,38 @@ func startManagedRuntime(options CommandOptions) (string, error) {
 		_ = cmd.Process.Kill()
 	}
 	return "", fmt.Errorf("managed runtime did not become ready")
+}
+
+func managedRuntimeArgs(options CommandOptions, runtimeCfg *configpkg.RuntimeConfig) []string {
+	args := []string{"--config", options.ConfigPath}
+	if options.InstanceID != "" {
+		args = append(args, "--instance-id", options.InstanceID)
+	}
+	if options.StateDir != "" {
+		args = append(args, "--state-dir", options.StateDir)
+	}
+	if runtimeCfg == nil || runtimeCfg.Local == nil {
+		return args
+	}
+	if runtimeCfg.Local.HeartbeatSeconds > 0 {
+		args = append(args, "--heartbeat-seconds", strconv.Itoa(runtimeCfg.Local.HeartbeatSeconds))
+	}
+	if runtimeCfg.Local.MissedHeartbeatLimit > 0 {
+		args = append(args, "--missed-heartbeat-limit", strconv.Itoa(runtimeCfg.Local.MissedHeartbeatLimit))
+	}
+	if runtimeCfg.Local.Shutdown != "" {
+		args = append(args, "--shutdown", runtimeCfg.Local.Shutdown)
+	}
+	if runtimeCfg.Local.SessionScope != "" {
+		args = append(args, "--session-scope", runtimeCfg.Local.SessionScope)
+	}
+	if runtimeCfg.Local.Share != "" {
+		args = append(args, "--share", runtimeCfg.Local.Share)
+	}
+	if options.ConfigFingerprint != "" {
+		args = append(args, "--config-fingerprint", options.ConfigFingerprint)
+	}
+	return args
 }
 
 func resolveDaemonBinary() (string, error) {
@@ -1163,9 +1246,9 @@ func newRuntimeClient(options CommandOptions) (runtimeClient, error) {
 			CacheDir:          paths.CacheDir,
 			DefaultConfigPath: options.ConfigPath,
 		})
-		return embeddedRuntimeClient{handler: server.Handler(), sessionID: options.SessionID}, nil
+		return embeddedRuntimeClient{handler: server.Handler(), sessionID: options.SessionID, configFingerprint: options.ConfigFingerprint}, nil
 	}
-	return httpRuntimeClient{baseURL: options.RuntimeURL, token: options.RuntimeToken, sessionID: options.SessionID}, nil
+	return httpRuntimeClient{baseURL: options.RuntimeURL, token: options.RuntimeToken, sessionID: options.SessionID, configFingerprint: options.ConfigFingerprint}, nil
 }
 
 func resolveRuntimeURLFromInstance(options CommandOptions) (string, bool) {

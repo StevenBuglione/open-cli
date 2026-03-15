@@ -14,6 +14,8 @@ Success responses are JSON. Error responses use Go's `http.Error`, so they are p
 
 Returns the full catalog plus the selected effective view.
 
+When `runtime.server.auth` is enabled, this endpoint requires `Authorization: Bearer ...` and the returned catalog is already filtered to the scopes authorized for that token.
+
 ### Query parameters
 
 | Parameter | Meaning |
@@ -100,6 +102,7 @@ If the upstream body is not valid JSON, the runtime returns:
 
 - `400` for bad JSON or config/catalog load failures
 - `403` for policy or approval rejections
+- `401` for missing or invalid runtime bearer auth when server-side runtime auth is enabled
 - `404` if the tool ID does not exist
 - `502` if upstream execution fails before an HTTP response is returned
 
@@ -161,6 +164,8 @@ Example response:
 }
 ```
 
+When server-side runtime auth is enabled, refresh also requires a bearer token.
+
 ## `GET /v1/audit/events`
 
 Returns the full audit log as an array.
@@ -170,3 +175,97 @@ curl -s http://127.0.0.1:8765/v1/audit/events | jq
 ```
 
 There is no filtering, paging, or server-side query API in the current implementation.
+
+When the runtime has server-side auth enabled and a default config is known, this endpoint also requires bearer auth.
+
+Each audit record is newline-delimited JSON with fields such as:
+
+- `eventType` for the high-level lifecycle category (`tool_execution`, `authz_denial`, `catalog_filtered`, `authenticated_connect`, `authn_failure`, `token_refresh`, `session_close`, `session_expiry`)
+- `principal` when server-side runtime auth resolved an authenticated subject
+- `sessionId` for local lifecycle events
+- the existing execution fields like `toolId`, `serviceId`, `decision`, `reasonCode`, `statusCode`, and `latencyMs`
+
+## `GET /v1/auth/browser-config`
+
+Returns the browser-login metadata that `oascli` uses for `runtime.remote.oauth.mode: "browserLogin"`.
+
+Example response:
+
+```json
+{
+  "authorizationURL": "https://auth.example.com/authorize",
+  "tokenURL": "https://auth.example.com/token",
+  "clientId": "oascli-browser",
+  "audience": "oasclird"
+}
+```
+
+## `GET /v1/runtime/info`
+
+Returns basic runtime metadata for discovery and diagnostics.
+
+Example response:
+
+```json
+{
+  "instanceId": "team-a",
+  "url": "http://127.0.0.1:18765",
+  "auditPath": "/state/instances/team-a/audit.log",
+  "stateDir": "/state/instances/team-a",
+  "cacheDir": "/cache/instances/team-a/http",
+  "lifecycle": {
+    "capabilities": ["heartbeat", "sessionClose"],
+    "heartbeatSeconds": 15,
+    "missedHeartbeatLimit": 3,
+    "shutdown": "when-owner-exits",
+    "sessionScope": "terminal",
+    "shareMode": "exclusive",
+    "configFingerprint": "sha256:...",
+    "activeSessions": 1
+  }
+}
+```
+
+The `lifecycle` block is present for lease-aware managed local runtimes and is what `oascli` uses to validate reuse before attaching.
+
+## `POST /v1/runtime/heartbeat`
+
+Registers or renews a local managed-runtime session lease.
+
+### Request body
+
+```json
+{
+  "sessionId": "terminal:pts-12",
+  "configFingerprint": "sha256:..."
+}
+```
+
+Common error responses:
+
+- `409 runtime_attach_conflict` when the runtime is exclusive and a different session tries to attach
+- `409 runtime_attach_mismatch` when the caller's effective local-runtime config fingerprint differs from the daemon's
+
+## `POST /v1/runtime/stop`
+
+Invokes the runtime shutdown hook when the daemon was started with one configured.
+
+Success response:
+
+```json
+{
+  "stopped": true
+}
+```
+
+## `POST /v1/runtime/session-close`
+
+Closes the current runtime session, removes its active lease, and clears session-scoped auth cache state under the runtime state directory.
+
+Success response:
+
+```json
+{
+  "closed": true
+}
+```

@@ -8,6 +8,7 @@ import (
 type rawConfig struct {
 	CLI        string                  `json:"cli"`
 	Mode       *ModeConfig             `json:"mode,omitempty"`
+	Runtime    *rawRuntimeConfig       `json:"runtime,omitempty"`
 	Sources    map[string]rawSource    `json:"sources,omitempty"`
 	MCPServers map[string]rawMCPServer `json:"mcpServers,omitempty"`
 	Services   map[string]rawService   `json:"services,omitempty"`
@@ -25,6 +26,61 @@ type rawSource struct {
 	Transport     *rawMCPTransport `json:"transport,omitempty"`
 	DisabledTools []string         `json:"disabledTools,omitempty"`
 	OAuth         *rawOAuthConfig  `json:"oauth,omitempty"`
+}
+
+type rawRuntimeConfig struct {
+	Mode   *string                 `json:"mode,omitempty"`
+	Local  *rawLocalRuntimeConfig  `json:"local,omitempty"`
+	Remote *rawRemoteRuntimeConfig `json:"remote,omitempty"`
+	Server *rawRuntimeServerConfig `json:"server,omitempty"`
+}
+
+type rawLocalRuntimeConfig struct {
+	SessionScope         *string `json:"sessionScope,omitempty"`
+	HeartbeatSeconds     *int    `json:"heartbeatSeconds,omitempty"`
+	MissedHeartbeatLimit *int    `json:"missedHeartbeatLimit,omitempty"`
+	Shutdown             *string `json:"shutdown,omitempty"`
+	Share                *string `json:"share,omitempty"`
+	ShareKey             *string `json:"shareKey,omitempty"`
+}
+
+type rawRemoteRuntimeConfig struct {
+	URL   *string               `json:"url,omitempty"`
+	OAuth *rawRemoteOAuthConfig `json:"oauth,omitempty"`
+}
+
+type rawRemoteOAuthConfig struct {
+	Mode         *string                     `json:"mode,omitempty"`
+	Audience     *string                     `json:"audience,omitempty"`
+	Scopes       []string                    `json:"scopes,omitempty"`
+	TokenRef     *string                     `json:"tokenRef,omitempty"`
+	Client       *rawRemoteOAuthClientConfig `json:"client,omitempty"`
+	BrowserLogin *rawBrowserLoginConfig      `json:"browserLogin,omitempty"`
+}
+
+type rawRemoteOAuthClientConfig struct {
+	TokenURL     *string    `json:"tokenURL,omitempty"`
+	ClientID     *SecretRef `json:"clientId,omitempty"`
+	ClientSecret *SecretRef `json:"clientSecret,omitempty"`
+}
+
+type rawBrowserLoginConfig struct {
+	CallbackPort *int `json:"callbackPort,omitempty"`
+}
+
+type rawRuntimeServerConfig struct {
+	Auth *rawRuntimeServerAuthConfig `json:"auth,omitempty"`
+}
+
+type rawRuntimeServerAuthConfig struct {
+	Mode             *string    `json:"mode,omitempty"`
+	Audience         *string    `json:"audience,omitempty"`
+	IntrospectionURL *string    `json:"introspectionURL,omitempty"`
+	AuthorizationURL *string    `json:"authorizationURL,omitempty"`
+	TokenURL         *string    `json:"tokenURL,omitempty"`
+	BrowserClientID  *string    `json:"browserClientId,omitempty"`
+	ClientID         *SecretRef `json:"clientId,omitempty"`
+	ClientSecret     *SecretRef `json:"clientSecret,omitempty"`
 }
 
 type rawService struct {
@@ -141,6 +197,138 @@ func (cfg *Config) merge(scope Scope, raw rawConfig) {
 	}
 	if raw.Mode != nil && raw.Mode.Default != "" {
 		cfg.Mode = *raw.Mode
+	}
+	if raw.Runtime != nil {
+		current := cfg.Runtime
+		if current == nil {
+			current = &RuntimeConfig{}
+		}
+		if raw.Runtime.Mode != nil {
+			current.Mode = *raw.Runtime.Mode
+		}
+		if raw.Runtime.Local != nil {
+			local := current.Local
+			if local == nil {
+				local = &LocalRuntimeConfig{}
+			}
+			if raw.Runtime.Local.SessionScope != nil {
+				local.SessionScope = *raw.Runtime.Local.SessionScope
+			}
+			if raw.Runtime.Local.HeartbeatSeconds != nil {
+				local.HeartbeatSeconds = *raw.Runtime.Local.HeartbeatSeconds
+			}
+			if raw.Runtime.Local.MissedHeartbeatLimit != nil {
+				local.MissedHeartbeatLimit = *raw.Runtime.Local.MissedHeartbeatLimit
+			}
+			if raw.Runtime.Local.Shutdown != nil {
+				local.Shutdown = *raw.Runtime.Local.Shutdown
+			}
+			if raw.Runtime.Local.Share != nil {
+				local.Share = *raw.Runtime.Local.Share
+			}
+			if raw.Runtime.Local.ShareKey != nil {
+				local.ShareKey = *raw.Runtime.Local.ShareKey
+			}
+			current.Local = local
+		}
+		if raw.Runtime.Remote != nil {
+			remote := current.Remote
+			if remote == nil {
+				remote = &RemoteRuntimeConfig{}
+			}
+			if raw.Runtime.Remote.URL != nil {
+				remote.URL = *raw.Runtime.Remote.URL
+			}
+			if raw.Runtime.Remote.OAuth != nil {
+				oauth := remote.OAuth
+				if oauth == nil {
+					oauth = &RemoteOAuthConfig{}
+				}
+				if raw.Runtime.Remote.OAuth.Mode != nil {
+					oauth.Mode = *raw.Runtime.Remote.OAuth.Mode
+				}
+				if raw.Runtime.Remote.OAuth.Audience != nil {
+					oauth.Audience = *raw.Runtime.Remote.OAuth.Audience
+				}
+				if raw.Runtime.Remote.OAuth.Scopes != nil {
+					oauth.Scopes = append([]string(nil), raw.Runtime.Remote.OAuth.Scopes...)
+				}
+				if raw.Runtime.Remote.OAuth.TokenRef != nil {
+					oauth.TokenRef = *raw.Runtime.Remote.OAuth.TokenRef
+				}
+				if raw.Runtime.Remote.OAuth.Client != nil {
+					client := oauth.Client
+					if client == nil {
+						client = &RemoteOAuthClientConfig{}
+					}
+					if raw.Runtime.Remote.OAuth.Client.TokenURL != nil {
+						client.TokenURL = *raw.Runtime.Remote.OAuth.Client.TokenURL
+					}
+					if raw.Runtime.Remote.OAuth.Client.ClientID != nil {
+						ref := *raw.Runtime.Remote.OAuth.Client.ClientID
+						client.ClientID = &ref
+					}
+					if raw.Runtime.Remote.OAuth.Client.ClientSecret != nil {
+						ref := *raw.Runtime.Remote.OAuth.Client.ClientSecret
+						client.ClientSecret = &ref
+					}
+					oauth.Client = client
+				}
+				if raw.Runtime.Remote.OAuth.BrowserLogin != nil {
+					browserLogin := oauth.BrowserLogin
+					if browserLogin == nil {
+						browserLogin = &BrowserLoginConfig{}
+					}
+					if raw.Runtime.Remote.OAuth.BrowserLogin.CallbackPort != nil {
+						browserLogin.CallbackPort = *raw.Runtime.Remote.OAuth.BrowserLogin.CallbackPort
+					}
+					oauth.BrowserLogin = browserLogin
+				}
+				remote.OAuth = oauth
+			}
+			current.Remote = remote
+		}
+		if raw.Runtime.Server != nil {
+			serverCfg := current.Server
+			if serverCfg == nil {
+				serverCfg = &RuntimeServerConfig{}
+			}
+			if raw.Runtime.Server.Auth != nil {
+				auth := serverCfg.Auth
+				if auth == nil {
+					auth = &RuntimeServerAuthConfig{}
+				}
+				if raw.Runtime.Server.Auth.Mode != nil {
+					auth.Mode = *raw.Runtime.Server.Auth.Mode
+				}
+				if raw.Runtime.Server.Auth.Audience != nil {
+					auth.Audience = *raw.Runtime.Server.Auth.Audience
+				}
+				if raw.Runtime.Server.Auth.IntrospectionURL != nil {
+					auth.IntrospectionURL = *raw.Runtime.Server.Auth.IntrospectionURL
+				}
+				if raw.Runtime.Server.Auth.AuthorizationURL != nil {
+					auth.AuthorizationURL = *raw.Runtime.Server.Auth.AuthorizationURL
+				}
+				if raw.Runtime.Server.Auth.TokenURL != nil {
+					auth.TokenURL = *raw.Runtime.Server.Auth.TokenURL
+				}
+				if raw.Runtime.Server.Auth.BrowserClientID != nil {
+					auth.BrowserClientID = *raw.Runtime.Server.Auth.BrowserClientID
+				}
+				if raw.Runtime.Server.Auth.ClientID != nil {
+					ref := *raw.Runtime.Server.Auth.ClientID
+					auth.ClientID = &ref
+				}
+				if raw.Runtime.Server.Auth.ClientSecret != nil {
+					ref := *raw.Runtime.Server.Auth.ClientSecret
+					auth.ClientSecret = &ref
+				}
+				serverCfg.Auth = auth
+			}
+			current.Server = serverCfg
+		}
+		cfg.Runtime = current
 	}
 
 	for key, source := range raw.Sources {

@@ -20,6 +20,9 @@ func main() {
 	heartbeatSeconds := flag.Int("heartbeat-seconds", 0, "heartbeat interval in seconds for lease management")
 	missedHeartbeatLimit := flag.Int("missed-heartbeat-limit", 0, "number of missed heartbeats before session expiry")
 	shutdownMode := flag.String("shutdown", "", "shutdown mode: when-owner-exits or manual")
+	sessionScope := flag.String("session-scope", "", "local runtime session scope")
+	shareMode := flag.String("share", "", "local runtime share mode")
+	configFingerprint := flag.String("config-fingerprint", "", "local runtime config fingerprint")
 	flag.Parse()
 
 	paths, err := instance.Resolve(instance.Options{
@@ -55,6 +58,9 @@ func main() {
 		HeartbeatSeconds:     *heartbeatSeconds,
 		MissedHeartbeatLimit: *missedHeartbeatLimit,
 		ShutdownMode:         *shutdownMode,
+		SessionScope:         *sessionScope,
+		ShareMode:            *shareMode,
+		ConfigFingerprint:    *configFingerprint,
 		Shutdown:             listener.Close,
 	})
 	info := instance.RuntimeInfo{

@@ -27,6 +27,7 @@
       "properties": {
         "type": {
           "enum": [
+            "literal",
             "env",
             "file",
             "osKeychain",
@@ -167,6 +168,181 @@
             "instance",
             "memory"
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "localRuntime": {
+      "type": "object",
+      "properties": {
+        "sessionScope": {
+          "enum": [
+            "terminal",
+            "agent",
+            "shared-group"
+          ]
+        },
+        "heartbeatSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "missedHeartbeatLimit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "shutdown": {
+          "enum": [
+            "when-owner-exits",
+            "manual"
+          ]
+        },
+        "share": {
+          "enum": [
+            "exclusive",
+            "group"
+          ]
+        },
+        "shareKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "browserLogin": {
+      "type": "object",
+      "properties": {
+        "callbackPort": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtimeServerAuth": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "oauth2Introspection"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "introspectionURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorizationURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tokenURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "browserClientId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientId": {
+          "$ref": "#/$defs/secretRef"
+        },
+        "clientSecret": {
+          "$ref": "#/$defs/secretRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtimeServer": {
+      "type": "object",
+      "properties": {
+        "auth": {
+          "$ref": "#/$defs/runtimeServerAuth"
+        }
+      },
+      "additionalProperties": false
+    },
+    "remoteOAuthClient": {
+      "type": "object",
+      "properties": {
+        "tokenURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientId": {
+          "$ref": "#/$defs/secretRef"
+        },
+        "clientSecret": {
+          "$ref": "#/$defs/secretRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "remoteOAuth": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "providedToken",
+            "oauthClient",
+            "browserLogin"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tokenRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "client": {
+          "$ref": "#/$defs/remoteOAuthClient"
+        },
+        "browserLogin": {
+          "$ref": "#/$defs/browserLogin"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "auto",
+            "embedded",
+            "local",
+            "remote"
+          ]
+        },
+        "local": {
+          "$ref": "#/$defs/localRuntime"
+        },
+        "remote": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "oauth": {
+              "$ref": "#/$defs/remoteOAuth"
+            }
+          },
+          "additionalProperties": false
+        },
+        "server": {
+          "$ref": "#/$defs/runtimeServer"
         }
       },
       "additionalProperties": false
@@ -423,6 +599,9 @@
       "additionalProperties": {
         "$ref": "#/$defs/mcpServer"
       }
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtime"
     },
     "services": {
       "type": "object",

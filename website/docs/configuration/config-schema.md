@@ -16,6 +16,7 @@ This implementation also carries a local copy at `pkg/config/cli.schema.json`, a
 | --- | --- | --- | --- |
 | `cli` | string | yes | Must be non-empty. |
 | `mode` | object | yes | Requires `default`. |
+| `runtime` | object | no | Runtime deployment selection plus local/remote runtime settings. |
 | `sources` | object | yes | Must contain at least one source after final merge. |
 | `mcpServers` | object | no | Compatibility input normalized into canonical MCP sources and services. |
 | `services` | object | no | Optional named services. |
@@ -36,6 +37,59 @@ This implementation also carries a local copy at `pkg/config/cli.schema.json`, a
 | `transport` | object | for `mcp` | MCP transport configuration |
 | `disabledTools` | string[] | no | MCP tools removed before normalization |
 | `oauth` | object | streamable-http only | Source-local MCP transport OAuth (`clientCredentials` only) |
+
+## `runtime`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `mode` | string | `auto`, `embedded`, `local`, or `remote` |
+| `local` | object | Local runtime lifecycle and sharing configuration |
+| `remote` | object | Remote runtime URL and runtime-auth configuration |
+
+## `runtime.local`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `sessionScope` | string | `terminal`, `agent`, or `shared-group` |
+| `heartbeatSeconds` | integer | Expected heartbeat interval for managed local ownership |
+| `missedHeartbeatLimit` | integer | Missed heartbeat threshold before considering the owner gone |
+| `shutdown` | string | `when-owner-exits` or `manual` |
+| `share` | string | `exclusive` or `group` |
+| `shareKey` | string | Explicit group-sharing key |
+
+`shutdown: "manual"` is only valid with `sessionScope: "shared-group"`.
+
+## `runtime.remote`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `url` | string | Base URL for the remote runtime. Required when `runtime.mode` is `remote`. |
+| `oauth` | object | Optional runtime-auth configuration for the remote runtime itself |
+
+## `runtime.remote.oauth`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `mode` | string | `providedToken`, `oauthClient`, or `browserLogin` |
+| `audience` | string | Optional OAuth audience for runtime token requests |
+| `scopes` | string[] | Optional runtime scopes such as service bundles or tool grants |
+| `tokenRef` | string | Required for `providedToken`; currently supports `env:NAME` references |
+| `client.tokenURL` | string | Token endpoint for `oauthClient` mode |
+| `client.clientId` | object | Secret ref for the OAuth client ID in `oauthClient` mode |
+| `client.clientSecret` | object | Secret ref for the OAuth client secret in `oauthClient` mode |
+| `browserLogin.callbackPort` | integer | Optional fixed localhost callback port for `browserLogin` mode |
+
+## `runtime.server.auth`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `mode` | string | `oauth2Introspection` |
+| `audience` | string | Required audience for runtime bearer tokens |
+| `introspectionURL` | string | RFC 7662-style token introspection endpoint |
+| `clientId` / `clientSecret` | object | Optional secret refs used when the introspection endpoint itself requires client auth |
+| `authorizationURL` | string | Optional browser-login authorization endpoint exposed via runtime metadata |
+| `tokenURL` | string | Optional browser-login token endpoint exposed via runtime metadata |
+| `browserClientId` | string | Optional public OAuth client ID exposed via runtime metadata |
 
 ## `sources.*.transport`
 
@@ -119,6 +173,13 @@ The loader calls `DisallowUnknownFields()` during JSON decoding. In practice, th
 After schema validation, the loader also checks that every `services.<id>.source` points at a known source.
 
 It also validates MCP transport constraints, OAuth ownership of the transport `Authorization` header, and MCP/OAuth compatibility rules such as "SSE forbids source-local OAuth".
+
+It also validates runtime-specific rules such as:
+
+- `runtime.mode: "remote"` requires `runtime.remote.url`
+- `runtime.remote.oauth.mode: "providedToken"` requires `runtime.remote.oauth.tokenRef`
+- `runtime.remote.oauth.mode: "oauthClient"` requires `client.tokenURL`, `client.clientId`, and `client.clientSecret`
+- `runtime.server.auth.mode: "oauth2Introspection"` requires `audience` and `introspectionURL`
 
 ### Final validation is stricter than per-scope validation
 

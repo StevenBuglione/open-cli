@@ -73,6 +73,87 @@ Example:
 }
 ```
 
+## Runtime deployment in `.cli.json`
+
+Runtime selection can now come from configuration, not just flags:
+
+```json
+{
+  "runtime": {
+    "mode": "auto",
+    "local": {
+      "sessionScope": "terminal",
+      "heartbeatSeconds": 15,
+      "missedHeartbeatLimit": 3,
+      "shutdown": "when-owner-exits",
+      "share": "exclusive"
+    }
+  }
+}
+```
+
+Current behavior:
+
+- `runtime.mode=embedded` keeps execution in-process
+- `runtime.mode=local` uses a local `oasclird`
+- `runtime.mode=remote` uses the configured remote runtime URL
+- `runtime.mode=auto` stays embedded unless local MCP sources are present, in which case `oascli` promotes to local-daemon mode automatically
+- managed local runtimes now register a session lease, renew it with heartbeat calls, and can shut down automatically when the owning session exits
+- local reuse now enforces `share` and `sessionScope` through explicit attach conflicts and config-fingerprint mismatch checks before a second client attaches
+
+For remote mode, the runtime block also supports remote OAuth metadata:
+
+```json
+{
+  "runtime": {
+    "mode": "remote",
+    "remote": {
+      "url": "https://runtime.example.com",
+      "oauth": {
+        "mode": "providedToken",
+        "audience": "oasclird",
+        "scopes": ["bundle:payments"],
+        "tokenRef": "env:OAS_REMOTE_TOKEN"
+      }
+    }
+  }
+}
+```
+
+Current remote client auth modes:
+
+- `providedToken` forwards a bearer token from an environment reference such as `env:OAS_REMOTE_TOKEN`
+- `oauthClient` acquires a client-credentials bearer token before runtime HTTP requests
+- `browserLogin` fetches browser-login metadata from the runtime and completes an authorization-code + PKCE flow against the server-configured IdP
+
+Remote runtimes can also enforce scope-filtered access on the server side:
+
+```json
+{
+  "runtime": {
+    "server": {
+      "auth": {
+        "mode": "oauth2Introspection",
+        "audience": "oasclird",
+        "introspectionURL": "https://auth.example.com/oauth/introspect",
+        "authorizationURL": "https://auth.example.com/authorize",
+        "tokenURL": "https://auth.example.com/token",
+        "browserClientId": "oascli-browser"
+      }
+    }
+  }
+}
+```
+
+With that server-side auth enabled, `oasclird` now:
+
+- requires bearer auth for catalog, execute, workflow, refresh, and audit surfaces
+- filters the visible catalog by `bundle:*`, `profile:*`, and `tool:*` scopes
+- re-checks execution against the same resolved authorization envelope
+- exposes browser-login metadata at `GET /v1/auth/browser-config`
+- exposes runtime discovery/session-control surfaces at `GET /v1/runtime/info`, `POST /v1/runtime/heartbeat`, `POST /v1/runtime/stop`, and `POST /v1/runtime/session-close`
+- records explicit audit event types for authenticated connect, authn failure, authz denial, token refresh, session close, session expiry, and tool execution
+
 ## Install from source
 
 There are no packaged installers in this repository today; the documented path is to build from source.
@@ -121,6 +202,12 @@ For one-off inspection or local experimentation, run the runtime in-process:
 ```bash
 go run ./cmd/oascli --embedded --config /path/to/.cli.json catalog list --format pretty
 ```
+
+### Config-driven local mode
+
+If your `.cli.json` contains local MCP servers and `runtime.mode` is `auto`, `oascli` now promotes to local-daemon mode automatically and will start a managed local `oasclird` when no live runtime is registered for that instance yet.
+
+For `runtime.local.sessionScope: "terminal"` and `"agent"`, the managed local runtime identity now includes the owning session identity instead of only the config path. That keeps concurrent terminals or agent sessions from accidentally colliding onto the same exclusive runtime. For `shared-group`, the identity uses `shareKey`.
 
 For a fuller walkthrough, see the quickstart: https://stevenbuglione.github.io/oas-cli-go/docs/getting-started/quickstart
 

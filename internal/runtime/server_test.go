@@ -3,16 +3,19 @@ package runtime_test
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
+	"github.com/StevenBuglione/oas-cli-go/pkg/audit"
 	"github.com/StevenBuglione/oas-cli-go/pkg/obs"
 )
 
@@ -165,6 +168,8 @@ func TestServerSessionCloseRemovesLease(t *testing.T) {
 		HeartbeatSeconds:     5,
 		MissedHeartbeatLimit: 1,
 		ShutdownMode:         "when-owner-exits",
+		SessionScope:         "shared-group",
+		ShareMode:            "group",
 		Shutdown: func() error {
 			select {
 			case shutdownCalled <- struct{}{}:
@@ -238,6 +243,283 @@ func TestServerLeaseExpiryRetainsManualRuntime(t *testing.T) {
 
 	postRuntimeJSON(t, httpServer.URL+"/v1/runtime/heartbeat", map[string]any{"sessionId": "sess-1"})
 	expectNoSignal(t, shutdownCalled, 1500*time.Millisecond, "expected manual runtime to ignore lease expiry")
+}
+
+func TestServerRejectsExclusiveLeaseConflict(t *testing.T) {
+	dir := t.TempDir()
+	server := runtime.NewServer(runtime.Options{
+		AuditPath:            filepath.Join(dir, "audit.log"),
+		StateDir:             filepath.Join(dir, "state"),
+		HeartbeatSeconds:     15,
+		MissedHeartbeatLimit: 3,
+		ShutdownMode:         "when-owner-exits",
+		SessionScope:         "terminal",
+		ShareMode:            "exclusive",
+		ConfigFingerprint:    "fp-1",
+	})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	resp, _ := postRuntimeJSON(t, httpServer.URL+"/v1/runtime/heartbeat", map[string]any{
+		"sessionId":         "sess-1",
+		"configFingerprint": "fp-1",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected first heartbeat 200, got %d", resp.StatusCode)
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"sessionId":         "sess-2",
+		"configFingerprint": "fp-1",
+	})
+	if err != nil {
+		t.Fatalf("marshal heartbeat: %v", err)
+	}
+	conflictResp, err := http.Post(httpServer.URL+"/v1/runtime/heartbeat", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("post conflicting heartbeat: %v", err)
+	}
+	defer conflictResp.Body.Close()
+	if conflictResp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 conflicting heartbeat, got %d", conflictResp.StatusCode)
+	}
+	data, _ := io.ReadAll(conflictResp.Body)
+	if strings.TrimSpace(string(data)) != "runtime_attach_conflict" {
+		t.Fatalf("expected runtime_attach_conflict response, got %q", strings.TrimSpace(string(data)))
+	}
+}
+
+func TestServerRejectsLeaseFingerprintMismatch(t *testing.T) {
+	dir := t.TempDir()
+	server := runtime.NewServer(runtime.Options{
+		AuditPath:            filepath.Join(dir, "audit.log"),
+		StateDir:             filepath.Join(dir, "state"),
+		HeartbeatSeconds:     15,
+		MissedHeartbeatLimit: 3,
+		ShutdownMode:         "when-owner-exits",
+		SessionScope:         "terminal",
+		ShareMode:            "exclusive",
+		ConfigFingerprint:    "fp-1",
+	})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	body, err := json.Marshal(map[string]any{
+		"sessionId":         "sess-1",
+		"configFingerprint": "fp-2",
+	})
+	if err != nil {
+		t.Fatalf("marshal heartbeat: %v", err)
+	}
+	resp, err := http.Post(httpServer.URL+"/v1/runtime/heartbeat", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("post mismatched heartbeat: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 mismatched heartbeat, got %d", resp.StatusCode)
+	}
+	data, _ := io.ReadAll(resp.Body)
+	if strings.TrimSpace(string(data)) != "runtime_attach_mismatch" {
+		t.Fatalf("expected runtime_attach_mismatch response, got %q", strings.TrimSpace(string(data)))
+	}
+}
+
+func TestServerRecordsSessionLifecycleAuditEvents(t *testing.T) {
+	dir := t.TempDir()
+	auditPath := filepath.Join(dir, "audit.log")
+	server := runtime.NewServer(runtime.Options{
+		AuditPath:            auditPath,
+		StateDir:             filepath.Join(dir, "state"),
+		HeartbeatSeconds:     1,
+		MissedHeartbeatLimit: 1,
+		ShutdownMode:         "manual",
+		SessionScope:         "shared-group",
+		ShareMode:            "group",
+		ConfigFingerprint:    "fp-1",
+	})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	postRuntimeJSON(t, httpServer.URL+"/v1/runtime/heartbeat", map[string]any{
+		"sessionId":         "close-me",
+		"configFingerprint": "fp-1",
+	})
+	postRuntimeJSON(t, httpServer.URL+"/v1/runtime/session-close", map[string]any{"sessionId": "close-me"})
+	postRuntimeJSON(t, httpServer.URL+"/v1/runtime/heartbeat", map[string]any{
+		"sessionId":         "expire-me",
+		"configFingerprint": "fp-1",
+	})
+	time.Sleep(1500 * time.Millisecond)
+
+	events, err := audit.NewFileStore(auditPath).List()
+	if err != nil {
+		t.Fatalf("list audit events: %v", err)
+	}
+
+	var sawClose, sawExpiry bool
+	for _, event := range events {
+		if event.EventType == "session_close" && event.SessionID == "close-me" {
+			sawClose = true
+		}
+		if event.EventType == "session_expiry" && event.SessionID == "expire-me" {
+			sawExpiry = true
+		}
+	}
+	if !sawClose {
+		t.Fatalf("expected session_close audit event, got %#v", events)
+	}
+	if !sawExpiry {
+		t.Fatalf("expected session_expiry audit event, got %#v", events)
+	}
+}
+
+func TestServerRecordsAuthLifecycleAuditEvents(t *testing.T) {
+	dir := t.TempDir()
+	writeRuntimeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Tickets API
+  version: "1.0.0"
+servers:
+  - url: https://example.com
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      responses:
+        "200":
+          description: OK
+`)
+
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse introspection form: %v", err)
+		}
+		if got := r.Form.Get("token"); got != "scoped-token" {
+			t.Fatalf("expected scoped-token, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"active": true,
+			"scope":  "bundle:tickets",
+			"aud":    "oasclird",
+			"sub":    "agent-1",
+		})
+	}))
+	defer introspectionServer.Close()
+
+	configPath := writeRuntimeFile(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "server": {
+	      "auth": {
+	        "mode": "oauth2Introspection",
+	        "audience": "oasclird",
+	        "introspectionURL": "`+introspectionServer.URL+`"
+	      }
+	    }
+	  },
+	  "sources": {
+	    "ticketsSource": {
+	      "type": "openapi",
+	      "uri": "./tickets.openapi.yaml",
+	      "enabled": true
+	    }
+	  },
+	  "services": {
+	    "tickets": {
+	      "source": "ticketsSource",
+	      "alias": "tickets"
+	    }
+	  }
+	}`)
+
+	auditPath := filepath.Join(dir, "audit.log")
+	server := runtime.NewServer(runtime.Options{
+		AuditPath:         auditPath,
+		DefaultConfigPath: configPath,
+	})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, httpServer.URL+"/v1/catalog/effective?config="+configPath, nil)
+	if err != nil {
+		t.Fatalf("new catalog request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer scoped-token")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("authorized catalog request: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 authorized catalog, got %d", resp.StatusCode)
+	}
+
+	unauthorizedResp, err := http.Get(httpServer.URL + "/v1/catalog/effective?config=" + configPath)
+	if err != nil {
+		t.Fatalf("unauthorized catalog request: %v", err)
+	}
+	unauthorizedResp.Body.Close()
+	if unauthorizedResp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 unauthorized catalog, got %d", unauthorizedResp.StatusCode)
+	}
+
+	refreshBody := bytes.NewBufferString(`{"configPath":"` + configPath + `"}`)
+	refreshReq, err := http.NewRequest(http.MethodPost, httpServer.URL+"/v1/refresh", refreshBody)
+	if err != nil {
+		t.Fatalf("new refresh request: %v", err)
+	}
+	refreshReq.Header.Set("Content-Type", "application/json")
+	refreshReq.Header.Set("Authorization", "Bearer scoped-token")
+	refreshResp, err := http.DefaultClient.Do(refreshReq)
+	if err != nil {
+		t.Fatalf("authorized refresh request: %v", err)
+	}
+	refreshResp.Body.Close()
+	if refreshResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 authorized refresh, got %d", refreshResp.StatusCode)
+	}
+
+	events, err := audit.NewFileStore(auditPath).List()
+	if err != nil {
+		t.Fatalf("list audit events: %v", err)
+	}
+
+	var sawConnect, sawCatalog, sawAuthnFailure, sawRefresh bool
+	for _, event := range events {
+		switch event.EventType {
+		case "authenticated_connect":
+			if event.Principal == "agent-1" {
+				sawConnect = true
+			}
+		case "catalog_filtered":
+			if event.Principal == "agent-1" {
+				sawCatalog = true
+			}
+		case "authn_failure":
+			sawAuthnFailure = true
+		case "token_refresh":
+			if event.Principal == "agent-1" {
+				sawRefresh = true
+			}
+		}
+	}
+	if !sawConnect {
+		t.Fatalf("expected authenticated_connect audit event, got %#v", events)
+	}
+	if !sawCatalog {
+		t.Fatalf("expected catalog_filtered audit event, got %#v", events)
+	}
+	if !sawAuthnFailure {
+		t.Fatalf("expected authn_failure audit event, got %#v", events)
+	}
+	if !sawRefresh {
+		t.Fatalf("expected token_refresh audit event, got %#v", events)
+	}
 }
 
 func TestServerEnforcesCuratedViewExecutesAllowedToolsAndAuditsAttempts(t *testing.T) {

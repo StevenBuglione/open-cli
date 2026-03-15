@@ -35,6 +35,14 @@ func Decide(cfg config.Config, tool catalog.Tool, ctx Context) Decision {
 	return Decision{Allowed: true, ReasonCode: "allowed"}
 }
 
+func ToolAllowed(toolID string, toolSet config.ToolSet) bool {
+	return toolAllowed(toolID, toolSet)
+}
+
+func MatchesAny(patterns []string, value string) bool {
+	return matchesAny(patterns, value)
+}
+
 func resolveModeAndToolSet(cfg config.Config, ctx Context) (string, config.ToolSet) {
 	mode := ctx.Mode
 	if mode == "" {

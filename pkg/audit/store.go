@@ -11,6 +11,9 @@ import (
 
 type Event struct {
 	Timestamp     time.Time `json:"timestamp"`
+	EventType     string    `json:"eventType,omitempty"`
+	Principal     string    `json:"principal,omitempty"`
+	SessionID     string    `json:"sessionId,omitempty"`
 	AgentProfile  string    `json:"agentProfile,omitempty"`
 	ToolID        string    `json:"toolId"`
 	ServiceID     string    `json:"serviceId,omitempty"`
@@ -33,6 +36,13 @@ type FileStore struct {
 
 func NewFileStore(path string) *FileStore {
 	return &FileStore{path: path}
+}
+
+func (store *FileStore) Path() string {
+	if store == nil {
+		return ""
+	}
+	return store.path
 }
 
 func (store *FileStore) Append(event Event) error {

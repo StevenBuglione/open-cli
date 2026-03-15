@@ -10,6 +10,7 @@ title: Configuration Overview
 
 A config file answers these questions:
 
+- where runtime execution happens (`runtime`)
 - where discovery starts (`sources`)
 - how native MCP servers are registered (`sources.type="mcp"` or `mcpServers`)
 - which discovered or explicit APIs become named services (`services`)
@@ -87,6 +88,25 @@ The default runtime mode. Current meaningful values are:
 
 - `discover`
 - `curated`
+
+### `runtime`
+
+Controls how `oascli` reaches execution:
+
+- `embedded`: run the runtime in-process
+- `local`: talk to a local `oasclird`
+- `remote`: talk to an explicitly configured remote runtime
+- `auto`: stay embedded unless local MCP sources require a managed local runtime
+
+`runtime.local` carries local lifecycle hints such as `sessionScope`, `shutdown`, and sharing semantics.
+
+`runtime.remote` carries the remote runtime base URL and optional runtime-auth configuration. The current CLI supports:
+
+- `providedToken`: forward a bearer token referenced by `tokenRef` such as `env:OAS_REMOTE_TOKEN`
+- `oauthClient`: acquire a client-credentials token for the remote runtime before calling it
+- `browserLogin`: fetch runtime-hosted browser-login metadata and complete an authorization-code + PKCE flow
+
+`runtime.server.auth` configures remote-runtime enforcement on the daemon itself. The current server-side mode is `oauth2Introspection`, which lets `oasclird` authenticate bearer tokens, filter catalogs by runtime scopes, and reject out-of-scope execution.
 
 ### `sources`
 
