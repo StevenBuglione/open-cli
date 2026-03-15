@@ -99,6 +99,21 @@ Default local ownership model:
 - a heartbeat is renewed by the client while the session is alive
 - after a small missed-heartbeat threshold, the daemon transitions to shutdown
 
+Runtime identity and fingerprinting:
+
+- local runtime identity is derived from the effective runtime-relevant config fingerprint plus session identity, and plus `shareKey` when group sharing is enabled
+- the config fingerprint is computed from a canonical serialization of only the fields that affect attach compatibility: the effective runtime block, effective local MCP source definitions, service-to-source mappings used by those local MCP sources, and policy fields that affect local launch or attach authorization
+- secret values are excluded from the fingerprint; secret references are included by stable reference name
+- attach succeeds only when the daemon reports the same fingerprint the client computed
+
+Heartbeat and lease behavior:
+
+- the client renews the heartbeat every `heartbeatSeconds`
+- the daemon marks the lease stale after `missedHeartbeatLimit` missed heartbeats
+- if no request is in flight when the lease becomes stale, shutdown begins immediately
+- if a request is in flight, shutdown waits for the request to complete or for a short grace timer to expire
+- daemon crash and lease expiry are recorded as distinct audit outcomes
+
 Attach and sharing rules:
 
 - `share=exclusive` is the default
@@ -159,6 +174,34 @@ Scope evaluation rules:
 - bundle and profile scopes are expanded server-side into concrete tool grants according to policy
 - clients must not pre-expand or self-authorize based on scope names alone
 - if a scope grants access to a bundle but server policy removes a tool from that bundle, the tool remains hidden and unexecutable
+
+Authorization resolution order:
+
+1. start from tools present in the effective instance configuration
+2. expand profile scopes into candidate tool sets
+3. expand bundle scopes into candidate tool sets
+4. intersect those candidate sets with explicit `tool:` scopes when such scopes are present
+5. apply server-side deny rules last
+
+Resolution rules:
+
+- deny rules always win
+- scopes can only expose tools that already exist in effective config
+- catalog filtering and execution authorization must use the same resolved authorization envelope
+
+#### Remote token lifecycle
+
+Remote runtime access tokens are session-scoped credentials.
+
+Acquisition and lifecycle rules:
+
+- the client presents a pre-issued ephemeral bearer token for the agent/session, or obtains one from a configured OAuth2 or token-exchange source before first remote use
+- the token must carry the audience and scopes required for the target remote runtime
+- refresh is allowed only for the lifetime of the owning session
+- on `authn_failed` caused by expiry, the client may attempt one refresh when refresh configuration exists
+- if refresh is unavailable, revoked, or fails, the command fails closed and requires a new session token
+- revocation or expiry invalidates any cached remote authorization envelope for that session
+- remote daemons do not mint broader replacement tokens on behalf of the client
 
 ### 4. Ephemeral remote session state
 
@@ -269,6 +312,13 @@ The contract must include:
 
 The client must validate handshake metadata before attaching to a local managed runtime or trusting a remote daemon for catalog and execution.
 
+Compatibility rules:
+
+- the handshake includes `contractVersion` and `capabilities`
+- attach or connect is allowed only when the major contract version matches
+- minor-version differences are allowed only when every client-required capability is advertised by the daemon
+- otherwise the client fails with `contract_mismatch`
+
 ### 9. Failure and recovery behavior
 
 Failure behavior must be explicit because agents need deterministic outcomes.
@@ -290,6 +340,13 @@ Version and contract mismatches:
 
 - if the client and daemon disagree on runtime contract version or required capabilities, fail with a clear compatibility error
 - catalog filtering and execution authorization must use the same effective authorization envelope to avoid discover/execute drift
+
+## Authorization examples
+
+- token has `bundle:payments`, config exposes payment tools, and policy allows them -> those payment tools appear
+- token has `bundle:payments`, but policy denies `payments.refund` -> all allowed payment tools except `payments.refund` appear
+- token has `profile:read-only` and `tool:users.get` -> only the intersection of the profile expansion and the explicit tool scope appears
+- token has no matching scopes for a configured tool -> the tool is absent from catalog and direct execution returns `authz_denied`
 
 ## Operational defaults
 
