@@ -740,14 +740,27 @@ func (server *Server) authenticateRequest(ctx context.Context, request *http.Req
 	if err != nil {
 		return nil, &runtimeAuthError{StatusCode: http.StatusUnauthorized, Code: "authn_failed", Message: err.Error()}
 	}
-	introspection, err := server.introspectToken(ctx, *authCfg, token)
-	if err != nil {
-		return nil, &runtimeAuthError{StatusCode: http.StatusUnauthorized, Code: "authn_failed", Message: err.Error()}
+	principal := ""
+	var scopes []string
+	if runtimeServerAuthUsesOIDCJWKS(authCfg) {
+		claims, err := server.validateJWTWithJWKS(ctx, *authCfg, token)
+		if err != nil {
+			return nil, &runtimeAuthError{StatusCode: http.StatusUnauthorized, Code: "authn_failed", Message: err.Error()}
+		}
+		principal = firstNonEmpty(claims.Subject, claims.ClientID)
+		scopes = strings.Fields(claims.Scope)
+	} else {
+		introspection, err := server.introspectToken(ctx, *authCfg, token)
+		if err != nil {
+			return nil, &runtimeAuthError{StatusCode: http.StatusUnauthorized, Code: "authn_failed", Message: err.Error()}
+		}
+		principal = firstNonEmpty(introspection.Subject, introspection.ClientID)
+		scopes = strings.Fields(introspection.Scope)
 	}
 	return &authResult{
 		Enabled:   true,
-		Principal: firstNonEmpty(introspection.Subject, introspection.ClientID),
-		Scopes:    strings.Fields(introspection.Scope),
+		Principal: principal,
+		Scopes:    scopes,
 	}, nil
 }
 
@@ -765,7 +778,10 @@ func runtimeServerAuthEnabled(auth *config.RuntimeServerAuthConfig) bool {
 	if auth.Mode == "oauth2Introspection" {
 		return true
 	}
-	return auth.ValidationProfile == "oauth2_introspection"
+	if auth.ValidationProfile == "oauth2_introspection" {
+		return true
+	}
+	return runtimeServerAuthUsesOIDCJWKS(auth)
 }
 
 func bearerToken(header string) (string, error) {

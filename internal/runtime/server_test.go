@@ -1055,6 +1055,120 @@ paths:
 	}
 }
 
+func TestServerRejectsExpiredOIDCJWKSToken(t *testing.T) {
+	dir := t.TempDir()
+	issuer := newOIDCJWKSTestIssuer(t)
+	configPath := writeOIDCJWKSRuntimeConfig(t, dir, issuer, "https://tickets.example.com", "https://users.example.com")
+
+	token := issuer.signToken(t, map[string]any{
+		"sub":   "agent-123",
+		"aud":   "oasclird",
+		"scope": "bundle:tickets",
+		"exp":   time.Now().Add(-time.Hour).Unix(),
+	})
+
+	server := runtime.NewServer(runtime.Options{AuditPath: filepath.Join(dir, "audit.log")})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, httpServer.URL+"/v1/catalog/effective?config="+configPath, nil)
+	if err != nil {
+		t.Fatalf("new catalog request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("get effective catalog: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 effective catalog for expired oidc_jwks token, got %d", resp.StatusCode)
+	}
+	if got := readTrimmedBody(t, resp); got != "authn_failed" {
+		t.Fatalf("expected authn_failed body for expired oidc_jwks token, got %q", got)
+	}
+}
+
+func TestServerReturnsEmptyAuthorizationEnvelopeWhenOIDCJWKSTokenMissingScopes(t *testing.T) {
+	dir := t.TempDir()
+	issuer := newOIDCJWKSTestIssuer(t)
+
+	var ticketsCalls int
+	ticketsAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ticketsCalls++
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []map[string]any{{"id": "T-1"}}})
+	}))
+	defer ticketsAPI.Close()
+
+	usersAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []map[string]any{{"id": "U-1"}}})
+	}))
+	defer usersAPI.Close()
+
+	configPath := writeOIDCJWKSRuntimeConfig(t, dir, issuer, ticketsAPI.URL, usersAPI.URL)
+	token := issuer.signToken(t, map[string]any{
+		"sub": "agent-123",
+		"aud": "oasclird",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+
+	server := runtime.NewServer(runtime.Options{AuditPath: filepath.Join(dir, "audit.log")})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, httpServer.URL+"/v1/catalog/effective?config="+configPath, nil)
+	if err != nil {
+		t.Fatalf("new catalog request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("get effective catalog: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 effective catalog for scope-less oidc_jwks token, got %d", resp.StatusCode)
+	}
+
+	var effective map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&effective); err != nil {
+		t.Fatalf("decode effective catalog: %v", err)
+	}
+	catalogData := effective["catalog"].(map[string]any)
+	tools := catalogData["tools"].([]any)
+	if len(tools) != 0 {
+		t.Fatalf("expected empty oidc_jwks authorization envelope without runtime scopes, got %#v", tools)
+	}
+
+	execBody := bytes.NewBufferString(`{
+	  "configPath": "` + configPath + `",
+	  "toolId": "tickets:listTickets"
+	}`)
+	execReq, err := http.NewRequest(http.MethodPost, httpServer.URL+"/v1/tools/execute", execBody)
+	if err != nil {
+		t.Fatalf("new execute request: %v", err)
+	}
+	execReq.Header.Set("Content-Type", "application/json")
+	execReq.Header.Set("Authorization", "Bearer "+token)
+
+	execResp, err := http.DefaultClient.Do(execReq)
+	if err != nil {
+		t.Fatalf("execute tool request: %v", err)
+	}
+	defer execResp.Body.Close()
+	if execResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 authz_denied for scope-less oidc_jwks token, got %d", execResp.StatusCode)
+	}
+	if got := readTrimmedBody(t, execResp); got != "authz_denied" {
+		t.Fatalf("expected authz_denied body for scope-less oidc_jwks token, got %q", got)
+	}
+	if ticketsCalls != 0 {
+		t.Fatalf("expected denied oidc_jwks execution not to hit upstream, got %d calls", ticketsCalls)
+	}
+}
+
 func TestServerReturnsBrowserLoginMetadata(t *testing.T) {
 	dir := t.TempDir()
 	configPath := writeRuntimeFile(t, dir, ".cli.json", `{

@@ -36,3 +36,12 @@ func TestAuthenticateRequestRequiresBearerTokenForCanonicalIntrospectionValidati
 		t.Fatalf("expected authn_failed code, got %q", authErr.Code)
 	}
 }
+
+func TestRuntimeServerAuthEnabledRequiresCanonicalOIDCJWKSValidationProfile(t *testing.T) {
+	if !runtimeServerAuthEnabled(&config.RuntimeServerAuthConfig{ValidationProfile: "oidc_jwks"}) {
+		t.Fatalf("expected canonical oidc_jwks validationProfile to enable runtime auth")
+	}
+	if runtimeServerAuthEnabled(&config.RuntimeServerAuthConfig{Mode: "oidcJWKS"}) {
+		t.Fatalf("expected unsupported oidcJWKS mode alias not to enable runtime auth")
+	}
+}
