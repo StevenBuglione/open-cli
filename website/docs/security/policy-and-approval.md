@@ -84,6 +84,8 @@ Examples:
 - `tickets:createTicket`
 - `**`
 
+For MCP-backed services, policy patterns are also validated at catalog-build time against `sources.<id>.disabledTools`. If an `approvalRequired`, managed deny, or curated tool-set pattern matches only MCP tools that were disabled, build fails closed. Broad patterns that still match at least one surviving tool remain valid.
+
 ## Audit behavior
 
 Allowed and denied tool execution attempts are both written to the audit log. The denial reason becomes the audit `reasonCode`.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,6 +23,86 @@ func writeFile(t *testing.T, dir, name, content string) string {
 		t.Fatalf("write %s: %v", name, err)
 	}
 	return path
+}
+
+func writeFakeMCPServer(t *testing.T, dir string, toolsJSON string) string {
+	t.Helper()
+	return writeFile(t, dir, "fake_mcp_server.py", `
+import json
+import sys
+
+TOOLS = `+toolsJSON+`
+
+def read_message():
+    line = sys.stdin.readline()
+    if not line:
+        return None
+    line = line.strip()
+    if not line:
+        return None
+    return json.loads(line)
+
+def write_message(message):
+    sys.stdout.write(json.dumps(message) + "\n")
+    sys.stdout.flush()
+
+while True:
+    message = read_message()
+    if message is None:
+        break
+    method = message.get("method")
+    if method == "initialize":
+        write_message({
+            "jsonrpc": "2.0",
+            "id": message["id"],
+            "result": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "fake-mcp", "version": "1.0.0"}
+            }
+        })
+    elif method == "notifications/initialized":
+        continue
+    elif method == "tools/list":
+        write_message({
+            "jsonrpc": "2.0",
+            "id": message["id"],
+            "result": {
+                "tools": TOOLS
+            }
+        })
+    else:
+        write_message({
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "error": {"code": -32601, "message": f"unsupported method: {method}"}
+        })
+`)
+}
+
+func disabledMCPTestConfig(dir, serverPath string) config.Config {
+	return config.Config{
+		CLI:  "1.0.0",
+		Mode: config.ModeConfig{Default: "discover"},
+		Sources: map[string]config.Source{
+			"filesystemSource": {
+				Type:          "mcp",
+				Enabled:       true,
+				DisabledTools: []string{"delete_file"},
+				Transport: &config.MCPTransport{
+					Type:    "stdio",
+					Command: "python3",
+					Args:    []string{filepath.ToSlash(serverPath)},
+				},
+			},
+		},
+		Services: map[string]config.Service{
+			"filesystem": {
+				Source: "filesystemSource",
+				Alias:  "filesystem",
+			},
+		},
+	}
 }
 
 func TestBuildProducesStableToolCatalogAndEffectiveViews(t *testing.T) {
@@ -193,6 +274,284 @@ workflows:
 
 	if _, err := json.Marshal(ntc); err != nil {
 		t.Fatalf("catalog should be json serializable: %v", err)
+	}
+}
+
+func TestBuildRejectsWorkflowReferencingDisabledMCPToolOperationID(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	writeFile(t, dir, "workflows/files.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Files workflows
+  version: 1.0.0
+workflows:
+  - workflowId: cleanup
+    steps:
+      - stepId: delete
+        operationId: delete_file
+`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Services["filesystem"] = config.Service{
+		Source:    "filesystemSource",
+		Alias:     "filesystem",
+		Workflows: []string{"./workflows/files.arazzo.yaml"},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err == nil {
+		t.Fatal("expected Build to fail when workflow references disabled MCP tool by operationId")
+	}
+	if !strings.Contains(err.Error(), `source "filesystemSource"`) ||
+		!strings.Contains(err.Error(), `workflow "./workflows/files.arazzo.yaml"`) ||
+		!strings.Contains(err.Error(), `operationId "delete_file"`) ||
+		!strings.Contains(err.Error(), `disabled MCP tool "delete_file"`) {
+		t.Fatalf("expected disabled MCP workflow reference error, got %v", err)
+	}
+}
+
+func TestBuildRejectsWorkflowReferencingDisabledMCPToolOperationPath(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	writeFile(t, dir, "workflows/files.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Files workflows
+  version: 1.0.0
+workflows:
+  - workflowId: cleanup
+    steps:
+      - stepId: delete
+        operationPath: POST /_mcp/filesystem/delete-file
+`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Services["filesystem"] = config.Service{
+		Source:    "filesystemSource",
+		Alias:     "filesystem",
+		Workflows: []string{"./workflows/files.arazzo.yaml"},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err == nil {
+		t.Fatal("expected Build to fail when workflow references disabled MCP tool by operationPath")
+	}
+	if !strings.Contains(err.Error(), `source "filesystemSource"`) ||
+		!strings.Contains(err.Error(), `workflow "./workflows/files.arazzo.yaml"`) ||
+		!strings.Contains(err.Error(), `operationPath "POST /_mcp/filesystem/delete-file"`) ||
+		!strings.Contains(err.Error(), `disabled MCP tool "delete_file"`) {
+		t.Fatalf("expected disabled MCP workflow path error, got %v", err)
+	}
+}
+
+func TestBuildRejectsOverlayTargetingDisabledMCPTool(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	writeFile(t, dir, "overlays/files.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/_mcp/filesystem/delete-file'].post"
+    update:
+      x-cli-name: remove
+`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Services["filesystem"] = config.Service{
+		Source:   "filesystemSource",
+		Alias:    "filesystem",
+		Overlays: []string{"./overlays/files.overlay.yaml"},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err == nil {
+		t.Fatal("expected Build to fail when overlay targets disabled MCP tool")
+	}
+	if !strings.Contains(err.Error(), `source "filesystemSource"`) ||
+		!strings.Contains(err.Error(), `overlay "./overlays/files.overlay.yaml"`) ||
+		!strings.Contains(err.Error(), `$.paths['/_mcp/filesystem/delete-file'].post`) ||
+		!strings.Contains(err.Error(), `disabled MCP tool "delete_file"`) {
+		t.Fatalf("expected disabled MCP overlay target error, got %v", err)
+	}
+}
+
+func TestBuildAllowsOverlayTargetThatStillMatchesSurvivingMCPTool(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	writeFile(t, dir, "overlays/files.overlay.yaml", `
+overlay: 1.1.0
+actions:
+  - target: "$.paths['/_mcp/filesystem/list-files'].post"
+    update:
+      x-cli-name: list
+`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Services["filesystem"] = config.Service{
+		Source:   "filesystemSource",
+		Alias:    "filesystem",
+		Overlays: []string{"./overlays/files.overlay.yaml"},
+	}
+
+	ntc, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+	tool := ntc.FindTool("filesystem:list_files")
+	if tool == nil {
+		t.Fatalf("expected surviving MCP tool in catalog, got %#v", ntc.Tools)
+	}
+	if tool.Command != "list" {
+		t.Fatalf("expected overlay to apply to surviving MCP tool, got %#v", tool)
+	}
+}
+
+func TestBuildRejectsApprovalRequiredPatternReferencingOnlyDisabledMCPTool(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Policy.ApprovalRequired = []string{"filesystem:delete_file"}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err == nil {
+		t.Fatal("expected Build to fail when approvalRequired references only a disabled MCP tool")
+	}
+	if !strings.Contains(err.Error(), `source "filesystemSource"`) ||
+		!strings.Contains(err.Error(), `service "filesystem"`) ||
+		!strings.Contains(err.Error(), `policy.approvalRequired`) ||
+		!strings.Contains(err.Error(), `pattern "filesystem:delete_file"`) ||
+		!strings.Contains(err.Error(), `disabled MCP tool "delete_file"`) {
+		t.Fatalf("expected disabled approvalRequired policy error, got %v", err)
+	}
+}
+
+func TestBuildRejectsManagedDenyPatternReferencingOnlyDisabledMCPTool(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Policy.ManagedDeny = []string{"filesystem:delete_*"}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err == nil {
+		t.Fatal("expected Build to fail when managed deny references only a disabled MCP tool")
+	}
+	if !strings.Contains(err.Error(), `source "filesystemSource"`) ||
+		!strings.Contains(err.Error(), `service "filesystem"`) ||
+		!strings.Contains(err.Error(), `policy.managedDeny`) ||
+		!strings.Contains(err.Error(), `pattern "filesystem:delete_*"`) ||
+		!strings.Contains(err.Error(), `disabled MCP tool "delete_file"`) {
+		t.Fatalf("expected disabled managed deny policy error, got %v", err)
+	}
+}
+
+func TestBuildRejectsCuratedAllowPatternReferencingOnlyDisabledMCPTool(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Curation.ToolSets = map[string]config.ToolSet{
+		"filesystem-set": {
+			Allow: []string{"filesystem:delete_*"},
+		},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err == nil {
+		t.Fatal("expected Build to fail when curated allow references only a disabled MCP tool")
+	}
+	if !strings.Contains(err.Error(), `source "filesystemSource"`) ||
+		!strings.Contains(err.Error(), `service "filesystem"`) ||
+		!strings.Contains(err.Error(), `toolSet "filesystem-set" allow`) ||
+		!strings.Contains(err.Error(), `pattern "filesystem:delete_*"`) ||
+		!strings.Contains(err.Error(), `disabled MCP tool "delete_file"`) {
+		t.Fatalf("expected disabled curated allow policy error, got %v", err)
+	}
+}
+
+func TestBuildRejectsCuratedDenyPatternReferencingOnlyDisabledMCPTool(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Curation.ToolSets = map[string]config.ToolSet{
+		"filesystem-set": {
+			Deny: []string{"filesystem:delete_*"},
+		},
+	}
+
+	_, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err == nil {
+		t.Fatal("expected Build to fail when curated deny references only a disabled MCP tool")
+	}
+	if !strings.Contains(err.Error(), `source "filesystemSource"`) ||
+		!strings.Contains(err.Error(), `service "filesystem"`) ||
+		!strings.Contains(err.Error(), `toolSet "filesystem-set" deny`) ||
+		!strings.Contains(err.Error(), `pattern "filesystem:delete_*"`) ||
+		!strings.Contains(err.Error(), `disabled MCP tool "delete_file"`) {
+		t.Fatalf("expected disabled curated deny policy error, got %v", err)
+	}
+}
+
+func TestBuildAllowsPolicyPatternMatchingDisabledAndSurvivingMCPTools(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is required for MCP stdio integration test")
+	}
+	dir := t.TempDir()
+	serverPath := writeFakeMCPServer(t, dir, `[
+  {"name": "list_files", "description": "List files", "inputSchema": {"type": "object"}},
+  {"name": "delete_file", "description": "Delete file", "inputSchema": {"type": "object"}}
+]`)
+	cfg := disabledMCPTestConfig(dir, serverPath)
+	cfg.Policy.ApprovalRequired = []string{"filesystem:*file*"}
+
+	ntc, err := catalog.Build(context.Background(), catalog.BuildOptions{Config: cfg, BaseDir: dir})
+	if err != nil {
+		t.Fatalf("Build returned error: %v", err)
+	}
+	if ntc.FindTool("filesystem:list_files") == nil {
+		t.Fatalf("expected surviving tool to remain available, got %#v", ntc.Tools)
 	}
 }
 

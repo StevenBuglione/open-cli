@@ -39,6 +39,8 @@ Operators decide:
 - workflows are validated and normalized, but not executed by the runtime
 - if a workflow references an ignored or missing operation, catalog build fails
 
+For MCP-backed services, that validation is now more specific: if a workflow step points at an operation that existed before `sources.<id>.disabledTools` filtering but now maps only to disabled MCP tools, catalog build fails with a disabled-tool-specific error instead of a generic missing-tool failure.
+
 Continue with:
 
 - [Skill manifests](./skill-manifests)

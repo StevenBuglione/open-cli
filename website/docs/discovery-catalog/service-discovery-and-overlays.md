@@ -73,6 +73,8 @@ Using relation URIs that include those fragments is the safest choice.
 
 Overlays are loaded before the OpenAPI document is normalized.
 
+For MCP-backed services, overlays are applied to the synthetic OpenAPI document generated from the discovered tool list. That means the same overlay mechanism can rename, hide, or annotate MCP tools after discovery.
+
 Current overlay document shape:
 
 ```yaml
@@ -93,6 +95,12 @@ Supported action forms:
 - `update`: merge keys into matched objects
 - `remove`: delete matched fields/items
 - `copy`: copy one matched value to a destination object field path
+
+## Fail-closed disabled MCP tool references
+
+`sources.<id>.disabledTools` is not just a visibility filter for MCP services.
+
+If an overlay target points only at MCP operations that were removed by `disabledTools`, catalog build fails instead of treating that target as a silent no-op. A target that still matches at least one surviving MCP operation continues to work.
 
 ## JSONPath subset
 

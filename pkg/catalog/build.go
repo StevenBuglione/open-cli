@@ -68,6 +68,7 @@ func Build(ctx context.Context, options BuildOptions) (*NormalizedCatalog, error
 	}
 	fingerprint := sha256.New()
 	sourceRecords := map[string]*SourceRecord{}
+	var mcpValidationStates []*mcpDisabledValidationState
 
 	referencedSources := map[string]bool{}
 	serviceIDs := sortedKeys(cfg.Services)
@@ -78,9 +79,12 @@ func Build(ctx context.Context, options BuildOptions) (*NormalizedCatalog, error
 			continue
 		}
 		referencedSources[serviceConfig.Source] = true
-		fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, serviceID, serviceConfig, sourceConfig, fingerprint, fetcher, cachePolicyForSource(sourceConfig, options.ForceRefresh), options.StateDir, options.HTTPClient)
+		fetches, validationState, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, serviceID, serviceConfig, sourceConfig, fingerprint, fetcher, cachePolicyForSource(sourceConfig, options.ForceRefresh), options.StateDir, options.HTTPClient)
 		if err != nil {
 			return nil, err
+		}
+		if validationState != nil {
+			mcpValidationStates = append(mcpValidationStates, validationState)
 		}
 		recordSource(sourceRecords, serviceConfig.Source, sourceConfig.Type, sourceConfig.URI, provenanceMethodForSourceType(sourceConfig.Type), fetches)
 	}
@@ -99,7 +103,7 @@ func Build(ctx context.Context, options BuildOptions) (*NormalizedCatalog, error
 			recordSource(sourceRecords, sourceID, sourceConfig.Type, sourceConfig.URI, string(discovery.ProvenanceRFC9727), sourceFetchesFromDiscovery(result.Provenance.Fetches))
 			for _, discoveredService := range result.Services {
 				discoveredConfig := config.Service{Source: sourceID}
-				fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", discoveredConfig, config.Source{
+				fetches, validationState, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", discoveredConfig, config.Source{
 					Type:    "serviceRoot",
 					URI:     discoveredService.URL,
 					Enabled: true,
@@ -108,18 +112,27 @@ func Build(ctx context.Context, options BuildOptions) (*NormalizedCatalog, error
 				if err != nil {
 					return nil, err
 				}
+				if validationState != nil {
+					mcpValidationStates = append(mcpValidationStates, validationState)
+				}
 				recordSource(sourceRecords, sourceID, sourceConfig.Type, sourceConfig.URI, string(discovery.ProvenanceRFC9727), fetches)
 			}
 		case "serviceRoot":
-			fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", config.Service{Source: sourceID}, sourceConfig, fingerprint, fetcher, policy, options.StateDir, options.HTTPClient)
+			fetches, validationState, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", config.Service{Source: sourceID}, sourceConfig, fingerprint, fetcher, policy, options.StateDir, options.HTTPClient)
 			if err != nil {
 				return nil, err
 			}
+			if validationState != nil {
+				mcpValidationStates = append(mcpValidationStates, validationState)
+			}
 			recordSource(sourceRecords, sourceID, sourceConfig.Type, sourceConfig.URI, string(discovery.ProvenanceRFC8631), fetches)
 		case "openapi":
-			fetches, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", config.Service{Source: sourceID}, sourceConfig, fingerprint, fetcher, policy, options.StateDir, options.HTTPClient)
+			fetches, validationState, err := buildServiceCatalog(ctx, catalog, &cfg, options.BaseDir, "", config.Service{Source: sourceID}, sourceConfig, fingerprint, fetcher, policy, options.StateDir, options.HTTPClient)
 			if err != nil {
 				return nil, err
+			}
+			if validationState != nil {
+				mcpValidationStates = append(mcpValidationStates, validationState)
 			}
 			recordSource(sourceRecords, sourceID, sourceConfig.Type, sourceConfig.URI, string(discovery.ProvenanceExplicit), fetches)
 		}
@@ -129,6 +142,9 @@ func Build(ctx context.Context, options BuildOptions) (*NormalizedCatalog, error
 	sort.Slice(catalog.Tools, func(i, j int) bool {
 		return catalog.Tools[i].ID < catalog.Tools[j].ID
 	})
+	if err := validateDisabledMCPPolicyPatterns(cfg, mcpValidationStates, catalog.Tools); err != nil {
+		return nil, err
+	}
 
 	catalog.SourceFingerprint = hex.EncodeToString(fingerprint.Sum(nil))
 	catalog.EffectiveViews = buildEffectiveViews(cfg, catalog.Tools)
@@ -270,7 +286,7 @@ func loadGuidance(baseDir string, refs []string, fetcher *cache.Fetcher, policy 
 	return guidance, fetches, nil
 }
 
-func loadWorkflows(baseDir string, refs []string, bindings map[string]string, fetcher *cache.Fetcher, policy cache.Policy, method string) ([]Workflow, []SourceFetch, error) {
+func loadWorkflows(baseDir string, refs []string, bindings map[string]string, fetcher *cache.Fetcher, policy cache.Policy, method string, validator *mcpDisabledValidationState) ([]Workflow, []SourceFetch, error) {
 	var workflows []Workflow
 	var fetches []SourceFetch
 	for _, ref := range refs {
@@ -291,6 +307,9 @@ func loadWorkflows(baseDir string, refs []string, bindings map[string]string, fe
 					toolID = bindings[step.OperationPath]
 				}
 				if toolID == "" {
+					if err := validator.disabledWorkflowReferenceError(ref, workflow, step); err != nil {
+						return nil, nil, err
+					}
 					return nil, nil, fmt.Errorf("workflow %q step %q references %s, but no matching tool is available in the catalog", workflow.WorkflowID, step.StepID, workflowReferenceLabel(step))
 				}
 				current.Steps = append(current.Steps, WorkflowStep{
@@ -418,14 +437,14 @@ func buildTools(service Service, document *openapi3.T, guidance map[string]Guida
 	return tools, nil
 }
 
-func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy, stateDir string, httpClient *http.Client) ([]SourceFetch, error) {
+func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy, stateDir string, httpClient *http.Client) ([]SourceFetch, *mcpDisabledValidationState, error) {
 	method := provenanceMethodForSourceType(sourceConfig.Type)
 	if sourceConfig.Type == "mcp" {
 		return buildMCPServiceCatalog(ctx, ntc, cfg, baseDir, serviceID, serviceConfig, sourceConfig, fingerprint, fetcher, policy, stateDir, httpClient)
 	}
 	openapiRef, metadataRefs, fetches, err := resolveServiceSource(ctx, baseDir, sourceConfig, fetcher, policy)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	serviceConfig.Overlays = append([]string(nil), serviceConfig.Overlays...)
@@ -435,7 +454,7 @@ func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *confi
 
 	document, err := openapi.LoadDocument(ctx, baseDir, openapiRef, serviceConfig.Overlays, fetcher, policy)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	fingerprint.Write([]byte(document.Fingerprint))
 	fetches = append(fetches, sourceFetchesFromOpenAPIFetches(document.Fetches, method)...)
@@ -446,7 +465,7 @@ func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *confi
 
 	guidance, guidanceFetches, err := loadGuidance(baseDir, serviceConfig.Skills, fetcher, policy, method)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	fetches = append(fetches, guidanceFetches...)
 	alias := serviceConfig.Alias
@@ -465,34 +484,40 @@ func buildServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *confi
 	operationBindings := map[string]string{}
 	tools, err := buildTools(service, document.Document, guidance, operationBindings, false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ntc.Tools = append(ntc.Tools, tools...)
 
-	workflows, workflowFetches, err := loadWorkflows(baseDir, serviceConfig.Workflows, operationBindings, fetcher, policy, method)
+	workflows, workflowFetches, err := loadWorkflows(baseDir, serviceConfig.Workflows, operationBindings, fetcher, policy, method, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	fetches = append(fetches, workflowFetches...)
 	ntc.Workflows = append(ntc.Workflows, workflows...)
-	return fetches, nil
+	return fetches, nil, nil
 }
 
-func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy, stateDir string, httpClient *http.Client) ([]SourceFetch, error) {
+func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *config.Config, baseDir, serviceID string, serviceConfig config.Service, sourceConfig config.Source, fingerprint hashWriter, fetcher *cache.Fetcher, policy cache.Policy, stateDir string, httpClient *http.Client) ([]SourceFetch, *mcpDisabledValidationState, error) {
 	client, err := mcpclient.Open(sourceConfig, cfg.Secrets, cfg.Policy, stateDir, httpClient, ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer client.Close()
 
 	descriptors, err := client.ListTools(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	document, err := mcpopenapi.BuildDocument(serviceID, serviceConfig.Source, sourceConfig.Transport.Type, descriptors, sourceConfig.DisabledTools)
+	buildResult, err := mcpopenapi.BuildDocumentResult(serviceID, serviceConfig.Source, sourceConfig.Transport.Type, descriptors, sourceConfig.DisabledTools)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	validation := newMCPDisabledValidationState(serviceConfig.Source, serviceID, buildResult)
+	document := buildResult.Document
+	document, overlayFetches, err := applyMCPOverlays(ctx, baseDir, document, serviceConfig.Overlays, fetcher, policy, provenanceMethodForSourceType(sourceConfig.Type), validation)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	data, err := json.Marshal(document)
@@ -503,7 +528,7 @@ func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *co
 	method := provenanceMethodForSourceType(sourceConfig.Type)
 	guidance, guidanceFetches, err := loadGuidance(baseDir, serviceConfig.Skills, fetcher, policy, method)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	alias := serviceConfig.Alias
@@ -521,16 +546,17 @@ func buildMCPServiceCatalog(ctx context.Context, ntc *NormalizedCatalog, cfg *co
 	operationBindings := map[string]string{}
 	tools, err := buildTools(service, document, guidance, operationBindings, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	validation.setFinalTools(tools)
 	ntc.Tools = append(ntc.Tools, tools...)
 
-	workflows, workflowFetches, err := loadWorkflows(baseDir, serviceConfig.Workflows, operationBindings, fetcher, policy, method)
+	workflows, workflowFetches, err := loadWorkflows(baseDir, serviceConfig.Workflows, operationBindings, fetcher, policy, method, validation)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ntc.Workflows = append(ntc.Workflows, workflows...)
-	return append(guidanceFetches, workflowFetches...), nil
+	return append(overlayFetches, append(guidanceFetches, workflowFetches...)...), validation, nil
 }
 
 type metadataReferences struct {

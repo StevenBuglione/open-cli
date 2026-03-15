@@ -125,7 +125,9 @@ Discovery starting points. Supported source types are:
 
 Non-MCP sources (`openapi`, `serviceRoot`, and `apiCatalog`) use `uri` and do not accept MCP-only fields such as `transport`, `disabledTools`, or source-local `oauth`.
 
-Each source can also define refresh behavior. For MCP sources, `disabledTools` can hide specific discovered MCP tools before normalization.
+Each source can also define refresh behavior. For MCP sources, `disabledTools` removes specific discovered MCP tools before normalization.
+
+That removal is **fail-closed**, not cosmetic. If a service overlay, workflow, or policy pattern still references a disabled MCP tool, catalog build now fails with a source-scoped error instead of silently ignoring the reference.
 
 ### `services`
 

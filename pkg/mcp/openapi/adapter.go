@@ -5,24 +5,39 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	mcpclient "github.com/StevenBuglione/oas-cli-go/pkg/mcp/client"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+type BuildResult struct {
+	Document           *openapi3.T
+	AllOperations      []OperationRef
+	FilteredOperations []OperationRef
+}
+
+type OperationRef struct {
+	ToolName    string
+	OperationID string
+	Method      string
+	Path        string
+	SourceID    string
+	ServiceID   string
+}
+
 func BuildDocument(serviceID, sourceID, transport string, tools []mcpclient.ToolDescriptor, disabledTools []string) (*openapi3.T, error) {
+	result, err := BuildDocumentResult(serviceID, sourceID, transport, tools, disabledTools)
+	if err != nil {
+		return nil, err
+	}
+	return result.Document, nil
+}
+
+func BuildDocumentResult(serviceID, sourceID, transport string, tools []mcpclient.ToolDescriptor, disabledTools []string) (*BuildResult, error) {
 	disabled := map[string]struct{}{}
 	for _, name := range disabledTools {
 		disabled[name] = struct{}{}
-	}
-
-	document := &openapi3.T{
-		OpenAPI: "3.1.0",
-		Info: &openapi3.Info{
-			Title:   serviceID,
-			Version: "mcp",
-		},
-		Paths: openapi3.NewPaths(),
 	}
 
 	usedPaths := map[string]string{}
@@ -32,28 +47,78 @@ func BuildDocument(serviceID, sourceID, transport string, tools []mcpclient.Tool
 		serviceSlug = "service"
 	}
 
+	refsByIndex := make([]OperationRef, len(tools))
+	var filteredRefs []OperationRef
+	for pass := 0; pass < 2; pass++ {
+		for idx, tool := range tools {
+			if tool.Name == "" {
+				return nil, fmt.Errorf("mcp tool name is required")
+			}
+			_, blocked := disabled[tool.Name]
+			if (pass == 0 && blocked) || (pass == 1 && !blocked) {
+				continue
+			}
+
+			operationID := uniqueValue(tool.Name, usedOperationIDs, tool.Name)
+			pathSlug := slugify(tool.Name)
+			if pathSlug == "" {
+				pathSlug = "tool"
+			}
+			pathValue := uniqueValue(pathSlug, usedPaths, tool.Name)
+
+			ref := OperationRef{
+				ToolName:    tool.Name,
+				OperationID: operationID,
+				Method:      http.MethodPost,
+				Path:        "/_mcp/" + serviceSlug + "/" + pathValue,
+				SourceID:    sourceID,
+				ServiceID:   serviceID,
+			}
+			refsByIndex[idx] = ref
+			if !blocked {
+				filteredRefs = append(filteredRefs, ref)
+			}
+		}
+	}
+
+	allRefs := make([]OperationRef, 0, len(refsByIndex))
+	for _, ref := range refsByIndex {
+		allRefs = append(allRefs, ref)
+	}
+
+	document, err := buildDocumentFromRefs(serviceID, sourceID, transport, tools, filteredRefs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BuildResult{
+		Document:           document,
+		AllOperations:      allRefs,
+		FilteredOperations: filteredRefs,
+	}, nil
+}
+
+func buildDocumentFromRefs(serviceID, sourceID, transport string, tools []mcpclient.ToolDescriptor, refs []OperationRef) (*openapi3.T, error) {
+	document := &openapi3.T{
+		OpenAPI: "3.1.0",
+		Info: &openapi3.Info{
+			Title:   serviceID,
+			Version: "mcp",
+		},
+		Paths: openapi3.NewPaths(),
+	}
+	toolsByName := map[string]mcpclient.ToolDescriptor{}
 	for _, tool := range tools {
-		if tool.Name == "" {
-			return nil, fmt.Errorf("mcp tool name is required")
-		}
-		if _, blocked := disabled[tool.Name]; blocked {
-			continue
-		}
-
-		operationID := uniqueValue(tool.Name, usedOperationIDs, tool.Name)
-		pathSlug := slugify(tool.Name)
-		if pathSlug == "" {
-			pathSlug = "tool"
-		}
-		pathValue := uniqueValue(pathSlug, usedPaths, tool.Name)
-
+		toolsByName[tool.Name] = tool
+	}
+	for _, ref := range refs {
+		tool := toolsByName[ref.ToolName]
 		schemaRef, inputWrapped, err := schemaForToolInput(tool.InputSchema)
 		if err != nil {
 			return nil, fmt.Errorf("mcp tool %q: %w", tool.Name, err)
 		}
-
 		operation := &openapi3.Operation{
-			OperationID: operationID,
+			OperationID: ref.OperationID,
 			Summary:     tool.Description,
 			Description: tool.Description,
 			Tags:        []string{serviceID},
@@ -73,11 +138,8 @@ func BuildDocument(serviceID, sourceID, transport string, tools []mcpclient.Tool
 				},
 			},
 		}
-		document.Paths.Set("/_mcp/"+serviceSlug+"/"+pathValue, &openapi3.PathItem{
-			Post: operation,
-		})
+		document.Paths.Set(ref.Path, &openapi3.PathItem{Post: operation})
 	}
-
 	return document, nil
 }
 
