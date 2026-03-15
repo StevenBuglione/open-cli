@@ -653,6 +653,130 @@ func TestLoadEffectiveLoadsRemoteRuntimeOIDCJWKSConfiguration(t *testing.T) {
 	requireStringField(t, auth, "JWKSURL", "https://broker.example.com/.well-known/jwks.json")
 }
 
+func TestLoadEffectiveHigherPrecedenceLegacyRuntimeAuthModeOverridesLowerValidationProfile(t *testing.T) {
+	dir := t.TempDir()
+	userPath := writeJSON(t, dir, "user.json", `{
+	  "runtime": {
+	    "server": {
+	      "auth": {
+	        "validationProfile": "oidc_jwks"
+	      }
+	    }
+	  }
+	}`)
+	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "server": {
+	      "auth": {
+	        "mode": "oauth2Introspection",
+	        "audience": "oasclird",
+	        "introspectionURL": "https://auth.example.com/oauth/introspect"
+	      }
+	    }
+	  },
+	  "sources": {
+	    "tickets": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.json"
+	    }
+	  },
+	  "services": {
+	    "tickets": {
+	      "source": "tickets"
+	    }
+	  }
+	}`)
+
+	effective, err := config.LoadEffective(config.LoadOptions{
+		UserPath:    userPath,
+		ProjectPath: projectPath,
+		WorkingDir:  dir,
+	})
+	if err != nil {
+		t.Fatalf("LoadEffective returned error: %v", err)
+	}
+
+	if effective.Config.Runtime == nil || effective.Config.Runtime.Server == nil || effective.Config.Runtime.Server.Auth == nil {
+		t.Fatalf("expected runtime server auth configuration to load")
+	}
+
+	auth := *effective.Config.Runtime.Server.Auth
+	if auth.Mode != "oauth2Introspection" {
+		t.Fatalf("expected legacy auth mode oauth2Introspection, got %q", auth.Mode)
+	}
+	requireStringField(t, auth, "ValidationProfile", "oauth2_introspection")
+	if auth.Audience != "oasclird" {
+		t.Fatalf("expected audience oasclird, got %q", auth.Audience)
+	}
+	if auth.IntrospectionURL != "https://auth.example.com/oauth/introspect" {
+		t.Fatalf("expected introspection URL to be preserved, got %q", auth.IntrospectionURL)
+	}
+}
+
+func TestLoadEffectiveHigherPrecedenceValidationProfileDoesNotOverrideLegacyRuntimeAuthMode(t *testing.T) {
+	dir := t.TempDir()
+	userPath := writeJSON(t, dir, "user.json", `{
+	  "runtime": {
+	    "server": {
+	      "auth": {
+	        "mode": "oauth2Introspection",
+	        "audience": "oasclird",
+	        "introspectionURL": "https://auth.example.com/oauth/introspect"
+	      }
+	    }
+	  }
+	}`)
+	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "server": {
+	      "auth": {
+	        "validationProfile": "oidc_jwks"
+	      }
+	    }
+	  },
+	  "sources": {
+	    "tickets": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.json"
+	    }
+	  },
+	  "services": {
+	    "tickets": {
+	      "source": "tickets"
+	    }
+	  }
+	}`)
+
+	effective, err := config.LoadEffective(config.LoadOptions{
+		UserPath:    userPath,
+		ProjectPath: projectPath,
+		WorkingDir:  dir,
+	})
+	if err != nil {
+		t.Fatalf("LoadEffective returned error: %v", err)
+	}
+
+	if effective.Config.Runtime == nil || effective.Config.Runtime.Server == nil || effective.Config.Runtime.Server.Auth == nil {
+		t.Fatalf("expected runtime server auth configuration to load")
+	}
+
+	auth := *effective.Config.Runtime.Server.Auth
+	if auth.Mode != "oauth2Introspection" {
+		t.Fatalf("expected legacy auth mode oauth2Introspection, got %q", auth.Mode)
+	}
+	requireStringField(t, auth, "ValidationProfile", "oauth2_introspection")
+	if auth.Audience != "oasclird" {
+		t.Fatalf("expected audience oasclird, got %q", auth.Audience)
+	}
+	if auth.IntrospectionURL != "https://auth.example.com/oauth/introspect" {
+		t.Fatalf("expected introspection URL to be preserved, got %q", auth.IntrospectionURL)
+	}
+}
+
 func TestLoadEffectivePreservesRemoteRuntimeOAuth2IntrospectionConfiguration(t *testing.T) {
 	dir := t.TempDir()
 	projectPath := writeJSON(t, dir, ".cli.json", `{

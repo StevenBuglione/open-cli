@@ -450,11 +450,9 @@ func normalizeRuntimeServerAuth(auth *RuntimeServerAuthConfig) {
 	if auth == nil {
 		return
 	}
-	if auth.ValidationProfile == "" {
-		switch auth.Mode {
-		case "oauth2Introspection":
-			auth.ValidationProfile = "oauth2_introspection"
-		}
+	switch auth.Mode {
+	case "oauth2Introspection":
+		auth.ValidationProfile = "oauth2_introspection"
 	}
 	if auth.Mode == "" {
 		switch auth.ValidationProfile {

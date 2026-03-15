@@ -295,14 +295,11 @@ func runtimeServerAuthValidationProfile(auth *RuntimeServerAuthConfig) string {
 	if auth == nil {
 		return ""
 	}
-	if auth.ValidationProfile != "" {
-		return auth.ValidationProfile
-	}
 	switch auth.Mode {
 	case "oauth2Introspection":
 		return "oauth2_introspection"
 	default:
-		return ""
+		return auth.ValidationProfile
 	}
 }
 
