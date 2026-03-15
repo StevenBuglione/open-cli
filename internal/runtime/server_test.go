@@ -16,6 +16,7 @@ import (
 
 	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
 	"github.com/StevenBuglione/oas-cli-go/pkg/audit"
+	"github.com/StevenBuglione/oas-cli-go/pkg/config"
 	"github.com/StevenBuglione/oas-cli-go/pkg/obs"
 )
 
@@ -977,6 +978,80 @@ paths:
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 without bearer token, got %d", resp.StatusCode)
+	}
+}
+
+func TestServerRejectsCatalogWithoutBearerTokenWhenValidationProfileNormalizesIntrospectionAuth(t *testing.T) {
+	dir := t.TempDir()
+	writeRuntimeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Tickets API
+  version: "1.0.0"
+servers:
+  - url: https://example.com
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      responses:
+        "200":
+          description: OK
+`)
+	configPath := writeRuntimeFile(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "server": {
+	      "auth": {
+	        "validationProfile": "oauth2_introspection",
+	        "audience": "oasclird",
+	        "introspectionURL": "https://auth.example.com/introspect"
+	      }
+	    }
+	  },
+	  "sources": {
+	    "ticketsSource": {
+	      "type": "openapi",
+	      "uri": "./tickets.openapi.yaml",
+	      "enabled": true
+	    }
+	  },
+	  "services": {
+	    "tickets": {
+	      "source": "ticketsSource",
+	      "alias": "tickets"
+	    }
+	  }
+	}`)
+
+	effective, err := config.LoadEffective(config.LoadOptions{ProjectPath: configPath, WorkingDir: dir})
+	if err != nil {
+		t.Fatalf("LoadEffective returned error: %v", err)
+	}
+	if effective.Config.Runtime == nil || effective.Config.Runtime.Server == nil || effective.Config.Runtime.Server.Auth == nil {
+		t.Fatalf("expected runtime server auth configuration to load")
+	}
+	auth := *effective.Config.Runtime.Server.Auth
+	if auth.Mode != "oauth2Introspection" {
+		t.Fatalf("expected canonical validation profile to normalize legacy mode, got %q", auth.Mode)
+	}
+	if auth.ValidationProfile != "oauth2_introspection" {
+		t.Fatalf("expected canonical validation profile to be preserved, got %q", auth.ValidationProfile)
+	}
+
+	server := runtime.NewServer(runtime.Options{AuditPath: filepath.Join(dir, "audit.log")})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	resp, err := http.Get(httpServer.URL + "/v1/catalog/effective?config=" + configPath)
+	if err != nil {
+		t.Fatalf("get effective catalog: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without bearer token after canonical normalization, got %d", resp.StatusCode)
 	}
 }
 

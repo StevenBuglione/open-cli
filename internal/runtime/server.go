@@ -733,7 +733,7 @@ func (server *Server) authorizeRequest(ctx context.Context, request *http.Reques
 
 func (server *Server) authenticateRequest(ctx context.Context, request *http.Request, cfg config.Config) (*authResult, error) {
 	authCfg := runtimeServerAuthConfig(cfg)
-	if authCfg == nil || authCfg.Mode == "" {
+	if !runtimeServerAuthEnabled(authCfg) {
 		return &authResult{}, nil
 	}
 	token, err := bearerToken(request.Header.Get("Authorization"))
@@ -756,6 +756,16 @@ func runtimeServerAuthConfig(cfg config.Config) *config.RuntimeServerAuthConfig 
 		return nil
 	}
 	return cfg.Runtime.Server.Auth
+}
+
+func runtimeServerAuthEnabled(auth *config.RuntimeServerAuthConfig) bool {
+	if auth == nil {
+		return false
+	}
+	if auth.Mode == "oauth2Introspection" {
+		return true
+	}
+	return auth.ValidationProfile == "oauth2_introspection"
 }
 
 func bearerToken(header string) (string, error) {
