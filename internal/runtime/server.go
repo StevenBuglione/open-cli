@@ -560,15 +560,21 @@ func (server *Server) handleBrowserConfig(w http.ResponseWriter, r *http.Request
 }
 
 func (server *Server) handleRuntimeInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	if ok := server.requireConfiguredAuth(w, r, false); !ok {
 		return
 	}
 	response := map[string]any{
-		"instanceId": server.instanceID,
-		"url":        server.runtimeURL,
-		"auditPath":  server.auditStorePath(),
-		"stateDir":   server.stateDir,
-		"cacheDir":   server.cacheDir,
+		"contractVersion": CurrentContractVersion,
+		"capabilities":    ServerCapabilities,
+		"instanceId":      server.instanceID,
+		"url":             server.runtimeURL,
+		"auditPath":       server.auditStorePath(),
+		"stateDir":        server.stateDir,
+		"cacheDir":        server.cacheDir,
 	}
 	if server.lifecycleEnabled() {
 		response["lifecycle"] = map[string]any{
