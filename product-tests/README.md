@@ -9,10 +9,15 @@ End-to-end product tests for oascli. These tests spin up real infrastructure
 product-tests/
   Makefile                  # Main entrypoints (smoke, full, per-capability targets)
   docker-compose.yml        # Core services (REST API, OAuth server)
+  authentik/
+    docker-compose.yml      # Authentik reference-broker stack for runtime auth proof
+    .env.example            # Example environment for the Authentik product-test stack
   scripts/
     check-prereqs.sh        # Validate required tools are present
     services-up.sh          # Thin wrapper: docker compose up
     services-down.sh        # Thin wrapper: docker compose down
+    authentik-up.sh         # Thin wrapper: Authentik reference stack up
+    authentik-down.sh       # Thin wrapper: Authentik reference stack down
   mcp/
     remote/
       docker-compose.yml    # MCP remote-mode server (server-everything, streamable-http)
@@ -57,6 +62,12 @@ product-tests/
 | Smoke | `make smoke` | Checks prerequisites and validates all compose config files — no services started |
 | Full | `make full` | Validates prerequisites and configs (smoke), then brings up and tears down services — placeholder; individual capability targets not yet wired in |
 
+Additional reference-broker targets:
+
+- `make authentik-up`
+- `make authentik-down`
+- `make test-runtime-auth-authentik`
+
 Smoke runs in CI automatically on every push and PR. Full is for local pre-merge validation.
 
 ## Running
@@ -69,7 +80,9 @@ make product-test-full     # full suite
 # From this directory
 make check-prereqs
 make services-up
+make authentik-up
 make smoke
+make authentik-down
 make services-down
 ```
 
@@ -143,4 +156,17 @@ go test ./tests/... -run TestCapabilityAudit -count=1 -v
 
 ```sh
 go test ./tests/... -run TestMultiInstance -count=1 -v
+```
+
+### Runtime auth — Authentik reference proof
+
+This target is the dedicated entrypoint for the Authentik-based runtime auth proof stack. It will become fully green once the Authentik runtime-auth test coverage is added.
+
+```sh
+make authentik-up
+docker compose -f authentik/docker-compose.yml config --quiet
+make authentik-down
+
+# later task target
+make test-runtime-auth-authentik
 ```

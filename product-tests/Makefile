@@ -1,4 +1,4 @@
-.PHONY: check-prereqs services-up services-down mcp-remote-up mcp-remote-down smoke full test-mcp-stdio test-mcp-remote
+.PHONY: check-prereqs services-up services-down authentik-up authentik-down mcp-remote-up mcp-remote-down smoke full test-mcp-stdio test-mcp-remote test-runtime-auth-authentik
 
 check-prereqs:
 	@bash scripts/check-prereqs.sh
@@ -8,6 +8,12 @@ services-up: check-prereqs
 
 services-down:
 	@bash scripts/services-down.sh
+
+authentik-up: check-prereqs
+	@bash scripts/authentik-up.sh
+
+authentik-down:
+	@bash scripts/authentik-down.sh
 
 mcp-remote-up:
 	docker compose -f mcp/remote/docker-compose.yml up -d
@@ -25,9 +31,18 @@ test-mcp-remote: mcp-remote-up
 	  $(MAKE) mcp-remote-down; \
 	  exit $$?
 
+test-runtime-auth-authentik: authentik-up
+	@echo "==> Waiting for Authentik reference stack..."
+	@sleep 10
+	go test ./tests/... -run TestCapabilityRuntimeAuthAuthentik -count=1 -v -timeout 180s; \
+	  status=$$?; \
+	  $(MAKE) authentik-down; \
+	  exit $$status
+
 smoke: check-prereqs
 	@echo "==> Validating compose configs..."
 	docker compose config --quiet
+	docker compose -f authentik/docker-compose.yml config --quiet
 	docker compose -f mcp/remote/docker-compose.yml config --quiet
 	@echo "==> Smoke OK (infrastructure configs valid)"
 
