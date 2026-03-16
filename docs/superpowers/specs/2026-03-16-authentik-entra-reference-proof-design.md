@@ -85,9 +85,22 @@ This path proves that a real user can authenticate through the standard runtime 
 This path proves that non-interactive service access works as well:
 
 - `oascli` uses `runtime.remote.oauth.mode: "oauthClient"`
-- the token endpoint used is owned by or fronted through Authentik
+- Authentik is the reference **runtime token issuer** for the workload path as well
+- the token endpoint used by `oascli` is therefore Authentik's token endpoint or an Authentik-owned endpoint with equivalent behavior
 - the resulting runtime token satisfies the same audience, expiry, identity, and scope semantics
 - `oasclird` validates the token and enforces the same authorization envelope behavior
+
+For the reference deployment, the workload path does **not** rely on handing raw Entra access tokens directly to `oasclird`. Entra remains the upstream identity/control plane, while Authentik remains the runtime-token broker visible to `oascli`.
+
+### Workload credential lifecycle and failure behavior
+
+For the reference deployment:
+
+- workload credentials presented to Authentik are operator-managed credentials for the runtime client
+- Authentik is responsible for issuing short-lived runtime-compatible access tokens
+- `oascli` consumes those tokens through the existing `oauthClient` path
+- `oasclird` must fail closed when the issuer, JWKS, audience, expiry, or scopes are invalid
+- verification must include at least one negative case showing that an invalid or insufficient workload token is rejected
 
 ## Completion bar for "enterprise end-to-end verified"
 
@@ -132,6 +145,37 @@ The spec remains clear on these boundaries:
 
 Organizations may replace Authentik with another broker, gateway, or compatible custom implementation as long as they preserve the external contract expected by `oascli`.
 
+## Ownership and interface boundaries
+
+To keep the example understandable and replaceable, the reference deployment is split into these units:
+
+### 1. Upstream identity unit: Entra
+
+- authenticates the human or workload principal
+- remains provider-specific and illustrative
+- is not directly consumed by `oascli`
+
+### 2. Broker unit: Authentik
+
+- federates Entra identity
+- maps upstream identity into normalized runtime claims and scopes
+- exposes the browser and token endpoints consumed by `oascli`
+- issues the runtime-compatible token used at the runtime boundary
+
+### 3. Client unit: `oascli`
+
+- consumes only the standard runtime metadata and broker-facing OAuth surfaces
+- must not require Entra-specific logic
+- must behave the same way with another compatible broker
+
+### 4. Runtime unit: `oasclird`
+
+- validates the runtime token according to the configured validation profile
+- derives the authorization envelope from normalized runtime scopes
+- enforces catalog filtering and fail-closed execution denial
+
+The normalized claim-to-scope mapping is owned by the broker unit, while the runtime only depends on the normalized claims it receives.
+
 ## Reference deployment requirements
 
 The official Authentik example should include:
@@ -173,6 +217,36 @@ Testing for the official proof should be split into three layers:
 
 3. **Operator documentation verification**
    - follow-the-docs runbook validation on a clean environment
+
+## Acceptance criteria and proof format
+
+The reference proof is complete only when all of the following are produced from a clean environment:
+
+### Environment assumptions
+
+- one reachable Authentik deployment
+- one reachable Entra tenant and application registration
+- one runtime configured for `oidc_jwks`
+- one test principal for browser login
+- one test workload credential for `oauthClient`
+
+### Required captured evidence
+
+- exported runtime config used for the proof
+- Authentik configuration summary sufficient to reproduce endpoints and claim mapping
+- Entra federation configuration summary sufficient to reproduce upstream login
+- command transcript or equivalent captured output for the browser path
+- command transcript or equivalent captured output for the workload path
+- captured deny-case output for at least one unauthorized tool or insufficient-scope token
+
+### Pass criteria
+
+- browser flow succeeds and reaches an allowed tool execution
+- workload flow succeeds and reaches an allowed tool execution
+- both flows show filtered catalog behavior consistent with the granted scopes
+- both flows show fail-closed denial for an unauthorized tool or insufficient scopes
+- runtime handshake metadata matches the documented contract
+- no step depends on provider-specific client logic inside `oascli`
 
 ## Risks and mitigations
 
