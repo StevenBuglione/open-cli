@@ -95,7 +95,7 @@ This path proves that non-interactive service access works as well:
 - the resulting runtime token satisfies the same audience, expiry, identity, and scope semantics
 - `oasclird` validates the token and enforces the same authorization envelope behavior
 
-For the reference deployment, the workload path does **not** rely on handing raw Entra access tokens directly to `oasclird`. Entra remains the upstream identity/control plane, while Authentik remains the runtime-token broker visible to `oascli`.
+For the reference deployment, the workload path does **not** rely on handing raw Entra access tokens directly to `oasclird`. Entra is the upstream identity provider for the human path, while Authentik remains the runtime-token broker visible to `oascli` in both paths.
 
 ### Workload credential lifecycle and failure behavior
 
@@ -209,7 +209,7 @@ The official Authentik example should include:
 - real Authentik deployment proof
 - real Entra federation proof
 - real browser-login proof against an external IdP chain
-- real workload-token proof against the same external chain
+- real workload-token proof against the documented Authentik workload path
 - operator runbooks and setup docs for the reference deployment
 
 ## Testing strategy
@@ -222,7 +222,7 @@ Testing for the official proof should be split into three layers:
 
 2. **Reference deployment verification**
    - Authentik + Entra browserLogin proof
-   - Authentik + Entra workload proof
+   - Authentik workload-token proof
 
 3. **Operator documentation verification**
    - follow-the-docs runbook validation on a clean environment
