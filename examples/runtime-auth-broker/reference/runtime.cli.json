@@ -1,0 +1,45 @@
+{
+  "cli": "1.0.0",
+  "mode": {
+    "default": "discover"
+  },
+  "runtime": {
+    "server": {
+      "auth": {
+        "validationProfile": "oidc_jwks",
+        "issuer": "https://broker.example.com",
+        "jwksURL": "https://broker.example.com/jwks.json",
+        "audience": "oasclird",
+        "authorizationURL": "https://broker.example.com/authorize",
+        "tokenURL": "https://broker.example.com/token",
+        "browserClientId": "oascli-browser"
+      }
+    },
+    "remote": {
+      "url": "https://runtime.example.com",
+      "oauth": {
+        "mode": "browserLogin",
+        "scopes": [
+          "bundle:tickets",
+          "tool:tickets:listTickets"
+        ],
+        "browserLogin": {
+          "callbackPort": 8787
+        }
+      }
+    }
+  },
+  "sources": {
+    "ticketsSource": {
+      "type": "openapi",
+      "uri": "./tickets.openapi.yaml",
+      "enabled": true
+    }
+  },
+  "services": {
+    "tickets": {
+      "source": "ticketsSource",
+      "alias": "tickets"
+    }
+  }
+}
