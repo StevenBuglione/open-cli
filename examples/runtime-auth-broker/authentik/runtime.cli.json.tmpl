@@ -1,0 +1,45 @@
+{
+  "cli": "1.0.0",
+  "mode": {
+    "default": "discover"
+  },
+  "runtime": {
+    "server": {
+      "auth": {
+        "validationProfile": "oidc_jwks",
+        "issuer": "${AUTHENTIK_ISSUER}",
+        "jwksURL": "${AUTHENTIK_JWKS_URL}",
+        "audience": "${RUNTIME_AUDIENCE}",
+        "authorizationURL": "${AUTHENTIK_AUTHORIZATION_URL}",
+        "tokenURL": "${AUTHENTIK_TOKEN_URL}",
+        "browserClientId": "${AUTHENTIK_BROWSER_CLIENT_ID}"
+      }
+    },
+    "remote": {
+      "url": "${RUNTIME_URL}",
+      "oauth": {
+        "mode": "browserLogin",
+        "scopes": [
+          "bundle:tickets",
+          "tool:tickets:listTickets"
+        ],
+        "browserLogin": {
+          "callbackPort": 8787
+        }
+      }
+    }
+  },
+  "sources": {
+    "ticketsSource": {
+      "type": "openapi",
+      "uri": "./tickets.openapi.yaml",
+      "enabled": true
+    }
+  },
+  "services": {
+    "tickets": {
+      "source": "ticketsSource",
+      "alias": "tickets"
+    }
+  }
+}
