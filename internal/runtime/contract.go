@@ -7,10 +7,25 @@ import (
 )
 
 // CurrentContractVersion is the contract version advertised by this runtime server.
-const CurrentContractVersion = "1.0"
+const CurrentContractVersion = "1.1"
+
+// CurrentAuthorizationEnvelopeVersion is the version advertised for the
+// runtime authorization envelope used by catalog filtering and execution.
+const CurrentAuthorizationEnvelopeVersion = "1.0"
 
 // ServerCapabilities are the capabilities advertised by this runtime server.
-var ServerCapabilities = []string{"catalog", "execute", "refresh", "audit"}
+var ServerCapabilities = []string{
+	"catalog",
+	"execute",
+	"refresh",
+	"audit",
+	"brokered-auth",
+	"authorization-envelope",
+}
+
+// AuthScopePrefixes are the canonical scope prefixes recognized by the runtime
+// when resolving catalog and execution authorization envelopes.
+var AuthScopePrefixes = []string{"bundle:", "profile:", "tool:"}
 
 // ContractVersion is a major.minor contract version pair.
 type ContractVersion struct {
@@ -54,6 +69,40 @@ type HandshakeInfo struct {
 	// RequiredCapabilities is used client-side to declare which capabilities are mandatory.
 	// It is omitted from server responses.
 	RequiredCapabilities []string `json:"requiredCapabilities,omitempty"`
+	// Auth advertises runtime auth requirements, diagnostics, and compatibility
+	// metadata for brokered authentication flows.
+	Auth *AuthHandshakeInfo `json:"auth,omitempty"`
+}
+
+// AuthHandshakeInfo describes the auth-specific handshake metadata advertised by
+// the runtime.
+type AuthHandshakeInfo struct {
+	Required bool   `json:"required"`
+	Audience string `json:"audience,omitempty"`
+	// ScopePrefixes are the recognized prefixes for scopes that participate in
+	// the runtime authorization envelope.
+	ScopePrefixes []string `json:"scopePrefixes,omitempty"`
+	// TokenValidationProfiles advertises the configured validation profiles used
+	// to authenticate bearer tokens at the runtime boundary.
+	TokenValidationProfiles []string                            `json:"tokenValidationProfiles,omitempty"`
+	BrowserLogin            *BrowserLoginHandshakeInfo          `json:"browserLogin,omitempty"`
+	Principal               string                              `json:"principal,omitempty"`
+	SessionID               string                              `json:"sessionId,omitempty"`
+	AuthorizationEnvelope   *AuthorizationEnvelopeHandshakeInfo `json:"authorizationEnvelope,omitempty"`
+}
+
+// BrowserLoginHandshakeInfo describes the browser-login discovery surface for
+// remote runtime auth.
+type BrowserLoginHandshakeInfo struct {
+	Configured     bool   `json:"configured"`
+	ConfigEndpoint string `json:"configEndpoint,omitempty"`
+}
+
+// AuthorizationEnvelopeHandshakeInfo describes the versioned authorization
+// envelope metadata used to keep catalog filtering and execution parity.
+type AuthorizationEnvelopeHandshakeInfo struct {
+	Version       string   `json:"version"`
+	ScopePrefixes []string `json:"scopePrefixes,omitempty"`
 }
 
 // ContractMismatchError is returned by CheckCompatibility when the client and

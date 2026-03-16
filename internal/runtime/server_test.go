@@ -68,6 +68,22 @@ func expectNoSignal(t *testing.T, signal <-chan struct{}, duration time.Duration
 	}
 }
 
+func expectJSONStringSlice(t *testing.T, got any, want []string, field string) {
+	t.Helper()
+	values, ok := got.([]any)
+	if !ok {
+		t.Fatalf("expected %s to be an array, got %#v", field, got)
+	}
+	if len(values) != len(want) {
+		t.Fatalf("expected %s length %d, got %#v", field, len(want), values)
+	}
+	for i, expected := range want {
+		if values[i] != expected {
+			t.Fatalf("expected %s[%d]=%q, got %#v", field, i, expected, values[i])
+		}
+	}
+}
+
 func TestServerRuntimeInfoIncludesLeaseMetadata(t *testing.T) {
 	dir := t.TempDir()
 	server := runtime.NewServer(runtime.Options{
@@ -1169,7 +1185,7 @@ func TestServerReturnsEmptyAuthorizationEnvelopeWhenOIDCJWKSTokenMissingScopes(t
 	}
 }
 
-func TestServerReturnsBrowserLoginMetadata(t *testing.T) {
+func TestServerBrowserConfigIncludesBrokeredAuthMetadata(t *testing.T) {
 	dir := t.TempDir()
 	configPath := writeRuntimeFile(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
@@ -1177,7 +1193,7 @@ func TestServerReturnsBrowserLoginMetadata(t *testing.T) {
 	  "runtime": {
 	    "server": {
 	      "auth": {
-	        "mode": "oauth2Introspection",
+	        "validationProfile": "oauth2_introspection",
 	        "audience": "oasclird",
 	        "introspectionURL": "https://auth.example.com/introspect",
 	        "authorizationURL": "https://auth.example.com/authorize",
@@ -1229,6 +1245,19 @@ func TestServerReturnsBrowserLoginMetadata(t *testing.T) {
 	if got := metadata["audience"]; got != "oasclird" {
 		t.Fatalf("expected audience in metadata, got %#v", got)
 	}
+	if got := metadata["required"]; got != true {
+		t.Fatalf("expected required=true in metadata, got %#v", got)
+	}
+	expectJSONStringSlice(t, metadata["tokenValidationProfiles"], []string{"oauth2_introspection"}, "tokenValidationProfiles")
+	expectJSONStringSlice(t, metadata["scopePrefixes"], []string{"bundle:", "profile:", "tool:"}, "scopePrefixes")
+	envelope, ok := metadata["authorizationEnvelope"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected authorizationEnvelope metadata, got %#v", metadata["authorizationEnvelope"])
+	}
+	if got := envelope["version"]; got != "1.0" {
+		t.Fatalf("expected authorization envelope version 1.0, got %#v", got)
+	}
+	expectJSONStringSlice(t, envelope["scopePrefixes"], []string{"bundle:", "profile:", "tool:"}, "authorizationEnvelope.scopePrefixes")
 }
 
 func TestServerFiltersCatalogByProfileAndExplicitToolScopes(t *testing.T) {
@@ -1560,22 +1589,73 @@ func TestServerRejectsAuditEventsWithoutBearerTokenWhenRemoteAuthEnabled(t *test
 	}
 }
 
-func TestServerReturnsRuntimeInfo(t *testing.T) {
+func TestServerRuntimeInfoIncludesBrokeredAuthMetadata(t *testing.T) {
+	dir := t.TempDir()
+	introspectionServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("ParseForm: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"active": true,
+			"scope":  "profile:reader tool:tickets:getTicket",
+			"aud":    "oasclird",
+			"sub":    "agent-456",
+		})
+	}))
+	defer introspectionServer.Close()
+
+	configPath := writeRuntimeFile(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "server": {
+	      "auth": {
+	        "validationProfile": "oauth2_introspection",
+	        "audience": "oasclird",
+	        "introspectionURL": "`+introspectionServer.URL+`",
+	        "authorizationURL": "https://auth.example.com/authorize",
+	        "tokenURL": "https://auth.example.com/token",
+	        "browserClientId": "browser-client"
+	      }
+	    }
+	  },
+	  "sources": {
+	    "ticketsSource": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.yaml",
+	      "enabled": true
+	    }
+	  },
+	  "services": {
+	    "tickets": {
+	      "source": "ticketsSource",
+	      "alias": "tickets"
+	    }
+	  }
+	}`)
+
 	server := runtime.NewServer(runtime.Options{
-		AuditPath:  filepath.Join(t.TempDir(), "audit.log"),
-		InstanceID: "team-a",
-		RuntimeURL: "http://127.0.0.1:18765",
+		AuditPath:         filepath.Join(dir, "audit.log"),
+		DefaultConfigPath: configPath,
+		InstanceID:        "team-a",
+		RuntimeURL:        "http://127.0.0.1:18765",
 	})
 	httpServer := httptest.NewServer(server.Handler())
 	defer httpServer.Close()
 
-	resp, err := http.Get(httpServer.URL + "/v1/runtime/info")
+	req, err := http.NewRequest(http.MethodGet, httpServer.URL+"/v1/runtime/info", nil)
+	if err != nil {
+		t.Fatalf("new runtime info request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer brokered-token")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("runtime info request: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 runtime info response, got %d", resp.StatusCode)
+		t.Fatalf("expected 200 runtime info response, got %d with body %q", resp.StatusCode, readTrimmedBody(t, resp))
 	}
 	var info map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
@@ -1587,6 +1667,39 @@ func TestServerReturnsRuntimeInfo(t *testing.T) {
 	if got := info["url"]; got != "http://127.0.0.1:18765" {
 		t.Fatalf("expected runtime url in info response, got %#v", got)
 	}
+	auth, ok := info["auth"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected auth metadata block, got %#v", info["auth"])
+	}
+	if got := auth["required"]; got != true {
+		t.Fatalf("expected auth.required=true, got %#v", got)
+	}
+	if got := auth["audience"]; got != "oasclird" {
+		t.Fatalf("expected auth audience oasclird, got %#v", got)
+	}
+	expectJSONStringSlice(t, auth["tokenValidationProfiles"], []string{"oauth2_introspection"}, "auth.tokenValidationProfiles")
+	expectJSONStringSlice(t, auth["scopePrefixes"], []string{"bundle:", "profile:", "tool:"}, "auth.scopePrefixes")
+	if got := auth["principal"]; got != "agent-456" {
+		t.Fatalf("expected resolved auth principal agent-456, got %#v", got)
+	}
+	browserLogin, ok := auth["browserLogin"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected browserLogin metadata, got %#v", auth["browserLogin"])
+	}
+	if got := browserLogin["configured"]; got != true {
+		t.Fatalf("expected browserLogin.configured=true, got %#v", got)
+	}
+	if got := browserLogin["configEndpoint"]; got != "/v1/auth/browser-config" {
+		t.Fatalf("expected browserLogin.configEndpoint=/v1/auth/browser-config, got %#v", got)
+	}
+	envelope, ok := auth["authorizationEnvelope"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected auth.authorizationEnvelope metadata, got %#v", auth["authorizationEnvelope"])
+	}
+	if got := envelope["version"]; got != "1.0" {
+		t.Fatalf("expected auth authorization envelope version 1.0, got %#v", got)
+	}
+	expectJSONStringSlice(t, envelope["scopePrefixes"], []string{"bundle:", "profile:", "tool:"}, "auth.authorizationEnvelope.scopePrefixes")
 }
 
 func TestServerStopEndpointInvokesShutdownHook(t *testing.T) {
@@ -1645,7 +1758,7 @@ func TestServerSessionCloseClearsOAuthCache(t *testing.T) {
 	}
 }
 
-func TestServerRejectsRuntimeInfoWithoutBearerTokenWhenRemoteAuthEnabled(t *testing.T) {
+func TestServerReturnsRuntimeInfoHandshakeWithoutBearerTokenWhenRemoteAuthEnabled(t *testing.T) {
 	dir := t.TempDir()
 	configPath := writeRuntimeFile(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
@@ -1653,7 +1766,7 @@ func TestServerRejectsRuntimeInfoWithoutBearerTokenWhenRemoteAuthEnabled(t *test
 	  "runtime": {
 	    "server": {
 	      "auth": {
-	        "mode": "oauth2Introspection",
+	        "validationProfile": "oauth2_introspection",
 	        "audience": "oasclird",
 	        "introspectionURL": "https://auth.example.com/introspect"
 	      }
@@ -1686,8 +1799,23 @@ func TestServerRejectsRuntimeInfoWithoutBearerTokenWhenRemoteAuthEnabled(t *test
 		t.Fatalf("runtime info request: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401 runtime info response without bearer token, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 runtime info response without bearer token, got %d", resp.StatusCode)
+	}
+	var info map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		t.Fatalf("decode runtime info: %v", err)
+	}
+	auth, ok := info["auth"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected auth metadata block, got %#v", info["auth"])
+	}
+	if got := auth["required"]; got != true {
+		t.Fatalf("expected auth.required=true, got %#v", got)
+	}
+	expectJSONStringSlice(t, auth["tokenValidationProfiles"], []string{"oauth2_introspection"}, "auth.tokenValidationProfiles")
+	if _, ok := auth["principal"]; ok {
+		t.Fatalf("expected principal to be omitted without bearer token, got %#v", auth["principal"])
 	}
 }
 

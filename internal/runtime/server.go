@@ -594,10 +594,17 @@ func (server *Server) handleBrowserConfig(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"authorizationURL": authCfg.AuthorizationURL,
-		"tokenURL":         authCfg.TokenURL,
-		"clientId":         authCfg.BrowserClientID,
-		"audience":         authCfg.Audience,
+		"authorizationURL":        authCfg.AuthorizationURL,
+		"tokenURL":                authCfg.TokenURL,
+		"clientId":                authCfg.BrowserClientID,
+		"audience":                authCfg.Audience,
+		"required":                runtimeServerAuthEnabled(authCfg),
+		"scopePrefixes":           append([]string(nil), AuthScopePrefixes...),
+		"tokenValidationProfiles": configuredTokenValidationProfiles(authCfg),
+		"authorizationEnvelope": map[string]any{
+			"version":       CurrentAuthorizationEnvelopeVersion,
+			"scopePrefixes": append([]string(nil), AuthScopePrefixes...),
+		},
 	})
 }
 
@@ -606,8 +613,32 @@ func (server *Server) handleRuntimeInfo(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if ok := server.requireConfiguredAuth(w, r, false); !ok {
-		return
+
+	configPath := r.URL.Query().Get("config")
+	if configPath == "" {
+		configPath = server.defaultConfigPath
+	}
+
+	var authCfg *config.RuntimeServerAuthConfig
+	resolvedAuth := &authResult{}
+	if configPath != "" {
+		cfg, err := config.LoadEffective(config.LoadOptions{ProjectPath: configPath})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		authCfg = runtimeServerAuthConfig(cfg.Config)
+		if strings.TrimSpace(r.Header.Get("Authorization")) != "" {
+			resolvedAuth, err = server.authenticateRequest(r.Context(), r, cfg.Config)
+			if err != nil {
+				if authErr, ok := err.(*runtimeAuthError); ok {
+					http.Error(w, authErr.Code, authErr.StatusCode)
+					return
+				}
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 	}
 	response := map[string]any{
 		"contractVersion": CurrentContractVersion,
@@ -618,6 +649,7 @@ func (server *Server) handleRuntimeInfo(w http.ResponseWriter, r *http.Request) 
 		"auditPath":       server.auditStorePath(),
 		"stateDir":        server.stateDir,
 		"cacheDir":        server.cacheDir,
+		"auth":            runtimeAuthHandshakeMetadata(authCfg, resolvedAuth),
 	}
 	if server.lifecycleEnabled() {
 		response["lifecycle"] = map[string]any{
@@ -785,6 +817,48 @@ func runtimeServerAuthEnabled(auth *config.RuntimeServerAuthConfig) bool {
 		return true
 	}
 	return runtimeServerAuthUsesOIDCJWKS(auth)
+}
+
+func configuredTokenValidationProfiles(auth *config.RuntimeServerAuthConfig) []string {
+	if auth == nil {
+		return []string{}
+	}
+	if auth.ValidationProfile != "" {
+		return []string{auth.ValidationProfile}
+	}
+	if auth.Mode == "oauth2Introspection" {
+		return []string{"oauth2_introspection"}
+	}
+	return []string{}
+}
+
+func browserLoginConfigured(auth *config.RuntimeServerAuthConfig) bool {
+	return auth != nil && auth.AuthorizationURL != "" && auth.TokenURL != "" && auth.BrowserClientID != ""
+}
+
+func runtimeAuthHandshakeMetadata(authCfg *config.RuntimeServerAuthConfig, resolved *authResult) map[string]any {
+	metadata := map[string]any{
+		"required":                runtimeServerAuthEnabled(authCfg),
+		"scopePrefixes":           append([]string(nil), AuthScopePrefixes...),
+		"tokenValidationProfiles": configuredTokenValidationProfiles(authCfg),
+		"browserLogin": map[string]any{
+			"configured":     browserLoginConfigured(authCfg),
+			"configEndpoint": "/v1/auth/browser-config",
+		},
+		"authorizationEnvelope": map[string]any{
+			"version":       CurrentAuthorizationEnvelopeVersion,
+			"scopePrefixes": append([]string(nil), AuthScopePrefixes...),
+		},
+	}
+	if authCfg != nil && authCfg.Audience != "" {
+		metadata["audience"] = authCfg.Audience
+	}
+	if resolved != nil {
+		if resolved.Principal != "" {
+			metadata["principal"] = resolved.Principal
+		}
+	}
+	return metadata
 }
 
 func bearerToken(header string) (string, error) {

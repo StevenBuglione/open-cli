@@ -196,9 +196,22 @@ Example response:
   "authorizationURL": "https://auth.example.com/authorize",
   "tokenURL": "https://auth.example.com/token",
   "clientId": "oascli-browser",
-  "audience": "oasclird"
+  "audience": "oasclird",
+  "required": true,
+  "scopePrefixes": ["bundle:", "profile:", "tool:"],
+  "tokenValidationProfiles": ["oauth2_introspection"],
+  "authorizationEnvelope": {
+    "version": "1.0",
+    "scopePrefixes": ["bundle:", "profile:", "tool:"]
+  }
 }
 ```
+
+Notes:
+
+- `required` signals whether bearer auth is enforced by the runtime for the selected config.
+- `tokenValidationProfiles` advertises the configured bearer-token validation profile(s) used by the daemon.
+- `scopePrefixes` and `authorizationEnvelope.version` help operators confirm how catalog filtering and execution parity are derived from runtime scopes.
 
 ## `GET /v1/runtime/info`
 
@@ -208,14 +221,36 @@ Example response:
 
 ```json
 {
-  "contractVersion": "1.0",
-  "capabilities": ["catalog", "execute", "refresh", "audit"],
+  "contractVersion": "1.1",
+  "capabilities": [
+    "catalog",
+    "execute",
+    "refresh",
+    "audit",
+    "brokered-auth",
+    "authorization-envelope"
+  ],
   "instanceId": "team-a",
   "url": "http://127.0.0.1:18765",
   "runtimeMode": "local",
   "auditPath": "/state/instances/team-a/audit.log",
   "stateDir": "/state/instances/team-a",
   "cacheDir": "/cache/instances/team-a/http",
+  "auth": {
+    "required": true,
+    "audience": "oasclird",
+    "scopePrefixes": ["bundle:", "profile:", "tool:"],
+    "tokenValidationProfiles": ["oauth2_introspection"],
+    "browserLogin": {
+      "configured": true,
+      "configEndpoint": "/v1/auth/browser-config"
+    },
+    "principal": "agent-456",
+    "authorizationEnvelope": {
+      "version": "1.0",
+      "scopePrefixes": ["bundle:", "profile:", "tool:"]
+    }
+  },
   "lifecycle": {
     "capabilities": ["heartbeat", "session-close"],
     "heartbeatSeconds": 15,
@@ -233,6 +268,9 @@ Example response:
 Notes:
 
 - `contractVersion` and top-level `capabilities` are the runtime handshake surface used by `oascli` compatibility checks.
+- `auth.required`, `auth.tokenValidationProfiles`, and `auth.browserLogin` tell remote clients whether they must attach a bearer token and whether browser login discovery is available.
+- `auth.principal` is echoed only when the runtime already resolved an authenticated subject for the current request.
+- `auth.authorizationEnvelope.version` and `auth.scopePrefixes` let operators diagnose catalog/execution parity when runtime scopes are involved.
 - `runtimeMode` is typically `embedded` or `local` in the current implementation.
 - `shareKeyPresent` is only a boolean marker; the daemon never echoes the raw `shareKey`.
 - The `lifecycle` block is present for lease-aware managed local runtimes and is what `oascli` uses to validate reuse before attaching.

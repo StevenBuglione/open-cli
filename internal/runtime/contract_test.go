@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -138,9 +139,15 @@ func TestRuntimeInfoEndpointReturnsHandshakeInfo(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
+	raw := rec.Body.Bytes()
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("decode runtime info payload: %v", err)
+	}
+
 	// Decode as HandshakeInfo; extra fields (instanceId, lifecycle, etc.) are ignored.
 	var info runtime.HandshakeInfo
-	if err := json.NewDecoder(rec.Body).Decode(&info); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&info); err != nil {
 		t.Fatalf("decode HandshakeInfo: %v", err)
 	}
 	if info.ContractVersion == "" {
@@ -151,6 +158,37 @@ func TestRuntimeInfoEndpointReturnsHandshakeInfo(t *testing.T) {
 	}
 	if len(info.Capabilities) == 0 {
 		t.Fatal("expected at least one capability in handshake response")
+	}
+	if info.Auth == nil {
+		t.Fatal("expected auth handshake metadata in runtime info response")
+	}
+	if info.Auth.Required {
+		t.Fatal("expected auth.required=false when runtime auth is not configured")
+	}
+	if info.Auth.AuthorizationEnvelope == nil {
+		t.Fatal("expected authorization-envelope metadata in runtime info response")
+	}
+	if info.Auth.AuthorizationEnvelope.Version != "1.0" {
+		t.Fatalf("expected authorization-envelope version 1.0, got %q", info.Auth.AuthorizationEnvelope.Version)
+	}
+	if got := info.Auth.ScopePrefixes; len(got) != 3 || got[0] != "bundle:" || got[1] != "profile:" || got[2] != "tool:" {
+		t.Fatalf("expected canonical auth scope prefixes, got %#v", got)
+	}
+	if info.Auth.BrowserLogin == nil {
+		t.Fatal("expected browser-login handshake metadata in runtime info response")
+	}
+	if info.Auth.BrowserLogin.Configured {
+		t.Fatal("expected browserLogin.configured=false without runtime auth browser config")
+	}
+	if info.Auth.BrowserLogin.ConfigEndpoint != "/v1/auth/browser-config" {
+		t.Fatalf("expected browserLogin.configEndpoint to be /v1/auth/browser-config, got %q", info.Auth.BrowserLogin.ConfigEndpoint)
+	}
+	authPayload, ok := payload["auth"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected raw auth payload block, got %#v", payload["auth"])
+	}
+	if got, ok := authPayload["tokenValidationProfiles"].([]any); !ok || len(got) != 0 {
+		t.Fatalf("expected tokenValidationProfiles to serialize as an empty array, got %#v", authPayload["tokenValidationProfiles"])
 	}
 }
 
@@ -187,6 +225,26 @@ func TestRuntimeInfoContractVersionCompatibleWithServerCapabilities(t *testing.T
 	var info runtime.HandshakeInfo
 	if err := json.NewDecoder(rec.Body).Decode(&info); err != nil {
 		t.Fatalf("decode HandshakeInfo: %v", err)
+	}
+	if runtime.CurrentContractVersion != "1.1" {
+		t.Fatalf("expected CurrentContractVersion to advertise brokered auth handshake v1.1, got %q", runtime.CurrentContractVersion)
+	}
+	expectedCapabilities := map[string]struct{}{
+		"catalog":                {},
+		"execute":                {},
+		"refresh":                {},
+		"audit":                  {},
+		"brokered-auth":          {},
+		"authorization-envelope": {},
+	}
+	if len(info.Capabilities) != len(expectedCapabilities) {
+		t.Fatalf("expected runtime info capabilities %#v, got %#v", expectedCapabilities, info.Capabilities)
+	}
+	for _, capability := range info.Capabilities {
+		delete(expectedCapabilities, capability)
+	}
+	if len(expectedCapabilities) != 0 {
+		t.Fatalf("expected brokered auth handshake capabilities to be advertised, missing %#v", expectedCapabilities)
 	}
 
 	client := runtime.HandshakeInfo{
