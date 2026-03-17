@@ -16,6 +16,29 @@
       "minLength": 1,
       "description": "Human-readable name of the campaign run (e.g. 'operator-crud-rest-auth')."
     },
+    "workstream": {
+      "type": "string",
+      "description": "Optional workstream identifier such as product-validation or website-review."
+    },
+    "capability": {
+      "type": "string",
+      "description": "Optional capability or lane identifier covered by this campaign."
+    },
+    "environmentClass": {
+      "type": "string",
+      "description": "Optional environment class for the lane, such as ci-containerized or live-external."
+    },
+    "authPattern": {
+      "type": "string",
+      "description": "Optional auth pattern used during the campaign."
+    },
+    "artifactPaths": {
+      "type": "array",
+      "description": "Optional artifact paths emitted by the campaign.",
+      "items": {
+        "type": "string"
+      }
+    },
     "runAt": {
       "type": "string",
       "format": "date-time",
