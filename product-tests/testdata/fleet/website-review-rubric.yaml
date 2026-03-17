@@ -4,7 +4,7 @@ sections:
     criteria:
       - id: first-success-path
         description: A new user can identify a clear path from intro to quickstart.
-        path: website/src/pages/index.tsx
+        path: website/src/components/homepage/PersonaPaths.tsx
         expectLinks:
           - /docs/getting-started/choose-your-path
           - /docs/getting-started/quickstart
@@ -43,7 +43,7 @@ sections:
           - runtime/authentik-reference
       - id: security-runtime-story
         description: The site surfaces auth, policy, runtime, and operations depth clearly.
-        path: website/src/pages/index.tsx
+        path: website/src/components/docs/AudienceCards.tsx
         expectLinks:
           - /docs/runtime/enterprise-readiness
           - /docs/runtime/deployment-models
