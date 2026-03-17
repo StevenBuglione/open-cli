@@ -136,6 +136,14 @@ func TestCampaignRemoteRuntimeMatrix(t *testing.T) {
 		if err := json.NewDecoder(resp.Body).Decode(&browserConfig); err != nil {
 			t.Fatalf("decode browser config: %v", err)
 		}
+		if err := fr.AddJSONArtifact("browser-config.json", map[string]any{
+			"authorizationURL": browserConfig.AuthorizationURL,
+			"tokenURL":         browserConfig.TokenURL,
+			"clientId":         browserConfig.ClientID,
+			"audience":         browserConfig.Audience,
+		}); err != nil {
+			t.Fatalf("record browser-config artifact: %v", err)
+		}
 		fr.Check("browser-config-client-id", "browser metadata exposes the configured client ID", broker.BrowserClientID, browserConfig.ClientID, browserConfig.ClientID == broker.BrowserClientID, "")
 		fr.Check("browser-config-audience", "browser metadata exposes the runtime audience", "oasclird", browserConfig.Audience, browserConfig.Audience == "oasclird", "")
 		fr.CheckBool("browser-config-authorization-url", "browser metadata exposes an authorization URL", browserConfig.AuthorizationURL != "", browserConfig.AuthorizationURL)

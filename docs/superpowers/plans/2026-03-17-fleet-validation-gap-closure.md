@@ -469,7 +469,7 @@ git commit -m "test: promote key known gaps into fleet coverage"
 - Modify: `.github/workflows/ci.yml`
 - Modify: campaign tests that should emit richer notes
 
-- [ ] **Step 1: Write a failing regression test for artifact richness**
+- [x] **Step 1: Write a failing regression test for artifact richness**
 
 Examples:
 
@@ -478,7 +478,7 @@ Examples:
 - ensure `expectedArtifacts` from the matrix is validated rather than ignored
 - ensure runner-added metadata does not overwrite test-recorded artifact paths
 
-- [ ] **Step 2: Decide the minimal first-wave evidence set**
+- [x] **Step 2: Decide the minimal first-wave evidence set**
 
 At least one of:
 
@@ -488,7 +488,7 @@ At least one of:
 - denied-response artifact
 - website-review result artifact once that workstream exists
 
-- [ ] **Step 3: Implement minimal artifact capture**
+- [x] **Step 3: Implement minimal artifact capture**
 
 Do this only for lanes where the evidence materially improves the truthfulness of the result.
 
@@ -496,7 +496,7 @@ Do this only for lanes where the evidence materially improves the truthfulness o
 - compare actual artifacts against `expectedArtifacts`
 - upload fleet artifacts from CI so proof survives after the run
 
-- [ ] **Step 4: Re-run the fleet lanes**
+- [x] **Step 4: Re-run the fleet lanes**
 
 Run:
 

@@ -23,3 +23,26 @@ func TestCampaignRubricIncludesFleetMetadata(t *testing.T) {
 		t.Fatalf("expected auth pattern oauthClient, got %q", rub.AuthPattern)
 	}
 }
+
+func TestCampaignRubricPreservesInlineArtifacts(t *testing.T) {
+	t.Parallel()
+
+	rec := NewFindingsRecorder("remote-runtime-auth")
+	if err := rec.AddJSONArtifact("browser-config.json", map[string]any{
+		"clientId": "oascli-browser",
+		"audience": "oasclird",
+	}); err != nil {
+		t.Fatalf("AddJSONArtifact: %v", err)
+	}
+
+	rub := rec.Rubric()
+	if len(rub.ArtifactPaths) != 1 || rub.ArtifactPaths[0] != "browser-config.json" {
+		t.Fatalf("expected browser-config.json artifact path, got %#v", rub.ArtifactPaths)
+	}
+	if len(rub.Artifacts) != 1 {
+		t.Fatalf("expected one inline artifact, got %#v", rub.Artifacts)
+	}
+	if rub.Artifacts[0].Path != "browser-config.json" {
+		t.Fatalf("expected inline artifact path browser-config.json, got %#v", rub.Artifacts[0].Path)
+	}
+}

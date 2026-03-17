@@ -31,6 +31,11 @@ type KnownGapEntry struct {
 	StillFails  bool   `json:"stillFails"`
 }
 
+type CampaignArtifact struct {
+	Path     string          `json:"path"`
+	Contents json.RawMessage `json:"contents"`
+}
+
 // CampaignRubric is the structured output emitted after every campaign run.
 // It satisfies the agent-rubric.schema.json schema.
 type CampaignRubric struct {
@@ -41,6 +46,7 @@ type CampaignRubric struct {
 	EnvironmentClass string            `json:"environmentClass,omitempty"`
 	AuthPattern      string            `json:"authPattern,omitempty"`
 	ArtifactPaths    []string          `json:"artifactPaths,omitempty"`
+	Artifacts        []CampaignArtifact `json:"artifacts,omitempty"`
 	RunAt            string            `json:"runAt"`
 	Pass             bool              `json:"pass"`
 	Criteria         []RubricCriterion `json:"criteria"`
@@ -57,6 +63,7 @@ type FindingsRecorder struct {
 	environmentClass string
 	authPattern      string
 	artifactPaths    []string
+	artifacts        []CampaignArtifact
 	runAt            string
 	criteria         []RubricCriterion
 	knownGaps        []KnownGapEntry
@@ -88,6 +95,31 @@ func (r *FindingsRecorder) AddArtifactPath(path string) {
 		return
 	}
 	r.artifactPaths = append(r.artifactPaths, path)
+}
+
+// AddJSONArtifact records a JSON artifact payload that the fleet runner can
+// materialize into the lane output directory.
+func (r *FindingsRecorder) AddJSONArtifact(path string, payload any) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return fmt.Errorf("artifact path is required")
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal artifact %s: %w", path, err)
+	}
+	r.AddArtifactPath(path)
+	for i := range r.artifacts {
+		if r.artifacts[i].Path == path {
+			r.artifacts[i].Contents = append(json.RawMessage(nil), data...)
+			return nil
+		}
+	}
+	r.artifacts = append(r.artifacts, CampaignArtifact{
+		Path:     path,
+		Contents: append(json.RawMessage(nil), data...),
+	})
+	return nil
 }
 
 // Check records a rubric criterion. If pass is false, an automatic finding
@@ -159,6 +191,7 @@ func (r *FindingsRecorder) Rubric() *CampaignRubric {
 		EnvironmentClass: r.environmentClass,
 		AuthPattern:      r.authPattern,
 		ArtifactPaths:    append([]string(nil), r.artifactPaths...),
+		Artifacts:        append([]CampaignArtifact(nil), r.artifacts...),
 		RunAt:            r.runAt,
 		Pass:             pass,
 		Criteria:         r.criteria,

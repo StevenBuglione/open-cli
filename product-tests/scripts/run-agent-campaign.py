@@ -140,13 +140,28 @@ def write_lane_rubric(rubric: dict, lane: dict, output_dir: Path, transcript_pat
     rubric["capability"] = lane["capability"]
     rubric["environmentClass"] = lane["environmentClass"]
     rubric["authPattern"] = lane["authPattern"]
-    rubric["artifactPaths"] = sorted(set([
+    rubric["artifactPaths"] = sorted(set((rubric.get("artifactPaths") or []) + [
         "rubric.json",
         transcript_path.name,
     ]))
     path = output_dir / "rubric.json"
     path.write_text(json.dumps(rubric, indent=2))
     return path
+
+
+def materialize_inline_artifacts(rubric: dict, output_dir: Path) -> None:
+    for artifact in rubric.get("artifacts") or []:
+        target = output_dir / artifact["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(artifact["contents"], indent=2))
+
+
+def missing_expected_artifacts(lane: dict, output_dir: Path) -> list[str]:
+    missing: list[str] = []
+    for relative_path in lane.get("expectedArtifacts") or []:
+        if not (output_dir / relative_path).exists():
+            missing.append(relative_path)
+    return missing
 
 
 def write_transcript(output: str, output_dir: Path) -> Path:
@@ -362,6 +377,14 @@ def main() -> None:
                 continue
             for rub in rubrics:
                 path = write_lane_rubric(rub, lane, lane_output_dir, transcript_path)
+                materialize_inline_artifacts(rub, lane_output_dir)
+                missing = missing_expected_artifacts(lane, lane_output_dir)
+                if missing:
+                    msg = f"lane {lane['id']} missing expected artifacts: {', '.join(missing)}"
+                    print(f"[error] {msg}", file=sys.stderr)
+                    lane_validation_failures.append(msg)
+                    raw_failures.append(output)
+                    continue
                 all_rubrics.append(json.loads(path.read_text()))
                 print(f"[run-agent-campaign] wrote rubric → {path}")
         if lane_validation_failures and overall_go_returncode == 0:

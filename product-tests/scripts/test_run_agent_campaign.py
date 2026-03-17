@@ -1,5 +1,7 @@
 import importlib.util
+import json
 import pathlib
+import tempfile
 import unittest
 
 
@@ -38,6 +40,43 @@ class RunAgentCampaignTests(unittest.TestCase):
     def test_print_summary_honors_missing_rubrics_with_failure(self):
         module = load_module()
         self.assertEqual(module.print_summary([], 1), 1)
+
+    def test_write_lane_rubric_preserves_test_recorded_artifacts(self):
+        module = load_module()
+        lane = {
+            "id": "remote-runtime-oauth-client",
+            "workstream": "product-validation",
+            "capability": "remote-runtime",
+            "environmentClass": "ci-containerized",
+            "authPattern": "oauthClient",
+            "expectedArtifacts": ["rubric.json", "transcript.log", "browser-config.json"],
+        }
+        rubric = {
+            "campaign": "remote-runtime-matrix",
+            "artifactPaths": ["browser-config.json"],
+        }
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_dir = pathlib.Path(tempdir)
+            transcript = output_dir / "transcript.log"
+            transcript.write_text("transcript")
+            rubric_path = module.write_lane_rubric(rubric, lane, output_dir, transcript)
+            saved = json.loads(rubric_path.read_text())
+            self.assertEqual(
+                set(saved["artifactPaths"]),
+                {"rubric.json", "transcript.log", "browser-config.json"},
+            )
+
+    def test_missing_expected_artifacts_detects_missing_files(self):
+        module = load_module()
+        lane = {"expectedArtifacts": ["rubric.json", "transcript.log", "browser-config.json"]}
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_dir = pathlib.Path(tempdir)
+            (output_dir / "rubric.json").write_text("{}")
+            (output_dir / "transcript.log").write_text("ok")
+            self.assertEqual(
+                module.missing_expected_artifacts(lane, output_dir),
+                ["browser-config.json"],
+            )
 
 
 if __name__ == "__main__":

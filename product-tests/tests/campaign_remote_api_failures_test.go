@@ -33,6 +33,9 @@ func TestCampaignRemoteAPIFailures(t *testing.T) {
 		result := executeTool(t, srv.URL, configPath, "testapi:triggerForbidden", nil)
 		statusCode, _ := result["statusCode"].(float64)
 		fr.Check("forbidden-status", "forbidden upstream response is surfaced", "403", fmt.Sprintf("%.0f", statusCode), statusCode == 403, "")
+		if err := fr.AddJSONArtifact("forbidden-response.json", result); err != nil {
+			t.Fatalf("record forbidden-response artifact: %v", err)
+		}
 
 		events := (&helpers.Instance{URL: srv.URL, AuditPath: filepath.Join(dir, "audit.log")}).AuditEvents(t)
 		event := findAuditEvent(events, "testapi:triggerForbidden")

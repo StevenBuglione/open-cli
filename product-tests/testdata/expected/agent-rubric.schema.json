@@ -39,6 +39,13 @@
         "type": "string"
       }
     },
+    "artifacts": {
+      "type": "array",
+      "description": "Optional inline artifact payloads that the fleet runner can materialize into files.",
+      "items": {
+        "$ref": "#/$defs/CampaignArtifact"
+      }
+    },
     "runAt": {
       "type": "string",
       "format": "date-time",
@@ -124,6 +131,21 @@
         "stillFails": {
           "type": "boolean",
           "description": "True if the gap still exists; false means the gap has been resolved."
+        }
+      }
+    },
+    "CampaignArtifact": {
+      "type": "object",
+      "required": ["path", "contents"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative output path for the artifact within the lane output directory."
+        },
+        "contents": {
+          "description": "JSON payload to write to the artifact file."
         }
       }
     }

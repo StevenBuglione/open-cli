@@ -29,6 +29,7 @@ lanes:
     expectedArtifacts:
       - transcript.log
       - rubric.json
+      - browser-config.json
   - id: remote-runtime-auth-failures
     workstream: product-validation
     capability: remote-runtime
@@ -79,6 +80,7 @@ lanes:
     expectedArtifacts:
       - transcript.log
       - rubric.json
+      - forbidden-response.json
   - id: remote-api-pagination
     workstream: product-validation
     capability: remote-api
