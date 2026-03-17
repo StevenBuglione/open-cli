@@ -34,23 +34,33 @@ type KnownGapEntry struct {
 // CampaignRubric is the structured output emitted after every campaign run.
 // It satisfies the agent-rubric.schema.json schema.
 type CampaignRubric struct {
-	Schema    string            `json:"$schema,omitempty"`
-	Campaign  string            `json:"campaign"`
-	RunAt     string            `json:"runAt"`
-	Pass      bool              `json:"pass"`
-	Criteria  []RubricCriterion `json:"criteria"`
-	KnownGaps []KnownGapEntry   `json:"knownGaps,omitempty"`
-	Findings  []string          `json:"findings"`
+	Schema           string            `json:"$schema,omitempty"`
+	Campaign         string            `json:"campaign"`
+	Workstream       string            `json:"workstream,omitempty"`
+	Capability       string            `json:"capability,omitempty"`
+	EnvironmentClass string            `json:"environmentClass,omitempty"`
+	AuthPattern      string            `json:"authPattern,omitempty"`
+	ArtifactPaths    []string          `json:"artifactPaths,omitempty"`
+	RunAt            string            `json:"runAt"`
+	Pass             bool              `json:"pass"`
+	Criteria         []RubricCriterion `json:"criteria"`
+	KnownGaps        []KnownGapEntry   `json:"knownGaps,omitempty"`
+	Findings         []string          `json:"findings"`
 }
 
 // FindingsRecorder accumulates rubric criteria and freeform findings
 // during a campaign run and emits a final CampaignRubric.
 type FindingsRecorder struct {
-	campaign  string
-	runAt     string
-	criteria  []RubricCriterion
-	knownGaps []KnownGapEntry
-	findings  []string
+	campaign         string
+	workstream       string
+	capability       string
+	environmentClass string
+	authPattern      string
+	artifactPaths    []string
+	runAt            string
+	criteria         []RubricCriterion
+	knownGaps        []KnownGapEntry
+	findings         []string
 }
 
 // NewFindingsRecorder creates a recorder for the named campaign.
@@ -62,6 +72,22 @@ func NewFindingsRecorder(campaign string) *FindingsRecorder {
 		knownGaps: []KnownGapEntry{},
 		findings:  []string{},
 	}
+}
+
+// SetLaneMetadata records the fleet lane metadata for this campaign run.
+func (r *FindingsRecorder) SetLaneMetadata(workstream, capability, environmentClass, authPattern string) {
+	r.workstream = workstream
+	r.capability = capability
+	r.environmentClass = environmentClass
+	r.authPattern = authPattern
+}
+
+// AddArtifactPath records an artifact path associated with this campaign run.
+func (r *FindingsRecorder) AddArtifactPath(path string) {
+	if strings.TrimSpace(path) == "" {
+		return
+	}
+	r.artifactPaths = append(r.artifactPaths, path)
 }
 
 // Check records a rubric criterion. If pass is false, an automatic finding
@@ -127,12 +153,17 @@ func (r *FindingsRecorder) Rubric() *CampaignRubric {
 		}
 	}
 	return &CampaignRubric{
-		Campaign:  r.campaign,
-		RunAt:     r.runAt,
-		Pass:      pass,
-		Criteria:  r.criteria,
-		KnownGaps: r.knownGaps,
-		Findings:  r.findings,
+		Campaign:         r.campaign,
+		Workstream:       r.workstream,
+		Capability:       r.capability,
+		EnvironmentClass: r.environmentClass,
+		AuthPattern:      r.authPattern,
+		ArtifactPaths:    append([]string(nil), r.artifactPaths...),
+		RunAt:            r.runAt,
+		Pass:             pass,
+		Criteria:         r.criteria,
+		KnownGaps:        r.knownGaps,
+		Findings:         r.findings,
 	}
 }
 
