@@ -4,63 +4,59 @@ title: Installation
 
 # Installation
 
-This repository currently documents **source-based installation**. There are no packaged installers or release-specific install commands in the codebase.
+**This repository uses source-based installation.** There are no packaged installers or pre-built release binaries — you compile from source using Go.
+
+**Time to usable binaries: ~1 minute** if you already have Go installed.
 
 ## Prerequisites
 
-- **Go 1.25.1 or newer**. The version in `go.mod` is the authoritative requirement for this worktree.
-- **Node.js 18 or newer** only if you need to build the docs site under `website/`.
+- **Go 1.25.1 or newer** — the version in `go.mod` is the authoritative requirement.
+- Git (to clone the repository).
+- **Node.js 18+** only if you need to build the docs site (`website/`).
 
-## Build the binaries
+## Fastest path: build and go
 
-From the repository root:
+From the repository root, run:
 
 ```bash
 go build -o ./bin/oascli ./cmd/oascli
 go build -o ./bin/oasclird ./cmd/oasclird
 ```
 
-Or install them into your Go bin directory:
+That produces `./bin/oascli` and `./bin/oasclird`. **If you only need binaries to follow the quickstart, stop here** and continue to [Quickstart](./quickstart).
+
+## Alternative: install into your Go bin directory
 
 ```bash
 go install ./cmd/oascli
 go install ./cmd/oasclird
 ```
 
-If you prefer not to install anything yet, you can also run both binaries directly from source:
+This puts the binaries on your `$PATH` via `$GOPATH/bin`. Use this if you want to run `oascli` without the `./bin/` prefix.
+
+## Alternative: run directly from source (no build step)
 
 ```bash
 go run ./cmd/oasclird --help
 go run ./cmd/oascli --embedded --config /path/to/.cli.json catalog list
 ```
 
-## Verify the checkout
+Useful for a one-off check. Slower than a compiled binary because Go compiles on each invocation.
 
-The repository-level verification target is:
+## What to do after building
+
+1. **Go to [Quickstart](./quickstart)** — it walks you through creating a minimal config and running your first embedded-mode command.
+2. Once that works, return to [Choose your path](./choose-your-path) to pick the runtime model that fits your workload.
+
+## Verify the full checkout (optional)
 
 ```bash
 make verify
 ```
 
-Today that expands to:
-
-- `gofmt -w $(find . -name '*.go' -print)`
-- `go test ./...`
-- `go build ./cmd/oascli ./cmd/oasclird`
-
-If you are only changing docs, you usually just need the docs build under `website/`, but `make verify` is still the best baseline when touching Go code.
-
-## First-run checklist
-
-After building:
-
-1. Create a `.cli.json` config file.
-2. Decide whether you want **embedded mode** (`oascli --embedded`) or a long-running **daemon** (`oasclird`).
-3. Run `catalog list` first to confirm that discovery and normalization work before you try tool execution.
+This runs `gofmt`, `go test ./...`, and `go build` on the entire codebase. Run this before submitting changes. If you are only following the quickstart, you do not need it.
 
 ## Docs site contributors
-
-To work on the Docusaurus site:
 
 ```bash
 cd website
@@ -68,4 +64,4 @@ npm install
 npm run build
 ```
 
-The current docs build requires the existing `website/package.json` toolchain; no extra site-specific tooling is implemented in this repo.
+The docs site uses the existing `website/package.json` toolchain; no additional site tooling is needed.

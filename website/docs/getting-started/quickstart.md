@@ -4,7 +4,13 @@ title: Quickstart
 
 # Quickstart
 
-This quickstart uses **embedded mode** first because it removes one moving part: you do not need a separate daemon just to inspect the catalog.
+**Goal:** get a generated command tree running in under 5 minutes.
+
+This quickstart uses **embedded mode** because it removes one moving part — you do not need a separate daemon just to inspect the catalog. You will need the binaries from [Installation](./installation) before continuing.
+
+:::tip First win
+After step 3, you will have a working generated CLI. **If you only need a first win, stop at step 3** and return when you are ready for tool execution or daemon mode.
+:::
 
 ## 1. Create a small OpenAPI document
 
@@ -67,27 +73,29 @@ paths:
 }
 ```
 
-## 3. Inspect the catalog in embedded mode
+## 3. Inspect the catalog — your first win ✓
 
 ```bash
 ./bin/oascli --embedded --config ./.cli.json catalog list --format pretty
 ```
 
-What to expect:
+**What to expect:**
 
-- the response contains a full `catalog` plus the selected `view`
-- service alias `helpdesk` becomes the top-level command name
-- operations become tools such as `tickets:listTickets` and `tickets:getTicket`
-- because no overlay renamed them, the generated commands are based on `operationId`: `list-tickets` and `get-ticket`
+- The response contains a full `catalog` plus the selected `view`.
+- Service alias `helpdesk` becomes the top-level command name.
+- Operations become tools such as `tickets:listTickets` and `tickets:getTicket`.
+- Generated commands are based on `operationId`: `list-tickets` and `get-ticket`.
 
-## 4. Ask for tool metadata before you execute anything
+If you see catalog output, the binary is working and discovery succeeded. **If you only needed to confirm the setup works, you can stop here.**
+
+## 4. Inspect tool metadata before executing anything
+
+These are the safest first commands because they do **not** call the upstream API:
 
 ```bash
 ./bin/oascli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
 ./bin/oascli --embedded --config ./.cli.json explain tickets:listTickets --format pretty
 ```
-
-These are the safest first commands because they do not call the upstream API.
 
 ## 5. Preview the dynamic command tree
 
@@ -95,7 +103,7 @@ These are the safest first commands because they do not call the upstream API.
 ./bin/oascli --embedded --config ./.cli.json helpdesk tickets --help
 ```
 
-That help works because the config and catalog are already available. Without a runtime/config, top-level help can fail before Cobra renders anything.
+This help renders correctly because the runtime and config are already available. Without `--embedded` and a valid config path, top-level help can fail before Cobra renders anything — that is expected behavior, not a bug.
 
 ## 6. Start the daemon when you want a reusable runtime
 
@@ -113,16 +121,17 @@ In another shell:
 
 ## 7. Execute a real tool only when the upstream API is reachable
 
-With the sample above, a dynamic command would look like this:
+With the sample config, a dynamic command looks like this:
 
 ```bash
 ./bin/oascli --runtime http://127.0.0.1:8765 --config ./.cli.json helpdesk tickets list-tickets --status open
 ```
 
-That command will call the first OpenAPI server URL (`https://api.example.com` in this sample). Replace it with a real service before expecting a successful response.
+This calls the first OpenAPI server URL (`https://api.example.com` in this sample). Replace it with a real service before expecting a successful response.
 
 ## Where to go next
 
-- Add overlays, skill manifests, and workflows in [Configuration overview](../configuration/overview).
-- Learn the command tree in [CLI overview](../cli/overview).
-- Learn how discovery and normalization work in [Discovery & Catalog overview](../discovery-catalog/overview).
+- [Choose your path](./choose-your-path) — pick the runtime model and reading order that fits your goal.
+- [Configuration overview](../configuration/overview) — add overlays, skill manifests, and workflows.
+- [CLI overview](../cli/overview) — learn the full command tree model.
+- [Discovery & Catalog overview](../discovery-catalog/overview) — understand how discovery and normalization work.
