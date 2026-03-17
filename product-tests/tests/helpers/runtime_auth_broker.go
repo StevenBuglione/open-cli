@@ -215,6 +215,10 @@ type runtimeTokenClaims struct {
 }
 
 func (broker *RuntimeAuthBroker) signRuntimeToken(upstream string, claims runtimeTokenClaims) (string, error) {
+	return broker.signRuntimeTokenWithExpiry(upstream, claims, time.Now().Add(time.Hour))
+}
+
+func (broker *RuntimeAuthBroker) signRuntimeTokenWithExpiry(upstream string, claims runtimeTokenClaims, expiry time.Time) (string, error) {
 	audience := claims.Audience
 	if audience == "" {
 		audience = "oasclird"
@@ -226,7 +230,7 @@ func (broker *RuntimeAuthBroker) signRuntimeToken(upstream string, claims runtim
 		"sub":               claims.Subject,
 		"client_id":         claims.ClientID,
 		"scope":             scope,
-		"exp":               time.Now().Add(time.Hour).Unix(),
+		"exp":               expiry.Unix(),
 		"upstream_provider": normalizeBrokerUpstream(upstream),
 	})
 	token.Header["kid"] = broker.keyID
@@ -312,6 +316,21 @@ func (broker *RuntimeAuthBroker) ExchangeAuthorizationCode(t *testing.T, code, c
 		t.Fatalf("expected access token from broker auth code exchange")
 	}
 	return payload.AccessToken
+}
+
+func (broker *RuntimeAuthBroker) AcquireExpiredClientCredentialsToken(t *testing.T, upstream, audience string, scopes []string) string {
+	t.Helper()
+
+	token, err := broker.signRuntimeTokenWithExpiry(normalizeBrokerUpstream(upstream), runtimeTokenClaims{
+		Audience: audience,
+		Scopes:   scopes,
+		Subject:  normalizeBrokerUpstream(upstream) + ":service-account",
+		ClientID: broker.ClientID,
+	}, time.Now().Add(-time.Minute))
+	if err != nil {
+		t.Fatalf("acquire expired broker token: %v", err)
+	}
+	return token
 }
 
 func WriteRuntimeAuthBrokerConfig(t *testing.T, dir string, broker *RuntimeAuthBroker, ticketsURL, usersURL string) string {
