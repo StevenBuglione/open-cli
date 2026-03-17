@@ -1,4 +1,11 @@
-.PHONY: check-prereqs services-up services-down authentik-up authentik-down mcp-remote-up mcp-remote-down smoke full test-mcp-stdio test-mcp-remote test-runtime-auth-authentik
+.PHONY: check-prereqs services-up services-down authentik-up authentik-down mcp-remote-up mcp-remote-down smoke full test-mcp-stdio test-mcp-remote test-runtime-auth-authentik fleet-matrix-ci fleet-matrix-mcp-remote
+
+FLEET_OUTPUT_DIR ?= /tmp/oascli-fleet
+FLEET_MATRIX ?= product-tests/testdata/fleet/capability-matrix.yaml
+
+define summarize_fleet
+python3 scripts/summarize-findings.py $$(find $(1) \( -name rubric.json -o -name '*.rubric.json' \) -type f | sort)
+endef
 
 check-prereqs:
 	@bash scripts/check-prereqs.sh
@@ -37,6 +44,27 @@ test-runtime-auth-authentik: authentik-up
 	OASCLI_RUN_AUTHENTIK_TESTS=1 go test ./tests/... -run TestCapabilityRuntimeAuthAuthentik -count=1 -v -timeout 180s; \
 	  status=$$?; \
 	  $(MAKE) authentik-down; \
+	  exit $$status
+
+fleet-matrix-ci:
+	rm -rf $(FLEET_OUTPUT_DIR)
+	python3 scripts/run-agent-campaign.py --matrix $(FLEET_MATRIX) \
+	  --lane local-daemon-core \
+	  --lane remote-runtime-oauth-client \
+	  --lane mcp-stdio-core \
+	  --lane remote-api-core \
+	  --output-dir $(FLEET_OUTPUT_DIR)
+	$(call summarize_fleet,$(FLEET_OUTPUT_DIR))
+
+fleet-matrix-mcp-remote: mcp-remote-up
+	@bash scripts/wait-for-mcp-remote.sh
+	rm -rf $(FLEET_OUTPUT_DIR)/mcp-remote-core
+	python3 scripts/run-agent-campaign.py --matrix $(FLEET_MATRIX) \
+	  --lane mcp-remote-core \
+	  --output-dir $(FLEET_OUTPUT_DIR); \
+	  status=$$?; \
+	  $(call summarize_fleet,$(FLEET_OUTPUT_DIR)/mcp-remote-core); \
+	  $(MAKE) mcp-remote-down; \
 	  exit $$status
 
 smoke: check-prereqs

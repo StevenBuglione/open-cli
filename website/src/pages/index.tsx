@@ -49,6 +49,18 @@ const features: FeatureItem[] = [
       'Review auth resolution, approval gates, audit logs, refresh flows, and instance isolation before you automate against the runtime.',
     href: '/docs/security/overview',
   },
+  {
+    title: 'Evaluate enterprise auth',
+    description:
+      'Start from the Authentik reference proof when you need a concrete, brokered runtime-auth example with real browser login and scoped runtime access.',
+    href: '/docs/runtime/authentik-reference',
+  },
+  {
+    title: 'See fleet validation',
+    description:
+      'Follow the reproducible capability matrix and live proof inventory that the repo now uses to validate local daemon, remote runtime, MCP, and remote API paths.',
+    href: '/docs/development/fleet-validation',
+  },
 ];
 
 const keySections = [
@@ -82,13 +94,13 @@ function HomepageHero() {
           governed tool interface that humans and agents can actually use.
         </p>
         <div className={styles.buttons}>
-          <Link className="button button--primary button--lg" to="/docs/getting-started/intro">
-            Read the docs
+          <Link className="button button--primary button--lg" to="/docs/getting-started/quickstart">
+            Start with Quickstart
           </Link>
           <Link
             className="button button--secondary button--lg"
-            to="https://github.com/StevenBuglione/oas-cli-go">
-            View GitHub
+            to="/docs/runtime/authentik-reference">
+            Evaluate Enterprise Auth
           </Link>
         </div>
       </div>
@@ -151,6 +163,35 @@ export default function Home(): ReactNode {
                   {section.label}
                 </Link>
               ))}
+            </div>
+          </div>
+        </section>
+        <section className={styles.section}>
+          <div className="container">
+            <div className={styles.sectionHeader}>
+              <Heading as="h2">Choose the path that matches why you are here</Heading>
+              <p>
+                New users should start with the quickstart and CLI overview. Operators and enterprise
+                evaluators should jump directly to runtime deployment, security, the Authentik reference
+                proof, and fleet validation.
+              </p>
+            </div>
+            <div className={styles.quickLinks}>
+              <Link className={styles.quickLink} to="/docs/getting-started/quickstart">
+                First run
+              </Link>
+              <Link className={styles.quickLink} to="/docs/cli/overview">
+                CLI mental model
+              </Link>
+              <Link className={styles.quickLink} to="/docs/runtime/deployment-models">
+                Runtime deployment
+              </Link>
+              <Link className={styles.quickLink} to="/docs/runtime/authentik-reference">
+                Enterprise auth proof
+              </Link>
+              <Link className={styles.quickLink} to="/docs/development/fleet-validation">
+                Fleet validation
+              </Link>
             </div>
           </div>
         </section>

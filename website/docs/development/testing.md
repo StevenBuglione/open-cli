@@ -62,6 +62,8 @@ If you change config semantics, catalog output, schema-facing behavior, or anyth
 
 The live Authentik runtime-auth slice is explicitly opt-in: plain `go test ./...` skips it unless `OASCLI_RUN_AUTHENTIK_TESTS=1` is set. Use `cd product-tests && make test-runtime-auth-authentik` for the real container-backed run; CI uses that dedicated target in its own job.
 
+The broader fleet-based validation program is documented in [Fleet Validation](./fleet-validation). Use that page for the capability matrix, live proof inventory, and rubric artifact workflow.
+
 ### Smoke vs full harness
 
 | Mode | Command | What it does | When to run |
@@ -89,6 +91,12 @@ make test-mcp-stdio
 
 # MCP remote / streamable-http transport (starts a Docker container)
 make test-mcp-remote
+
+# Reproducible fleet lanes
+make fleet-matrix-ci
+
+# Dedicated MCP remote fleet lane
+make fleet-matrix-mcp-remote
 
 # Explicit control
 make check-prereqs

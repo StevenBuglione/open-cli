@@ -29,6 +29,7 @@ The two binaries can run in two ways:
 
 - **End users / agent authors**: start with [Quickstart](./quickstart), then read the [CLI overview](../cli/overview) and [Tool execution](../cli/tool-execution).
 - **Operators**: focus on [Runtime](../runtime/overview), [Configuration](../configuration/overview), [Security](../security/overview), and [Operations](../operations/overview).
+- **Enterprise evaluators**: use [Deployment models](../runtime/deployment-models), [Authentik reference proof](../runtime/authentik-reference), and [Fleet validation](../development/fleet-validation) to review real auth, runtime, and validation evidence.
 - **Contributors**: read [Discovery & Catalog](../discovery-catalog/overview) and [Development](../development/overview) after you know the user-facing model.
 
 ## Important implementation nuance
@@ -46,3 +47,4 @@ That behavior is deliberate in the current implementation and is called out thro
 - Build the binaries in [Installation](./installation).
 - Create a minimal config in [Quickstart](./quickstart).
 - Learn the runtime-backed command model in [CLI overview](../cli/overview).
+- If you are evaluating production readiness, continue to [Authentik reference proof](../runtime/authentik-reference) and [Fleet validation](../development/fleet-validation).

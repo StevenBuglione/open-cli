@@ -78,6 +78,12 @@ def format_rubric_text(rubric: dict, schema_errors: list[str]) -> str:
     run_at = rubric.get("runAt", "")
     overall = "PASS ✓" if rubric.get("pass") else "FAIL ✗"
     lines.append(f"┌─ {campaign}  [{run_at}]  {overall}")
+    metadata = []
+    for key in ("workstream", "capability", "environmentClass", "authPattern"):
+        if rubric.get(key):
+            metadata.append(f"{key}={rubric[key]}")
+    if metadata:
+        lines.append("│  Lane: " + "  ".join(metadata))
 
     if schema_errors:
         lines.append("│  ⚠ SCHEMA ERRORS:")
@@ -109,6 +115,12 @@ def format_rubric_text(rubric: dict, schema_errors: list[str]) -> str:
         for f in findings:
             lines.append(f"│    · {f}")
 
+    artifact_paths: list[str] = rubric.get("artifactPaths") or []
+    if artifact_paths:
+        lines.append("│  Artifacts:")
+        for path in artifact_paths:
+            lines.append(f"│    · {path}")
+
     lines.append("└" + "─" * 60)
     return "\n".join(lines)
 
@@ -130,7 +142,11 @@ def main() -> None:
     # Collect input files.
     input_paths: list[Path] = [Path(f) for f in args.files]
     if args.dir:
-        input_paths.extend(sorted(Path(args.dir).glob("*.rubric.json")))
+        dir_path = Path(args.dir)
+        input_paths.extend(sorted(dir_path.glob("*.rubric.json")))
+        rubric_json = dir_path / "rubric.json"
+        if rubric_json.exists():
+            input_paths.append(rubric_json)
 
     if not input_paths:
         print("[error] No rubric files specified.  Use --dir or pass file paths.", file=sys.stderr)

@@ -1,4 +1,4 @@
-.PHONY: fmt test build verify verify-spec verify-conformance verify-all
+.PHONY: fmt test build verify verify-spec verify-conformance verify-all product-test-smoke product-test-full product-test-fleet product-test-fleet-mcp-remote
 
 fmt:
 	gofmt -w $$(find . -name '*.go' -print)
@@ -24,3 +24,9 @@ product-test-smoke:
 
 product-test-full:
 	cd product-tests && $(MAKE) full
+
+product-test-fleet:
+	cd product-tests && $(MAKE) fleet-matrix-ci
+
+product-test-fleet-mcp-remote:
+	cd product-tests && $(MAKE) fleet-matrix-mcp-remote

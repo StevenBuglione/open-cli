@@ -52,6 +52,34 @@ jobs:
       - name: Product-test smoke (validate infra configs)
         run: make product-test-smoke
 
+  product-test-fleet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run reproducible fleet matrix lanes
+        run: make product-test-fleet
+
+  product-test-fleet-mcp-remote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run MCP remote fleet lane
+        run: make product-test-fleet-mcp-remote
+
   product-test-authentik:
     runs-on: ubuntu-latest
     timeout-minutes: 20

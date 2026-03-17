@@ -15,7 +15,7 @@ lanes:
     capability: remote-runtime-live
     environmentClass: live-external
     authPattern: oauthClient
-    evidenceChecklist: website/docs/development/fleet-validation.md
+    evidenceChecklist: examples/runtime-auth-broker/authentik/evidence-checklist.md
     owner: operator
     prerequisites:
       - remote-runtime-endpoint

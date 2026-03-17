@@ -62,7 +62,7 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Development',
       link: {type: 'doc', id: 'development/overview'},
-      items: ['development/repo-layout', 'development/testing', 'development/extending-the-runtime'],
+      items: ['development/repo-layout', 'development/testing', 'development/fleet-validation', 'development/extending-the-runtime'],
     },
   ],
 };

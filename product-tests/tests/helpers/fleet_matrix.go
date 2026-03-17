@@ -13,13 +13,13 @@ type CapabilityMatrix struct {
 }
 
 type CapabilityLane struct {
-	ID               string   `yaml:"id"`
-	Workstream       string   `yaml:"workstream"`
-	Capability       string   `yaml:"capability"`
-	CapabilityFamily string   `yaml:"capabilityFamily"`
-	EnvironmentClass string   `yaml:"environmentClass"`
-	AuthPattern      string   `yaml:"authPattern"`
-	GoTestPattern    string   `yaml:"goTestPattern"`
+	ID                string   `yaml:"id"`
+	Workstream        string   `yaml:"workstream"`
+	Capability        string   `yaml:"capability"`
+	CapabilityFamily  string   `yaml:"capabilityFamily"`
+	EnvironmentClass  string   `yaml:"environmentClass"`
+	AuthPattern       string   `yaml:"authPattern"`
+	GoTestPattern     string   `yaml:"goTestPattern"`
 	ExpectedArtifacts []string `yaml:"expectedArtifacts"`
 }
 

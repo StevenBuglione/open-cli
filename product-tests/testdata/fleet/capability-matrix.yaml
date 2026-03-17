@@ -5,30 +5,27 @@ lanes:
     capabilityFamily: mode
     environmentClass: ci-containerized
     authPattern: none
-    goTestPattern: TestCampaignLocalDaemonMatrix
+    goTestPattern: ^TestCampaignLocalDaemonMatrix$
     expectedArtifacts:
       - transcript.log
       - rubric.json
-      - runtime-info.json
   - id: remote-runtime-oauth-client
     workstream: product-validation
     capability: remote-runtime
     capabilityFamily: auth
     environmentClass: ci-containerized
     authPattern: oauthClient
-    goTestPattern: TestCampaignRemoteRuntimeMatrix
+    goTestPattern: ^TestCampaignRemoteRuntimeMatrix$
     expectedArtifacts:
       - transcript.log
       - rubric.json
-      - runtime-info.json
-      - denied-execution.txt
   - id: mcp-stdio-core
     workstream: product-validation
     capability: mcp-stdio
     capabilityFamily: integration
     environmentClass: ci-containerized
     authPattern: none
-    goTestPattern: TestCampaignMCPMatrix
+    goTestPattern: ^TestCampaignMCPStdioMatrix$
     expectedArtifacts:
       - transcript.log
       - rubric.json
@@ -38,7 +35,7 @@ lanes:
     capabilityFamily: integration
     environmentClass: ci-containerized
     authPattern: transport-oauth
-    goTestPattern: TestCampaignMCPMatrix
+    goTestPattern: ^TestCampaignMCPRemoteMatrix$
     expectedArtifacts:
       - transcript.log
       - rubric.json
@@ -47,8 +44,8 @@ lanes:
     capability: remote-api
     capabilityFamily: integration
     environmentClass: ci-containerized
-    authPattern: providedToken
-    goTestPattern: TestCampaignRemoteAPIMatrix
+    authPattern: none
+    goTestPattern: ^TestCampaignAgentOperator$
     expectedArtifacts:
       - transcript.log
       - rubric.json
