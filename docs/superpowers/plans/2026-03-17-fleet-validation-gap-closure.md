@@ -177,14 +177,14 @@ This plan is complete only when all of the following are true:
 - Test: `product-tests/tests/campaign_mcp_remote_matrix_test.go`
 - Verify: `cd product-tests && make fleet-matrix-mcp-remote`
 
-- [ ] **Step 1: Decide whether to implement transport OAuth or relabel the lane**
+- [x] **Step 1: Decide whether to implement transport OAuth or relabel the lane**
 
 Decision rule:
 
 - If the repo already has a reusable MCP remote auth fixture, implement real auth proof.
 - If not, relabel the lane honestly now and create a follow-up live-proof or future lane for transport OAuth.
 
-- [ ] **Step 2: Write or update the failing test first**
+- [x] **Step 2: Write or update the failing test first**
 
 If relabeling:
 
@@ -203,7 +203,7 @@ func TestCapabilityMatrixMCPRemoteLaneIsHonest(t *testing.T) {
 
 If implementing transport OAuth, write a test that proves an unauthenticated request fails and an authenticated request succeeds.
 
-- [ ] **Step 3: Run the focused test to verify it fails**
+- [x] **Step 3: Run the focused test to verify it fails**
 
 Run:
 
@@ -214,7 +214,7 @@ go test ./product-tests/tests/... -run TestCapabilityMatrixMCPRemoteLaneIsHonest
 
 Expected: FAIL until the lane metadata and/or implementation is corrected.
 
-- [ ] **Step 4: Implement the minimal honest fix**
+- [x] **Step 4: Implement the minimal honest fix**
 
 Preferred immediate fix if no auth fixture exists:
 
@@ -226,7 +226,7 @@ Preferred immediate fix if no auth fixture exists:
   - a selected lane emits zero rubrics
   - a selected lane emits multiple rubrics
 
-- [ ] **Step 5: Re-run the remote MCP lane**
+- [x] **Step 5: Re-run the remote MCP lane**
 
 Run:
 
@@ -240,7 +240,7 @@ Expected:
 - lane passes
 - rubric language no longer implies transport OAuth proof
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add product-tests/testdata/fleet/capability-matrix.yaml \
@@ -255,7 +255,7 @@ git commit -m "fix: make remote MCP fleet proof honest"
 - Modify: `product-tests/tests/campaign_remote_runtime_matrix_test.go`
 - Test: `product-tests/tests/campaign_remote_runtime_matrix_test.go`
 
-- [ ] **Step 1: Write failing checks for payload semantics**
+- [x] **Step 1: Write failing checks for payload semantics**
 
 Add assertions for:
 
@@ -263,7 +263,7 @@ Add assertions for:
 - response body contents for the authorized tool call
 - response shape or fields from `/v1/auth/browser-config`, not just `200`
 
-- [ ] **Step 2: Run the focused test**
+- [x] **Step 2: Run the focused test**
 
 Run:
 
@@ -273,7 +273,7 @@ go test ./product-tests/tests -run ^TestCampaignRemoteRuntimeMatrix$ -count=1 -v
 
 Expected: FAIL until the new assertions are implemented.
 
-- [ ] **Step 3: Implement the minimal stronger checks**
+- [x] **Step 3: Implement the minimal stronger checks**
 
 Examples:
 
@@ -284,7 +284,7 @@ fr.Check("catalog-tool-id", "catalog exposes the expected authorized tool", "tic
 
 and decode the authorized execution response body instead of checking status only.
 
-- [ ] **Step 4: Add at least one explicit auth failure companion test**
+- [x] **Step 4: Add at least one explicit auth failure companion test**
 
 Create a dedicated failure-path campaign or subtest for:
 
@@ -294,7 +294,7 @@ Create a dedicated failure-path campaign or subtest for:
 
 Prefer a separate campaign file if it becomes longer than one focused scenario.
 
-- [ ] **Step 5: Re-run the lane**
+- [x] **Step 5: Re-run the lane**
 
 Run:
 
@@ -302,7 +302,7 @@ Run:
 go test ./product-tests/tests -run 'TestCampaignRemoteRuntimeMatrix|TestCampaignRemoteRuntimeFailures' -count=1 -v
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add product-tests/tests/campaign_remote_runtime_matrix_test.go \
@@ -353,7 +353,7 @@ Run:
 go test ./product-tests/tests -run 'TestCampaignAgentOperator|TestCampaignAgentOperatorWithAuth|TestCampaignRemoteAPIFailures' -count=1 -v
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add product-tests/tests/campaign_agent_operator_test.go \
@@ -406,7 +406,7 @@ Run:
 go test ./product-tests/tests -run 'TestCampaignLocalDaemon(Matrix|Process)' -count=1 -v
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add product-tests/tests/campaign_local_daemon_process_test.go \
@@ -452,7 +452,7 @@ Important:
 
 Revocation remains explicitly tracked as a known auth gap; Task 5 promoted invalid and expired token handling into executable fleet coverage without falsely claiming revocation support.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add product-tests/tests/... product-tests/testdata/fleet/capability-matrix.yaml
@@ -505,7 +505,7 @@ make product-test-fleet
 cd product-tests && make fleet-matrix-mcp-remote
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add product-tests/scripts/run-agent-campaign.py \
@@ -548,7 +548,7 @@ Run:
 cd website && npm run build
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add website/docs/runtime/deployment-models.md \
@@ -622,7 +622,7 @@ Run:
 cd website && npm run build
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add website/docs/getting-started/choose-your-path.md \
@@ -687,7 +687,7 @@ go test ./product-tests/tests -run ^TestCampaignWebsiteReview$ -count=1 -v
 cd website && npm run build
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add product-tests/tests/campaign_website_review_test.go \
@@ -707,13 +707,13 @@ git commit -m "test: add executable website review campaign"
   - `docs/superpowers/plans/2026-03-17-copilot-fleet-validation-and-website-program.md`
   - or keep this file as the official source of truth and note that explicitly
 
-- [ ] **Step 1: Decide whether to restore the original files**
+- [x] **Step 1: Decide whether to restore the original files**
 
 If they were meant to ship in the repo, restore them. If not, add a short note in this document and the session plan saying this file supersedes them for execution tracking.
 
 Status: the original master program spec and plan paths were restored so repository references resolve again, but this gap-closure tracker remains the execution source of truth for implementation status and verification.
 
-- [ ] **Step 2: Commit if needed**
+- [x] **Step 2: Commit if needed**
 
 ```bash
 git add docs/superpowers/specs/... docs/superpowers/plans/...
@@ -725,28 +725,28 @@ git commit -m "docs: restore fleet planning artifacts"
 **Files:**
 - No new files required
 
-- [ ] **Step 1: Run baseline verification**
+- [x] **Step 1: Run baseline verification**
 
 ```bash
 cd /home/sbuglione/oascli/oas-cli-go/.worktrees/copilot-fleet-validation
 make verify
 ```
 
-- [ ] **Step 2: Run fleet verification**
+- [x] **Step 2: Run fleet verification**
 
 ```bash
 make product-test-fleet
 cd product-tests && make fleet-matrix-mcp-remote
 ```
 
-- [ ] **Step 3: Run website review verification**
+- [x] **Step 3: Run website review verification**
 
 ```bash
 go test ./product-tests/tests -run ^TestCampaignWebsiteReview$ -count=1 -v
 cd website && npm run build
 ```
 
-- [ ] **Step 4: Inspect artifact output**
+- [x] **Step 4: Inspect artifact output**
 
 Check:
 
@@ -754,12 +754,14 @@ Check:
 - `/tmp/oascli-fleet/**/transcript.log`
 - any new evidence artifacts
 
-- [ ] **Step 5: Record what still remains**
+- [x] **Step 5: Record what still remains**
 
 If anything still cannot be proven automatically, add it explicitly to:
 
 - `product-tests/testdata/fleet/live-proof-matrix.yaml`
 - the docs pages that describe enterprise proof status
+
+Result: no new automatic-proof gaps surfaced during the final sweep. The remaining non-automated boundary is still the already-documented live-proof/manual slice for external identity federation and hosted-runtime scenarios, plus the explicitly tracked revocation/introspection auth gap.
 
 - [ ] **Step 6: Commit final verification changes**
 

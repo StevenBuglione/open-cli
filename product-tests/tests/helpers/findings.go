@@ -39,19 +39,19 @@ type CampaignArtifact struct {
 // CampaignRubric is the structured output emitted after every campaign run.
 // It satisfies the agent-rubric.schema.json schema.
 type CampaignRubric struct {
-	Schema           string            `json:"$schema,omitempty"`
-	Campaign         string            `json:"campaign"`
-	Workstream       string            `json:"workstream,omitempty"`
-	Capability       string            `json:"capability,omitempty"`
-	EnvironmentClass string            `json:"environmentClass,omitempty"`
-	AuthPattern      string            `json:"authPattern,omitempty"`
-	ArtifactPaths    []string          `json:"artifactPaths,omitempty"`
+	Schema           string             `json:"$schema,omitempty"`
+	Campaign         string             `json:"campaign"`
+	Workstream       string             `json:"workstream,omitempty"`
+	Capability       string             `json:"capability,omitempty"`
+	EnvironmentClass string             `json:"environmentClass,omitempty"`
+	AuthPattern      string             `json:"authPattern,omitempty"`
+	ArtifactPaths    []string           `json:"artifactPaths,omitempty"`
 	Artifacts        []CampaignArtifact `json:"artifacts,omitempty"`
-	RunAt            string            `json:"runAt"`
-	Pass             bool              `json:"pass"`
-	Criteria         []RubricCriterion `json:"criteria"`
-	KnownGaps        []KnownGapEntry   `json:"knownGaps,omitempty"`
-	Findings         []string          `json:"findings"`
+	RunAt            string             `json:"runAt"`
+	Pass             bool               `json:"pass"`
+	Criteria         []RubricCriterion  `json:"criteria"`
+	KnownGaps        []KnownGapEntry    `json:"knownGaps,omitempty"`
+	Findings         []string           `json:"findings"`
 }
 
 // FindingsRecorder accumulates rubric criteria and freeform findings

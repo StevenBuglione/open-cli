@@ -126,10 +126,10 @@ type executeToolRequest struct {
 }
 
 type executeToolResponse struct {
-	StatusCode int             `json:"statusCode"`
-	Body       json.RawMessage `json:"body,omitempty"`
-	Text       string          `json:"text,omitempty"`
-	ContentType string         `json:"contentType,omitempty"`
+	StatusCode  int             `json:"statusCode"`
+	Body        json.RawMessage `json:"body,omitempty"`
+	Text        string          `json:"text,omitempty"`
+	ContentType string          `json:"contentType,omitempty"`
 }
 
 type workflowRunRequest struct {
