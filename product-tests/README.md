@@ -160,13 +160,23 @@ go test ./tests/... -run TestMultiInstance -count=1 -v
 
 ### Runtime auth — Authentik reference proof
 
-This target is the dedicated entrypoint for the Authentik-based runtime auth proof stack. It will become fully green once the Authentik runtime-auth test coverage is added.
+This target is the dedicated entrypoint for the Authentik-based runtime auth proof stack.
+
+It is now the automated reference proof for the workload path and verifies:
+
+- live Authentik discovery/JWKS/token reachability
+- repo-managed provider/application bootstrap through Authentik
+- real `oascli` `oauthClient` token acquisition against Authentik
+- live `oidc_jwks` validation in `oasclird`
+- fail-closed rejection for insufficient scope, wrong audience, expired token, and alternate issuer
+
+The product harness uses a tiny local proxy in the test fixture so `oascli` and `oasclird` can reach the self-signed Authentik test stack without weakening the runtime contract. The validated token `iss` still comes from Authentik.
+
+This fixture is intentionally **workload-only**: it bootstraps a confidential Authentik provider for `oauthClient` and does **not** advertise `/v1/auth/browser-config`. The browser proof is covered separately with the public-client reference template under `examples/runtime-auth-broker/authentik/`.
 
 ```sh
+cd product-tests
 make authentik-up
-docker compose -f authentik/docker-compose.yml config --quiet
-make authentik-down
-
-# later task target
 make test-runtime-auth-authentik
+make authentik-down
 ```

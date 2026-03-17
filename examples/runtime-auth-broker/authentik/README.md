@@ -1,286 +1,252 @@
 # Authentik Reference Deployment for Brokered Runtime Auth
 
-This directory contains the official reference implementation for brokered runtime auth using Authentik as the identity broker.
+This directory contains the official reference deployment for the brokered runtime auth contract using **Authentik as the broker**.
 
-**Important:** This is a reference deployment example. Organizations may use any broker or gateway that satisfies the runtime auth contract. Authentik is illustrative, not normative.
+Authentik is the worked example, **not** the requirement. Organizations can replace it with any broker or gateway that emits the same external contract expected by `oascli` and `oasclird`.
 
-## Architecture
+## What this reference proves
 
-The reference deployment demonstrates the two required proof paths:
+The reference deployment covers two proof paths:
 
-1. **Human interactive path (browserLogin):**
-   - User authenticates through Authentik
-   - Authentik can federate to upstream providers (e.g., Microsoft Entra ID)
-   - Authentik issues a runtime-compatible token
-   - `oascli` completes the browser login flow
-   - `oasclird` validates the token and enforces authorization
+1. **Human path (`browserLogin`)**
+   - `oascli` reads `/v1/runtime/info`
+   - `oascli` reads `/v1/auth/browser-config`
+   - the browser redirects to Authentik
+   - Authentik can federate to Microsoft Entra ID
+   - Authentik issues the runtime token
+   - `oasclird` validates the token and enforces scopes
 
-2. **Workload path (oauthClient):**
-   - Workload authenticates to Authentik using client credentials
-   - Authentik issues a runtime-compatible token
-   - `oascli` acquires the token via OAuth client flow
-   - `oasclird` validates the token and enforces authorization
+2. **Workload path (`oauthClient`)**
+   - a workload authenticates to Authentik with client credentials
+   - Authentik issues a runtime token
+   - `oascli` acquires that token before runtime requests
+   - `oasclird` validates the token with `oidc_jwks`
+   - catalog visibility and execution remain fail-closed
 
-## Success Looks Like
+## Validated Authentik facts
 
-The reference deployment is verified when:
+These details were verified against the repo-managed Authentik harness:
 
-- ✅ Authentik serves discovery/JWKS/browser/token endpoints
-- ✅ `oasclird` validates Authentik-issued runtime tokens with `oidc_jwks` validation profile
-- ✅ `oascli` using `oauthClient` can acquire a runtime token and list the filtered catalog
-- ✅ `oascli runtime info` reports `auth.required=true` and `tokenValidationProfiles` including `oidc_jwks`
-- ✅ Authorized tool execution succeeds
-- ✅ Unauthorized tool execution is denied (fail-closed)
-- ✅ Browser login flow completes successfully with federated identity
+- discovery lives at `/application/o/<provider-slug>/.well-known/openid-configuration`
+- JWKS lives at `/application/o/<provider-slug>/jwks/`
+- the authorization endpoint is Authentik’s shared `/application/o/authorize/`
+- the token endpoint is Authentik’s shared `/application/o/token/`
+- the product-test stack exposes those working endpoints on HTTPS `:9444`
+- the runtime-compatible `scope` claim must be emitted from Authentik scope mappings using `token.scope`
 
-## Required Endpoints
+Validated scope-mapping expression:
 
-Before running the runtime proof, verify that Authentik exposes these endpoints:
+```python
+audience = "oasclird"
+return {
+    "scope": " ".join(token.scope),
+    "aud": audience,
+}
+```
 
-### Discovery and validation
-- `/.well-known/openid-configuration` - OpenID Connect discovery document
-- `/jwks.json` or equivalent JWKS endpoint (discovered from `.well-known/openid-configuration`)
+If you need a deliberate negative test audience:
 
-### Authentication endpoints
-- Authorization endpoint - for browser-based login flows
-- Token endpoint - for token acquisition and refresh
+```python
+audience = "wrong-audience" if "profile:wrong-audience" in token.scope else "oasclird"
+return {
+    "scope": " ".join(token.scope),
+    "aud": audience,
+}
+```
 
-The exact paths depend on your Authentik application configuration. Authentik typically serves these under:
-- `http://localhost:9000/application/o/<provider-slug>/.well-known/openid-configuration`
-- `http://localhost:9000/application/o/<provider-slug>/jwks/`
-- `http://localhost:9000/application/o/<provider-slug>/authorize/`
-- `http://localhost:9000/application/o/<provider-slug>/token/`
+## Quick start
 
-## Quick Start
-
-### 1. Prerequisites
-
-- Docker and Docker Compose
-- `oascli` and `oasclird` binaries
-- (Optional) Microsoft Entra ID tenant for upstream federation
-
-### 2. Initial Setup
-
-Copy the example environment file and configure it:
+### 1. Start the reference stack
 
 ```bash
 cd examples/runtime-auth-broker/authentik
 cp .env.example .env
-```
-
-Edit `.env` and set secure values for:
-- `PG_PASS` - PostgreSQL password
-- `AUTHENTIK_SECRET_KEY` - Authentik secret key (generate a long random string)
-
-### 3. Start Authentik
-
-```bash
 docker compose up -d
-```
-
-Wait for services to become healthy:
-
-```bash
 docker compose ps
 ```
 
-### 4. Configure Authentik
+The shipped product-test harness uses a self-signed certificate, so the validated OIDC endpoints are HTTPS-first. In production, use a normal public TLS deployment instead of the harness shortcut.
 
-Access Authentik at `http://localhost:9000` and complete the initial setup:
+### 2. Create the Authentik runtime application/provider
 
-1. Create an admin account
-2. Create an OAuth2/OpenID Provider for the runtime
-3. Create an Application linked to that provider
-4. Configure the following:
-   - Client ID for browser login (e.g., `oascli-browser`)
-   - Client ID and secret for workload login (e.g., `oascli-workload`)
-   - Redirect URIs (e.g., `http://localhost:8787/callback`)
-   - Token lifetime and signing key
-5. Configure scope mappings:
-   - Map user groups/roles to runtime scopes like `bundle:tickets` and `tool:tickets:listTickets`
-6. (Optional) Configure upstream federation to Microsoft Entra ID. Detailed Entra federation steps are out of scope for Task 1 and will be added in a later task.
+For the Authentik reference deployment, treat the two proof paths as **separate provider configurations**:
 
-### 5. Generate Runtime Configuration
+- **Browser proof** uses a **public** Authentik OAuth2/OpenID provider plus linked application
+- **Workload proof** uses a **confidential** Authentik OAuth2/OpenID provider plus linked application
 
-After configuring Authentik, retrieve the endpoint URLs and update `runtime.cli.json`:
+Both providers must emit the same normalized runtime scope vocabulary, but each one has its own provider-specific issuer and JWKS URL in Authentik.
+
+Browser provider requirements:
+
+- redirect URI: `http://127.0.0.1:8787/callback`
+- client type: `public`
+- signing key: a key that is published through JWKS
+- runtime audience: `oasclird`
+- runtime scopes: normalized values such as `bundle:tickets` and `tool:tickets:listTickets`
+
+Workload provider requirements:
+
+- client type: `confidential`
+- client credentials enabled for client-credentials token acquisition
+- signing key: a key that is published through JWKS
+- runtime audience: `oasclird`
+- runtime scopes: normalized values such as `bundle:tickets` and `tool:tickets:listTickets`
+
+Do **not** assume that you can keep one rendered config and only flip `runtime.remote.oauth.mode`. Authentik discovery and JWKS are provider-specific, so the browser and workload proofs need separate rendered configs when they use different provider types.
+
+### 3. Render the browser runtime template
+
+Render `runtime.cli.json.tmpl` with your **public browser-provider** values:
 
 ```bash
-# Substitute placeholders in the template
-export AUTHENTIK_ISSUER="http://localhost:9000/application/o/<your-provider-slug>/"
-export AUTHENTIK_JWKS_URL="http://localhost:9000/application/o/<your-provider-slug>/jwks/"
-export AUTHENTIK_TOKEN_URL="http://localhost:9000/application/o/<your-provider-slug>/token/"
-export AUTHENTIK_AUTHORIZATION_URL="http://localhost:9000/application/o/<your-provider-slug>/authorize/"
+export AUTHENTIK_ISSUER="https://auth.example.com/application/o/oascli-runtime/"
+export AUTHENTIK_JWKS_URL="https://auth.example.com/application/o/oascli-runtime/jwks/"
+export AUTHENTIK_AUTHORIZATION_URL="https://auth.example.com/application/o/authorize/"
+export AUTHENTIK_TOKEN_URL="https://auth.example.com/application/o/token/"
 export AUTHENTIK_BROWSER_CLIENT_ID="oascli-browser"
 export RUNTIME_AUDIENCE="oasclird"
-export RUNTIME_URL="http://localhost:8080"
+export RUNTIME_URL="https://runtime.example.com"
 
 envsubst < runtime.cli.json.tmpl > runtime.cli.json
 ```
 
-The template includes an example OpenAPI source at `./tickets.openapi.yaml`. Replace that path with a real API description you want to expose through the runtime, or add the referenced file before running catalog or execution commands.
+### 4. Render the workload runtime template
 
-### 6. Start the Runtime
-
-Configure `oasclird` to use Authentik for token validation. Your `oasclird` configuration should include:
-
-```yaml
-auth:
-  required: true
-  validationProfile: oidc_jwks
-  issuer: http://localhost:9000/application/o/<your-provider-slug>/
-  jwksURL: http://localhost:9000/application/o/<your-provider-slug>/jwks/
-  audience: oasclird
-```
-
-Start `oasclird`:
+Render `runtime.oauth-client.cli.json.tmpl` with your **confidential workload-provider** values:
 
 ```bash
-oasclird --config runtime-config.yaml
+export AUTHENTIK_ISSUER="https://auth.example.com/application/o/oascli-runtime-workload/"
+export AUTHENTIK_JWKS_URL="https://auth.example.com/application/o/oascli-runtime-workload/jwks/"
+export AUTHENTIK_TOKEN_URL="https://auth.example.com/application/o/token/"
+export RUNTIME_AUDIENCE="oasclird"
+export RUNTIME_URL="https://runtime.example.com"
+
+envsubst < runtime.oauth-client.cli.json.tmpl > runtime.oauth-client.cli.json
 ```
 
-### 7. Verify the Runtime Contract
-
-Check runtime metadata:
+Then provide the confidential client credentials out of band:
 
 ```bash
-oascli --config runtime.cli.json runtime info
+export OAS_REMOTE_CLIENT_ID="your-workload-client-id"
+export OAS_REMOTE_CLIENT_SECRET="your-workload-client-secret"
 ```
 
-Expected output includes:
-```json
-{
-  "auth": {
-    "required": true,
-    "tokenValidationProfiles": ["oidc_jwks"]
-  }
-}
-```
-
-### 8. Test Browser Login (Human Path)
-
-```bash
-oascli --config runtime.cli.json catalog list --format json
-```
-
-There is no separate `runtime login` command. The first runtime request triggers the configured browser-login flow. This command should:
-1. Open your browser
-2. Redirect to Authentik
-3. (If configured in a later task) Federate to Entra or another upstream provider
-4. Return a runtime token to `oascli`
-5. Return the filtered effective catalog
-6. Store the token for subsequent commands
-
-### 9. Test Workload Path
-
-Update `runtime.cli.json` to use `oauthClient` mode:
+The rendered workload file should look like this:
 
 ```json
-{
-  "runtime": {
-    "remote": {
-      "oauth": {
-        "mode": "oauthClient",
-        "scopes": ["bundle:tickets", "tool:tickets:listTickets"],
-        "client": {
-          "tokenURL": "http://localhost:9000/application/o/<your-provider-slug>/token/",
-          "clientId": { "type": "env", "value": "OAS_REMOTE_CLIENT_ID" },
-          "clientSecret": { "type": "env", "value": "OAS_REMOTE_CLIENT_SECRET" }
-        }
+"runtime": {
+  "server": {
+    "auth": {
+      "validationProfile": "oidc_jwks",
+      "issuer": "https://auth.example.com/application/o/oascli-runtime-workload/",
+      "jwksURL": "https://auth.example.com/application/o/oascli-runtime-workload/jwks/",
+      "audience": "oasclird"
+    }
+  },
+  "remote": {
+    "oauth": {
+      "mode": "oauthClient",
+      "audience": "oasclird",
+      "scopes": ["bundle:tickets", "tool:tickets:listTickets"],
+      "client": {
+        "tokenURL": "https://auth.example.com/application/o/token/",
+        "clientId": { "type": "env", "value": "OAS_REMOTE_CLIENT_ID" },
+        "clientSecret": { "type": "env", "value": "OAS_REMOTE_CLIENT_SECRET" }
       }
     }
   }
 }
 ```
 
-Run a catalog command:
+### 5. Configure the runtime server
 
-```bash
-oascli --config runtime.cli.json catalog list
+`oasclird` must validate the Authentik-issued runtime tokens:
+
+```json
+{
+  "runtime": {
+    "server": {
+      "auth": {
+        "validationProfile": "oidc_jwks",
+        "issuer": "https://auth.example.com/application/o/oascli-runtime/",
+        "jwksURL": "https://auth.example.com/application/o/oascli-runtime/jwks/",
+        "audience": "oasclird",
+        "authorizationURL": "https://auth.example.com/application/o/authorize/",
+        "tokenURL": "https://auth.example.com/application/o/token/",
+        "browserClientId": "oascli-browser"
+      }
+    }
+  }
+}
 ```
 
-This should:
-1. Acquire a token using client credentials
-2. Show only authorized tools based on the workload's scopes
+For the workload proof, use the workload provider issuer/JWKS instead and omit the browser-login fields entirely. The automated product fixture now does exactly that so it does not advertise a browser flow that the confidential workload provider cannot complete.
 
-### 10. Verify Authorization Enforcement
+## Verification commands
 
-Test allowed execution against a tool that is both present in your runtime config and granted by the issued runtime scopes. For the example `tickets` service shape, that will typically look like:
+### Automated workload proof
+
 ```bash
-oascli --config runtime.cli.json --format json tickets tickets list-tickets
+cd product-tests
+make authentik-up
+make test-runtime-auth-authentik
+make authentik-down
 ```
 
-For fail-closed denial, use a config that also exposes a second tool outside the granted scope set and verify that attempting to execute it returns an authorization error. The automated multi-tool proof for that case is added in later tasks of this implementation plan.
+This automated slice proves:
 
-## Endpoint Readiness Checklist
+- runtime info metadata is correct
+- `oauthClient` acquires a live Authentik token
+- catalog output is scope-filtered
+- allowed execution succeeds
+- denied execution fails closed
+- wrong audience, expired token, and alternate issuer are rejected
 
-Before claiming the reference deployment is working, verify:
+### Manual browser proof
 
-- [ ] `curl http://localhost:9000/application/o/<provider-slug>/.well-known/openid-configuration` returns valid JSON
-- [ ] Discovery document includes `jwks_uri`, `authorization_endpoint`, `token_endpoint`
-- [ ] `curl <jwks_uri>` returns valid JWKS with at least one key
-- [ ] Browser can reach authorization endpoint
-- [ ] Token endpoint accepts client credentials and returns valid JWT
-- [ ] JWT includes required claims: `iss`, `aud`, `sub` or `client_id`, `scope`, `exp`
-- [ ] `oasclird` can validate tokens using the JWKS endpoint
-- [ ] Runtime metadata reports correct auth configuration
+Run the browser path after the automated workload proof:
 
-## Troubleshooting
+```bash
+oascli --config runtime.cli.json catalog list --format json
+```
 
-### Authentik not starting
-- Check logs: `docker compose logs server`
-- Verify PostgreSQL and Redis are healthy: `docker compose ps`
-- Ensure `AUTHENTIK_SECRET_KEY` is set in `.env`
+There is no separate `runtime login` command. The first runtime request triggers the browser flow.
 
-### Token validation failing
-- Verify issuer URL matches exactly (including trailing slash)
-- Check JWKS endpoint is reachable from `oasclird`
-- Verify token audience matches runtime expectation
-- Check token has not expired
-- Verify signing key exists in JWKS
+Capture artifacts exactly as described in:
 
-### Authorization not working
-- Check scope mappings in Authentik
-- Verify user/workload has correct group assignments
-- Review `oasclird` logs for authorization decisions
-- Confirm runtime policy configuration
+- `entra-federation.md`
+- `evidence-checklist.md`
 
-### Browser login not working
-- Verify redirect URI matches exactly
-- Check browser client ID is correct
-- Ensure callback port (8787) is available
-- Review Authentik logs for authentication errors
+## Endpoint readiness checklist
 
-## Federation to Microsoft Entra ID
+Before claiming the deployment is ready, verify:
 
-Detailed Microsoft Entra federation instructions are out of scope for Task 1 and will be added in a later task.
+- [ ] discovery returns valid JSON
+- [ ] discovery includes `jwks_uri`, `authorization_endpoint`, and `token_endpoint`
+- [ ] JWKS returns at least one signing key
+- [ ] the token endpoint returns a JWT for client credentials
+- [ ] the JWT contains `iss`, `aud`, `sub` or `client_id`, `scope`, and `exp`
+- [ ] `oasclird` accepts a valid token and rejects invalid ones
+- [ ] `/v1/runtime/info` advertises `oidc_jwks`
 
-## Reference Contract
+## Entra federation
 
-This deployment satisfies the broker-neutral runtime auth contract by:
+Use the runbook in [`entra-federation.md`](./entra-federation.md) for the concrete Authentik -> Entra setup steps.
 
-1. **Token issuance:** Authentik issues JWT tokens with standard claims
-2. **Token validation:** `oasclird` validates tokens using OIDC/JWKS discovery
-3. **Authorization:** Runtime derives authorization from normalized scopes
-4. **Fail-closed:** Unauthorized requests are denied
+Do not claim the enterprise browser proof is complete without the artifacts listed in [`evidence-checklist.md`](./evidence-checklist.md).
 
-Organizations may replace Authentik with any compatible broker as long as the external contract remains the same.
+## Reference contract
+
+This reference deployment keeps the broker-neutral runtime contract intact:
+
+1. the broker issues runtime-compatible tokens
+2. the runtime validates those tokens with `oidc_jwks`
+3. authorization is derived from normalized runtime scopes
+4. failures remain explicit and fail-closed
 
 ## Links
 
 - [Runtime Auth Contract](../reference/README.md)
 - [Broker Notes](../reference/broker-notes.md)
-- Authentik Documentation: https://goauthentik.io/docs/
+- Authentik documentation: https://goauthentik.io/docs/
 - Microsoft Entra ID: https://learn.microsoft.com/entra/
-
-## Notes
-
-This is a reference deployment for documentation and verification purposes. It is **not** a production-ready configuration. For production use:
-
-- Use HTTPS with valid certificates
-- Secure all secrets using a secret management system
-- Configure proper network isolation
-- Enable audit logging
-- Implement backup and recovery procedures
-- Review and apply Authentik security hardening guidelines
-- Configure appropriate session and token lifetimes
-- Implement rate limiting and monitoring

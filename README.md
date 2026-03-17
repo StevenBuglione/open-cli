@@ -155,7 +155,10 @@ With that server-side auth enabled, `oasclird` now:
 - exposes runtime discovery/session-control surfaces at `GET /v1/runtime/info`, `POST /v1/runtime/heartbeat`, `POST /v1/runtime/stop`, and `POST /v1/runtime/session-close`
 - records explicit audit event types for authenticated connect, authn failure, authz denial, token refresh, session close, session expiry, and tool execution
 
-Supported validation profiles now include both `oidc_jwks` and `oauth2_introspection`. See `examples/runtime-auth-broker/reference/` for the runnable broker-shaped reference example used in product verification.
+Supported validation profiles now include both `oidc_jwks` and `oauth2_introspection`. The repository now ships an official Authentik-based reference proof for both `oauthClient` and `browserLogin` runtime auth paths, with separate public/browser and confidential/workload Authentik configurations:
+
+- repo assets: `examples/runtime-auth-broker/authentik/`
+- docs guide: `website/docs/runtime/authentik-reference.md`
 
 ## Install from source
 

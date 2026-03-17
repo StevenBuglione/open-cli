@@ -20,6 +20,10 @@ The current implementation focuses heavily on the second layer and leaves the fi
 
 The current server-side auth surface is profile-based rather than introspection-only. `oasclird` can validate runtime bearer tokens with `oauth2_introspection` or `oidc_jwks`, derive runtime scopes from the validated token, filter catalogs by those scopes, and reject out-of-scope execution requests.
 
+The repository’s official reference proof for that runtime-auth boundary uses Authentik as an example broker, with Microsoft Entra ID documented as the upstream federation example. That reference proof does **not** make Authentik or Entra normative; the contract remains broker-neutral.
+
+See [Authentik reference proof](../runtime/authentik-reference).
+
 If you expose the runtime on a broader network, do not rely on bind address alone. Use runtime auth and deployment controls such as:
 
 - firewall rules

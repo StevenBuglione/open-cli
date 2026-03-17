@@ -196,6 +196,7 @@ func TestCapabilityAuthAndPolicy(t *testing.T) {
 	})
 
 	t.Run("AuthAlternativesPreferNonInteractiveAPIKeyExecution", func(t *testing.T) {
+		originalPath := os.Getenv("PATH")
 		if err := os.Setenv("AUTH_ALT_API_KEY", "static-secret"); err != nil {
 			t.Fatalf("setenv: %v", err)
 		}
@@ -204,6 +205,7 @@ func TestCapabilityAuthAndPolicy(t *testing.T) {
 		}
 		t.Cleanup(func() {
 			_ = os.Unsetenv("AUTH_ALT_API_KEY")
+			_ = os.Setenv("PATH", originalPath)
 		})
 
 		var tokenCalls int32

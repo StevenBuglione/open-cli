@@ -1,0 +1,51 @@
+{
+  "cli": "1.0.0",
+  "mode": {
+    "default": "discover"
+  },
+  "runtime": {
+    "server": {
+      "auth": {
+        "validationProfile": "oidc_jwks",
+        "issuer": "${AUTHENTIK_ISSUER}",
+        "jwksURL": "${AUTHENTIK_JWKS_URL}",
+        "audience": "${RUNTIME_AUDIENCE}"
+      }
+    },
+    "remote": {
+      "url": "${RUNTIME_URL}",
+      "oauth": {
+        "mode": "oauthClient",
+        "audience": "${RUNTIME_AUDIENCE}",
+        "scopes": [
+          "bundle:tickets",
+          "tool:tickets:listTickets"
+        ],
+        "client": {
+          "tokenURL": "${AUTHENTIK_TOKEN_URL}",
+          "clientId": {
+            "type": "env",
+            "value": "OAS_REMOTE_CLIENT_ID"
+          },
+          "clientSecret": {
+            "type": "env",
+            "value": "OAS_REMOTE_CLIENT_SECRET"
+          }
+        }
+      }
+    }
+  },
+  "sources": {
+    "ticketsSource": {
+      "type": "openapi",
+      "uri": "./tickets.openapi.yaml",
+      "enabled": true
+    }
+  },
+  "services": {
+    "tickets": {
+      "source": "ticketsSource",
+      "alias": "tickets"
+    }
+  }
+}
