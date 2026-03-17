@@ -711,6 +711,8 @@ git commit -m "test: add executable website review campaign"
 
 If they were meant to ship in the repo, restore them. If not, add a short note in this document and the session plan saying this file supersedes them for execution tracking.
 
+Status: the original master program spec and plan paths were restored so repository references resolve again, but this gap-closure tracker remains the execution source of truth for implementation status and verification.
+
 - [ ] **Step 2: Commit if needed**
 
 ```bash
