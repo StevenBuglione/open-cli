@@ -34,7 +34,7 @@ lanes:
     capability: mcp-remote
     capabilityFamily: integration
     environmentClass: ci-containerized
-    authPattern: transport-oauth
+    authPattern: none
     goTestPattern: ^TestCampaignMCPRemoteMatrix$
     expectedArtifacts:
       - transcript.log

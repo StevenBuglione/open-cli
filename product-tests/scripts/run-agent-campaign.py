@@ -178,6 +178,20 @@ def select_lanes(lanes: list[dict], requested: list[str] | None) -> list[dict]:
     return [by_id[lane_id] for lane_id in requested]
 
 
+def exact_test_name(pattern: str) -> str | None:
+    match = re.fullmatch(r"\^([A-Za-z0-9_]+)\$$", pattern)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def selected_lane_was_skipped(output: str, go_test_pattern: str) -> bool:
+    test_name = exact_test_name(go_test_pattern)
+    if not test_name:
+        return False
+    return f"--- SKIP: {test_name} " in output
+
+
 def print_summary(rubrics: list[dict], go_returncode: int) -> int:
     """Print a human-readable summary table.  Returns the suggested exit code."""
     if not rubrics:
@@ -304,6 +318,7 @@ def main() -> None:
             print(f"[error] {exc}", file=sys.stderr)
             sys.exit(2)
 
+        lane_validation_failures: list[str] = []
         for lane in lanes:
             lane_output_dir = output_dir / lane["id"]
             print(f"[run-agent-campaign] lane={lane['id']!r} pattern={lane['goTestPattern']!r} timeout={args.timeout}s")
@@ -320,16 +335,37 @@ def main() -> None:
             if returncode != 0:
                 overall_go_returncode = returncode
                 raw_failures.append(output)
+            if selected_lane_was_skipped(output, lane["goTestPattern"]):
+                msg = f"lane {lane['id']} was skipped; refusing false-green"
+                print(f"[error] {msg}", file=sys.stderr)
+                lane_validation_failures.append(msg)
+                raw_failures.append(output)
+                continue
+            if len(rubrics) == 0:
+                msg = f"lane {lane['id']} emitted zero rubrics; refusing false-green"
+                print(f"[error] {msg}", file=sys.stderr)
+                lane_validation_failures.append(msg)
+                raw_failures.append(output)
+                continue
             if len(rubrics) > 1:
-                print(
-                    f"[error] lane {lane['id']} emitted {len(rubrics)} rubrics; expected exactly 1",
-                    file=sys.stderr,
-                )
+                msg = f"lane {lane['id']} emitted {len(rubrics)} rubrics; expected exactly 1"
+                print(f"[error] {msg}", file=sys.stderr)
+                lane_validation_failures.append(msg)
+                raw_failures.append(output)
+                continue
+            criteria = rubrics[0].get("criteria") or []
+            if len(criteria) == 0:
+                msg = f"lane {lane['id']} emitted zero criteria; refusing false-green"
+                print(f"[error] {msg}", file=sys.stderr)
+                lane_validation_failures.append(msg)
+                raw_failures.append(output)
                 continue
             for rub in rubrics:
                 path = write_lane_rubric(rub, lane, lane_output_dir, transcript_path)
                 all_rubrics.append(json.loads(path.read_text()))
                 print(f"[run-agent-campaign] wrote rubric → {path}")
+        if lane_validation_failures and overall_go_returncode == 0:
+            overall_go_returncode = 1
     else:
         print(f"[run-agent-campaign] pattern={args.campaign!r} timeout={args.timeout}s")
         returncode, output = run_go_tests(
