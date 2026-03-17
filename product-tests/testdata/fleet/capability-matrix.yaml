@@ -1,0 +1,54 @@
+lanes:
+  - id: local-daemon-core
+    workstream: product-validation
+    capability: local-daemon
+    capabilityFamily: mode
+    environmentClass: ci-containerized
+    authPattern: none
+    goTestPattern: TestCampaignLocalDaemonMatrix
+    expectedArtifacts:
+      - transcript.log
+      - rubric.json
+      - runtime-info.json
+  - id: remote-runtime-oauth-client
+    workstream: product-validation
+    capability: remote-runtime
+    capabilityFamily: auth
+    environmentClass: ci-containerized
+    authPattern: oauthClient
+    goTestPattern: TestCampaignRemoteRuntimeMatrix
+    expectedArtifacts:
+      - transcript.log
+      - rubric.json
+      - runtime-info.json
+      - denied-execution.txt
+  - id: mcp-stdio-core
+    workstream: product-validation
+    capability: mcp-stdio
+    capabilityFamily: integration
+    environmentClass: ci-containerized
+    authPattern: none
+    goTestPattern: TestCampaignMCPMatrix
+    expectedArtifacts:
+      - transcript.log
+      - rubric.json
+  - id: mcp-remote-core
+    workstream: product-validation
+    capability: mcp-remote
+    capabilityFamily: integration
+    environmentClass: ci-containerized
+    authPattern: transport-oauth
+    goTestPattern: TestCampaignMCPMatrix
+    expectedArtifacts:
+      - transcript.log
+      - rubric.json
+  - id: remote-api-core
+    workstream: product-validation
+    capability: remote-api
+    capabilityFamily: integration
+    environmentClass: ci-containerized
+    authPattern: providedToken
+    goTestPattern: TestCampaignRemoteAPIMatrix
+    expectedArtifacts:
+      - transcript.log
+      - rubric.json

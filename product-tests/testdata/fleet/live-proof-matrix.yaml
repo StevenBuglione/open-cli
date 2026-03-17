@@ -1,0 +1,23 @@
+lanes:
+  - id: entra-browser-federation
+    workstream: product-validation
+    capability: brokered-browser-login
+    environmentClass: live-external
+    authPattern: browserLogin
+    evidenceChecklist: examples/runtime-auth-broker/authentik/evidence-checklist.md
+    owner: operator
+    prerequisites:
+      - real-entra-tenant
+      - authentik-reference-stack
+      - runtime-deployment
+  - id: external-remote-runtime
+    workstream: product-validation
+    capability: remote-runtime-live
+    environmentClass: live-external
+    authPattern: oauthClient
+    evidenceChecklist: website/docs/development/fleet-validation.md
+    owner: operator
+    prerequisites:
+      - remote-runtime-endpoint
+      - issuer-metadata
+      - scoped-test-identity

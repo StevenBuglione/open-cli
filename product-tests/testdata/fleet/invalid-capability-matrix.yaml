@@ -1,0 +1,9 @@
+lanes:
+  - workstream: product-validation
+    capability: local-daemon
+    capabilityFamily: mode
+    environmentClass: ci-containerized
+    authPattern: none
+    goTestPattern: TestCampaignLocalDaemonMatrix
+    expectedArtifacts:
+      - rubric.json

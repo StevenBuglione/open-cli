@@ -1,0 +1,22 @@
+sections:
+  - id: onboarding
+    title: First-run onboarding
+    criteria:
+      - id: first-success-path
+        description: A new user can identify a clear path from intro to quickstart.
+      - id: mental-model
+        description: The site explains oascli versus oasclird early.
+  - id: depth
+    title: Progressive depth
+    criteria:
+      - id: concept-ordering
+        description: Advanced concepts are introduced after core mental model pages.
+      - id: cross-links
+        description: Advanced docs are reachable through intentional bridges.
+  - id: enterprise
+    title: Enterprise confidence
+    criteria:
+      - id: enterprise-proof
+        description: Enterprise claims link to runnable examples, proof artifacts, or deployment guidance.
+      - id: security-runtime-story
+        description: The site surfaces auth, policy, runtime, and operations depth clearly.
