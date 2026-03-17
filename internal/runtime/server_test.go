@@ -1703,11 +1703,11 @@ func TestServerRuntimeInfoIncludesBrokeredAuthMetadata(t *testing.T) {
 }
 
 func TestServerStopEndpointInvokesShutdownHook(t *testing.T) {
-	var stopped bool
+	stopped := make(chan struct{})
 	server := runtime.NewServer(runtime.Options{
 		AuditPath: filepath.Join(t.TempDir(), "audit.log"),
 		Shutdown: func() error {
-			stopped = true
+			close(stopped)
 			return nil
 		},
 	})
@@ -1722,7 +1722,9 @@ func TestServerStopEndpointInvokesShutdownHook(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 runtime stop response, got %d", resp.StatusCode)
 	}
-	if !stopped {
+	select {
+	case <-stopped:
+	case <-time.After(200 * time.Millisecond):
 		t.Fatalf("expected shutdown hook to be invoked")
 	}
 }
