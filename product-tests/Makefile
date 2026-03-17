@@ -34,7 +34,7 @@ test-mcp-remote: mcp-remote-up
 test-runtime-auth-authentik: authentik-up
 	@echo "==> Waiting for Authentik reference stack..."
 	@sleep 10
-	go test ./tests/... -run TestCapabilityRuntimeAuthAuthentik -count=1 -v -timeout 180s; \
+	OASCLI_RUN_AUTHENTIK_TESTS=1 go test ./tests/... -run TestCapabilityRuntimeAuthAuthentik -count=1 -v -timeout 180s; \
 	  status=$$?; \
 	  $(MAKE) authentik-down; \
 	  exit $$status

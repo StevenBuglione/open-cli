@@ -25,6 +25,7 @@ const (
 	authentikPrimarySlug       = "oascli-runtime"
 	authentikAlternateSlug     = "oascli-runtime-alt-issuer"
 	authentikCallbackURL       = "http://127.0.0.1:8787/callback"
+	authentikRunTestsEnv       = "OASCLI_RUN_AUTHENTIK_TESTS"
 	authentikClientIDEnv       = "OAS_REMOTE_CLIENT_ID"
 	authentikClientSecretEnv   = "OAS_REMOTE_CLIENT_SECRET"
 	authentikDefaultTTL        = "hours=1"
@@ -76,6 +77,10 @@ func NewAuthentikRuntimeFixture(t *testing.T) *AuthentikRuntimeFixture {
 
 	repoRoot := repoRoot(t)
 	composeFile := filepath.Join(repoRoot, "product-tests", "authentik", "docker-compose.yml")
+	if enabled := os.Getenv(authentikRunTestsEnv) == "1"; !enabled {
+		_, _, message := resolveAuthentikFixtureAvailability("worker", "", false)
+		t.Skip(message)
+	}
 	workerID := composeServiceContainerID(t, composeFile, "worker")
 	insecureClient := &http.Client{
 		Timeout: 20 * time.Second,
@@ -584,10 +589,24 @@ func composeServiceContainerID(t *testing.T, composeFile, service string) string
 		t.Fatalf("resolve %s container id: %v\n%s", service, err, output)
 	}
 	containerID := strings.TrimSpace(string(output))
-	if containerID == "" {
-		t.Fatalf("%s container is not running; start the Authentik stack with product-tests/scripts/authentik-up.sh or make authentik-up", service)
+	ready, fatal, message := resolveAuthentikFixtureAvailability(service, containerID, true)
+	if !ready {
+		if fatal {
+			t.Fatal(message)
+		}
+		t.Skip(message)
 	}
 	return containerID
+}
+
+func resolveAuthentikFixtureAvailability(service, containerID string, enableTests bool) (bool, bool, string) {
+	if !enableTests {
+		return false, false, "live Authentik product tests are disabled; set OASCLI_RUN_AUTHENTIK_TESTS=1 or use make test-runtime-auth-authentik"
+	}
+	if strings.TrimSpace(containerID) == "" {
+		return false, true, fmt.Sprintf("%s container is not running; start the Authentik stack with product-tests/scripts/authentik-up.sh or make authentik-up", service)
+	}
+	return true, false, ""
 }
 
 func runAuthentikManageScript(t *testing.T, workerID, script string) ([]byte, error) {
