@@ -79,7 +79,7 @@ ocli init --type mcp <address>   # MCP server
 3. For OpenAPI sources:
    - Fetch/read the spec
    - Extract `info.title` → suggest as service alias (slugified)
-   - Detect if spec has auth requirements → note in config comments
+   - Detect if spec has auth requirements → print note to stdout (e.g., "Note: this API requires OAuth — see https://open-cli.dev/security for auth configuration")
 4. Generate minimal `.cli.json`:
    ```json
    {
@@ -106,7 +106,7 @@ ocli init --type mcp <address>   # MCP server
 
 **Error handling:**
 - URL returns 404 → "Could not fetch <url>: HTTP 404. Check the URL and try again."
-- URL returns 401/403 → "Authentication required to fetch <url>. Use `ocli init --header 'Authorization: Bearer <token>' <url>` to provide credentials."
+- URL returns 401/403 → "Authentication required to fetch <url>. Download the spec manually and use `ocli init <local-path>`, or provide a publicly accessible URL."
 - File not found → "File not found: <path>. Provide an absolute path or path relative to current directory."
 - Spec parse error → "Could not parse <path> as OpenAPI: <parse error>. Is this a valid OpenAPI 3.x document?"
 - Already has `.cli.json` → "Found existing .cli.json. Use --force to overwrite, or edit it directly."
@@ -193,7 +193,7 @@ cmd/ocli/
     ├── commands/
     │   ├── root.go          # NewRootCommand (thin orchestrator)
     │   ├── dynamic.go       # addDynamicToolCommands, newToolCommand
-    │   ├── catalog.go       # catalog list/explain subcommands
+    │   ├── catalog.go       # catalog list + root-level explain subcommands
     │   ├── init.go          # ocli init command
     │   ├── demo.go          # ocli --demo handling
     │   └── util.go          # writeOutput, findTool, envBool, shared helpers
