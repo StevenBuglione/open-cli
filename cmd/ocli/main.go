@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -16,10 +15,9 @@ import (
 	"strings"
 	"time"
 
+	authpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/auth"
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
-	embeddedruntime "github.com/StevenBuglione/open-cli/internal/runtime"
 	"github.com/StevenBuglione/open-cli/internal/version"
-	oauthruntime "github.com/StevenBuglione/open-cli/pkg/auth"
 	"github.com/StevenBuglione/open-cli/pkg/catalog"
 	configpkg "github.com/StevenBuglione/open-cli/pkg/config"
 	toolsexec "github.com/StevenBuglione/open-cli/pkg/exec"
@@ -51,20 +49,8 @@ type CommandOptions struct {
 
 type runtimeCatalogResponse = runtimepkg.CatalogResponse
 
-type runtimeBrowserLoginMetadata struct {
-	AuthorizationURL string `json:"authorizationURL"`
-	TokenURL         string `json:"tokenURL"`
-	ClientID         string `json:"clientId"`
-	Audience         string `json:"audience,omitempty"`
-}
-
-type runtimeBrowserLoginRequest struct {
-	Metadata     runtimeBrowserLoginMetadata
-	Scopes       []string
-	Audience     string
-	CallbackPort int
-	StateDir     string
-}
+type runtimeBrowserLoginMetadata = authpkg.BrowserLoginMetadata
+type runtimeBrowserLoginRequest = authpkg.BrowserLoginRequest
 
 type executeRequest = runtimepkg.ExecuteRequest
 type executeResponse = runtimepkg.ExecuteResponse
@@ -83,7 +69,6 @@ func newRuntimeTokenSession(token runtimeSessionToken, refresh func(context.Cont
 const defaultRuntimeURL = "http://127.0.0.1:8765"
 
 var managedRuntimeStarter = startManagedRuntime
-var runtimeBrowserLoginTokenAcquirer = acquireRuntimeBrowserLoginToken
 var terminalSessionIdentityProvider = detectTerminalSessionIdentity
 var agentSessionIdentityProvider = detectAgentSessionIdentity
 var localSessionHandshake = performLocalSessionHandshake
@@ -571,7 +556,14 @@ func resolveCommandOptions(options CommandOptions) (CommandOptions, error) {
 	}
 	if options.RuntimeToken == "" && options.RuntimeDeployment == "remote" {
 		if runtimeCfg, ok := loadCachedRuntimeConfig(); ok && runtimeCfg.Remote != nil && runtimeCfg.Remote.OAuth != nil {
-			token, session, err := resolveRuntimeToken(options, *runtimeCfg.Remote.OAuth)
+			paths, pathsErr := resolveInstancePaths(options)
+			if pathsErr != nil {
+				return options, pathsErr
+			}
+			token, session, err := authpkg.ResolveToken(authpkg.TokenResolveOptions{
+				RuntimeURL: options.RuntimeURL,
+				StateDir:   paths.StateDir,
+			}, *runtimeCfg.Remote.OAuth)
 			if err != nil {
 				return options, err
 			}
@@ -616,152 +608,6 @@ func loadRuntimeConfig(options CommandOptions) (*configpkg.RuntimeConfig, bool) 
 
 func hasLocalMCPSource(cfg configpkg.Config) bool {
 	return runtimepkg.HasLocalMCPSource(cfg)
-}
-
-func resolveRuntimeToken(options CommandOptions, oauth configpkg.RemoteOAuthConfig) (string, *runtimeTokenSession, error) {
-	var runtimeHandshake embeddedruntime.HandshakeInfo
-	if options.RuntimeURL != "" && (oauth.Mode == "oauthClient" || oauth.Mode == "browserLogin") {
-		info, err := fetchRuntimeHandshake(options.RuntimeURL)
-		if err != nil {
-			return "", nil, err
-		}
-		runtimeHandshake = info
-	}
-	switch oauth.Mode {
-	case "", "providedToken":
-		token := ""
-		if strings.HasPrefix(oauth.TokenRef, "env:") {
-			token = os.Getenv(strings.TrimPrefix(oauth.TokenRef, "env:"))
-		}
-		return token, newRuntimeTokenSession(runtimeSessionToken{AccessToken: token}, nil), nil
-	case "oauthClient":
-		if oauth.Client == nil {
-			return "", nil, fmt.Errorf("runtime.remote.oauth.client is required for oauthClient mode")
-		}
-		effectiveOAuth := oauth
-		if effectiveOAuth.Audience == "" && runtimeHandshake.Auth != nil {
-			effectiveOAuth.Audience = runtimeHandshake.Auth.Audience
-		}
-		acquire := func(ctx context.Context) (runtimeSessionToken, error) {
-			return resolveRuntimeOAuthClientToken(ctx, effectiveOAuth)
-		}
-		token, err := acquire(context.Background())
-		if err != nil {
-			return "", nil, err
-		}
-		return token.AccessToken, newRuntimeTokenSession(token, acquire), nil
-	case "browserLogin":
-		if options.RuntimeURL == "" {
-			return "", nil, fmt.Errorf("runtime URL is required for browserLogin mode")
-		}
-		browserConfigEndpoint := "/v1/auth/browser-config"
-		if runtimeHandshake.Auth != nil && runtimeHandshake.Auth.BrowserLogin != nil {
-			if !runtimeHandshake.Auth.BrowserLogin.Configured {
-				return "", nil, fmt.Errorf("runtime browser login is not configured")
-			}
-			if endpoint := strings.TrimSpace(runtimeHandshake.Auth.BrowserLogin.ConfigEndpoint); endpoint != "" {
-				browserConfigEndpoint = endpoint
-			}
-		}
-		metadata, err := fetchRuntimeBrowserLoginMetadata(options.RuntimeURL, browserConfigEndpoint)
-		if err != nil {
-			return "", nil, err
-		}
-		paths, err := resolveInstancePaths(options)
-		if err != nil {
-			return "", nil, err
-		}
-		request := runtimeBrowserLoginRequest{
-			Metadata: metadata,
-			Scopes:   append([]string(nil), oauth.Scopes...),
-			Audience: metadata.Audience,
-			StateDir: paths.StateDir,
-		}
-		if request.Audience == "" && runtimeHandshake.Auth != nil {
-			request.Audience = runtimeHandshake.Auth.Audience
-		}
-		if oauth.Audience != "" {
-			request.Audience = oauth.Audience
-		}
-		if strings.TrimSpace(request.Audience) == "" {
-			return "", nil, fmt.Errorf("runtime browser login metadata missing audience")
-		}
-		if oauth.BrowserLogin != nil {
-			request.CallbackPort = oauth.BrowserLogin.CallbackPort
-		}
-		token, err := runtimeBrowserLoginTokenAcquirer(request)
-		if err != nil {
-			return "", nil, err
-		}
-		return token, newRuntimeTokenSession(runtimeSessionToken{AccessToken: token}, nil), nil
-	default:
-		return "", nil, fmt.Errorf("runtime.remote.oauth.mode %q is not supported yet", oauth.Mode)
-	}
-}
-
-func resolveRuntimeOAuthClientToken(ctx context.Context, oauth configpkg.RemoteOAuthConfig) (runtimeSessionToken, error) {
-	if oauth.Client == nil {
-		return runtimeSessionToken{}, fmt.Errorf("runtime.remote.oauth.client is required for oauthClient mode")
-	}
-	clientID, err := resolveRuntimeOAuthSecret(oauth.Client.ClientID)
-	if err != nil {
-		return runtimeSessionToken{}, fmt.Errorf("resolve runtime oauth clientId: %w", err)
-	}
-	clientSecret, err := resolveRuntimeOAuthSecret(oauth.Client.ClientSecret)
-	if err != nil {
-		return runtimeSessionToken{}, fmt.Errorf("resolve runtime oauth clientSecret: %w", err)
-	}
-	form := url.Values{}
-	form.Set("grant_type", "client_credentials")
-	form.Set("client_id", clientID)
-	form.Set("client_secret", clientSecret)
-	if len(oauth.Scopes) > 0 {
-		form.Set("scope", strings.Join(oauth.Scopes, " "))
-	}
-	if oauth.Audience != "" {
-		form.Set("audience", oauth.Audience)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, oauth.Client.TokenURL, strings.NewReader(form.Encode()))
-	if err != nil {
-		return runtimeSessionToken{}, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return runtimeSessionToken{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return runtimeSessionToken{}, fmt.Errorf("runtime oauth token request failed with status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-	var token struct {
-		AccessToken string `json:"access_token"`
-		ExpiresIn   int    `json:"expires_in"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return runtimeSessionToken{}, err
-	}
-	if token.AccessToken == "" {
-		return runtimeSessionToken{}, fmt.Errorf("runtime oauth token response missing access_token")
-	}
-	expiresAt := time.Time{}
-	if token.ExpiresIn > 0 {
-		expiresAt = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
-	}
-	return runtimeSessionToken{AccessToken: token.AccessToken, ExpiresAt: expiresAt}, nil
-}
-
-func resolveRuntimeOAuthSecret(secret *configpkg.SecretRef) (string, error) {
-	if secret == nil {
-		return "", fmt.Errorf("missing secret reference")
-	}
-	return oauthruntime.ResolveStaticSecret(configpkg.PolicyConfig{}, configpkg.Secret{
-		Type:    secret.Type,
-		Value:   secret.Value,
-		Command: append([]string(nil), secret.Command...),
-	}, nil)
 }
 
 func resolveLocalRuntimeInstanceID(options CommandOptions, local configpkg.LocalRuntimeConfig) string {
@@ -852,108 +698,6 @@ func performLocalSessionHandshake(options CommandOptions) (CommandOptions, error
 
 func localRuntimeConfigFingerprint(options CommandOptions) string {
 	return runtimepkg.ConfigFingerprint(options.ConfigPath)
-}
-
-func fetchRuntimeHandshake(baseURL string) (embeddedruntime.HandshakeInfo, error) {
-	return getJSON[embeddedruntime.HandshakeInfo](strings.TrimRight(baseURL, "/")+"/v1/runtime/info", "")
-}
-
-func fetchRuntimeBrowserLoginMetadata(baseURL, endpoint string) (runtimeBrowserLoginMetadata, error) {
-	endpointURL, err := resolveRuntimeEndpointURL(baseURL, endpoint)
-	if err != nil {
-		return runtimeBrowserLoginMetadata{}, err
-	}
-	req, err := http.NewRequest(http.MethodGet, endpointURL, nil)
-	if err != nil {
-		return runtimeBrowserLoginMetadata{}, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return runtimeBrowserLoginMetadata{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
-		return runtimeBrowserLoginMetadata{}, fmt.Errorf("%s", strings.TrimSpace(string(body)))
-	}
-	var metadata runtimeBrowserLoginMetadata
-	if err := json.NewDecoder(resp.Body).Decode(&metadata); err != nil {
-		return runtimeBrowserLoginMetadata{}, err
-	}
-	if err := validateRuntimeBrowserLoginMetadata(metadata); err != nil {
-		return runtimeBrowserLoginMetadata{}, err
-	}
-	return metadata, nil
-}
-
-func resolveRuntimeEndpointURL(baseURL, endpoint string) (string, error) {
-	if strings.TrimSpace(baseURL) == "" {
-		return "", fmt.Errorf("runtime URL is required")
-	}
-	if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
-		return endpoint, nil
-	}
-	if endpoint == "" {
-		endpoint = "/"
-	}
-	if !strings.HasPrefix(endpoint, "/") {
-		endpoint = "/" + endpoint
-	}
-	return strings.TrimRight(baseURL, "/") + endpoint, nil
-}
-
-func validateRuntimeBrowserLoginMetadata(metadata runtimeBrowserLoginMetadata) error {
-	switch {
-	case strings.TrimSpace(metadata.AuthorizationURL) == "":
-		return fmt.Errorf("runtime browser login metadata missing authorizationURL")
-	case strings.TrimSpace(metadata.TokenURL) == "":
-		return fmt.Errorf("runtime browser login metadata missing tokenURL")
-	case strings.TrimSpace(metadata.ClientID) == "":
-		return fmt.Errorf("runtime browser login metadata missing clientId")
-	default:
-		return nil
-	}
-}
-
-func acquireRuntimeBrowserLoginToken(request runtimeBrowserLoginRequest) (string, error) {
-	secret := configpkg.Secret{
-		Type: "oauth2",
-		OAuthConfig: configpkg.OAuthConfig{
-			Mode:             "authorizationCode",
-			AuthorizationURL: request.Metadata.AuthorizationURL,
-			TokenURL:         request.Metadata.TokenURL,
-			ClientID: &configpkg.SecretRef{
-				Type:  "literal",
-				Value: request.Metadata.ClientID,
-			},
-			Scopes:       append([]string(nil), request.Scopes...),
-			Audience:     request.Audience,
-			TokenStorage: "instance",
-		},
-	}
-	if request.CallbackPort > 0 {
-		callbackPort := request.CallbackPort
-		secret.CallbackPort = &callbackPort
-	}
-	requirement := catalog.AuthRequirement{
-		Type:   "oauth2",
-		Scopes: append([]string(nil), request.Scopes...),
-		OAuthFlows: []catalog.OAuthFlow{{
-			Mode:             "authorizationCode",
-			AuthorizationURL: request.Metadata.AuthorizationURL,
-			TokenURL:         request.Metadata.TokenURL,
-		}},
-	}
-	return oauthruntime.ResolveOAuthAccessToken(
-		context.Background(),
-		http.DefaultClient,
-		configpkg.PolicyConfig{},
-		secret,
-		requirement,
-		"runtime.browser."+request.Metadata.AuthorizationURL,
-		request.StateDir,
-		nil,
-	)
 }
 
 func startManagedRuntime(options CommandOptions) (string, error) {

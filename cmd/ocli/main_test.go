@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	authpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/auth"
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
 	"github.com/StevenBuglione/open-cli/pkg/catalog"
 	configpkg "github.com/StevenBuglione/open-cli/pkg/config"
@@ -1493,9 +1494,9 @@ func TestHTTPRuntimeClientRefreshesAfterAuthnFailedOnNextRequest(t *testing.T) {
 }
 
 func TestRootCommandUsesRemoteBrowserLoginBearerToken(t *testing.T) {
-	previousAcquirer := runtimeBrowserLoginTokenAcquirer
-	t.Cleanup(func() { runtimeBrowserLoginTokenAcquirer = previousAcquirer })
-	runtimeBrowserLoginTokenAcquirer = func(request runtimeBrowserLoginRequest) (string, error) {
+	previousAcquirer := authpkg.BrowserLoginTokenAcquirer
+	t.Cleanup(func() { authpkg.BrowserLoginTokenAcquirer = previousAcquirer })
+	authpkg.BrowserLoginTokenAcquirer = func(request runtimeBrowserLoginRequest) (string, error) {
 		if request.Metadata.AuthorizationURL != "https://auth.example.com/authorize" {
 			t.Fatalf("expected authorization URL from runtime metadata, got %q", request.Metadata.AuthorizationURL)
 		}
@@ -1616,9 +1617,9 @@ func TestRootCommandUsesRemoteBrowserLoginBearerToken(t *testing.T) {
 }
 
 func TestRootCommandFailsClosedOnInvalidRuntimeBrowserLoginMetadata(t *testing.T) {
-	previousAcquirer := runtimeBrowserLoginTokenAcquirer
-	t.Cleanup(func() { runtimeBrowserLoginTokenAcquirer = previousAcquirer })
-	runtimeBrowserLoginTokenAcquirer = func(request runtimeBrowserLoginRequest) (string, error) {
+	previousAcquirer := authpkg.BrowserLoginTokenAcquirer
+	t.Cleanup(func() { authpkg.BrowserLoginTokenAcquirer = previousAcquirer })
+	authpkg.BrowserLoginTokenAcquirer = func(request runtimeBrowserLoginRequest) (string, error) {
 		t.Fatalf("expected invalid runtime metadata to fail before browser login token acquisition")
 		return "", nil
 	}
@@ -1719,9 +1720,9 @@ func TestRootCommandCompletesRemoteBrowserLoginAuthorizationCodeFlow(t *testing.
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	previousAcquirer := runtimeBrowserLoginTokenAcquirer
-	t.Cleanup(func() { runtimeBrowserLoginTokenAcquirer = previousAcquirer })
-	runtimeBrowserLoginTokenAcquirer = acquireRuntimeBrowserLoginToken
+	previousAcquirer := authpkg.BrowserLoginTokenAcquirer
+	t.Cleanup(func() { authpkg.BrowserLoginTokenAcquirer = previousAcquirer })
+	authpkg.BrowserLoginTokenAcquirer = authpkg.AcquireBrowserLoginToken
 
 	var authServer *httptest.Server
 	var codeChallenge string
