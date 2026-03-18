@@ -4,7 +4,7 @@
 
 **Goal:** Create a net-new Microsoft Entra application in an isolated Terraform workspace, wire it into the Authentik reference broker, and complete the real Authentik -> Entra browser proof without modifying the existing `k8s.oremuslabs.app` deployment.
 
-**Architecture:** Keep the existing `entra-oidc/` Terraform module, but isolate the new state with a dedicated non-default Terraform workspace and a dedicated `tfvars` file for the new `oascli` app. Use the new Entra app only as the Authentik upstream for the browser-login proof, while the already-verified Authentik workload path remains unchanged. Capture live evidence for the browser proof and update the reference docs with the exact isolated setup.
+**Architecture:** Keep the existing `entra-oidc/` Terraform module, but isolate the new state with a dedicated non-default Terraform workspace and a dedicated `tfvars` file for the new `ocli` app. Use the new Entra app only as the Authentik upstream for the browser-login proof, while the already-verified Authentik workload path remains unchanged. Capture live evidence for the browser proof and update the reference docs with the exact isolated setup.
 
 **Tech Stack:** Terraform, Azure Entra ID, Azure CLI, Authentik 2024.12, Go product tests, Docusaurus docs
 
@@ -14,8 +14,8 @@
 
 ### Terraform / Entra app isolation
 
-- Create: `../entra-oidc/envs/oascli-runtime-auth.tfvars`
-  - Dedicated app name, redirect URIs, and any claim/group settings for the `oascli` reference proof.
+- Create: `../entra-oidc/envs/ocli-runtime-auth.tfvars`
+  - Dedicated app name, redirect URIs, and any claim/group settings for the `ocli` reference proof.
 - Modify: `../entra-oidc/README.md`
   - Document the new isolated workspace + tfvars workflow so operators do not apply against the default workspace by accident.
 
@@ -44,7 +44,7 @@
 ### Task 1: Add isolated Terraform inputs and document the safe workflow
 
 **Files:**
-- Create: `../entra-oidc/envs/oascli-runtime-auth.tfvars`
+- Create: `../entra-oidc/envs/ocli-runtime-auth.tfvars`
 - Modify: `../entra-oidc/README.md`
 
 - [x] **Step 1: Write the failing safety check in the README**
@@ -55,21 +55,21 @@ Expected text includes:
 
 ```md
 - use a non-default Terraform workspace
-- use envs/oascli-runtime-auth.tfvars
+- use envs/ocli-runtime-auth.tfvars
 - do not apply from the existing default workspace
 ```
 
 - [x] **Step 2: Add the new isolated tfvars file**
 
-Create `../entra-oidc/envs/oascli-runtime-auth.tfvars` with:
+Create `../entra-oidc/envs/ocli-runtime-auth.tfvars` with:
 
 ```hcl
 tenant_id = "abfcbee8-658f-4ab3-97f5-9b357e0f8cda"
-app_name  = "oascli-runtime-auth"
+app_name  = "ocli-runtime-auth"
 identifier_uri = ""
 redirect_uris = [
   "https://auth.oremuslabs.app/application/o/authorize/",
-  "https://auth.oremuslabs.app/application/o/source/oascli-entra/callback/"
+  "https://auth.oremuslabs.app/application/o/source/ocli-entra/callback/"
 ]
 public_redirect_uris = [
   "http://127.0.0.1:8787/callback"
@@ -83,8 +83,8 @@ Adjust the Authentik callback URI if the live Authentik source setup proves a di
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/entra-oidc
-terraform fmt envs/oascli-runtime-auth.tfvars
+cd /home/sbuglione/ocli/entra-oidc
+terraform fmt envs/ocli-runtime-auth.tfvars
 ```
 
 Expected: exit code `0`.
@@ -94,16 +94,16 @@ Expected: exit code `0`.
 Add these exact commands:
 
 ```bash
-cd /home/sbuglione/oascli/entra-oidc
-terraform workspace new oascli-runtime-auth || terraform workspace select oascli-runtime-auth
-terraform plan -var-file=envs/oascli-runtime-auth.tfvars
-terraform apply -var-file=envs/oascli-runtime-auth.tfvars
+cd /home/sbuglione/ocli/entra-oidc
+terraform workspace new ocli-runtime-auth || terraform workspace select ocli-runtime-auth
+terraform plan -var-file=envs/ocli-runtime-auth.tfvars
+terraform apply -var-file=envs/ocli-runtime-auth.tfvars
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git -C /home/sbuglione/oascli/oas-cli-go add docs/superpowers/plans/2026-03-16-isolated-entra-browser-proof.md examples/runtime-auth-broker/authentik/entra-federation.md examples/runtime-auth-broker/authentik/evidence-checklist.md examples/runtime-auth-broker/authentik/README.md product-tests/README.md website/docs/runtime/authentik-reference.md
+git -C /home/sbuglione/ocli/open-cli add docs/superpowers/plans/2026-03-16-isolated-entra-browser-proof.md examples/runtime-auth-broker/authentik/entra-federation.md examples/runtime-auth-broker/authentik/evidence-checklist.md examples/runtime-auth-broker/authentik/README.md product-tests/README.md website/docs/runtime/authentik-reference.md
 ```
 
 Do **not** commit Terraform state, secrets, or session artifacts.
@@ -111,7 +111,7 @@ Do **not** commit Terraform state, secrets, or session artifacts.
 ### Task 2: Create the isolated workspace and apply the new Entra app
 
 **Files:**
-- Use: `../entra-oidc/envs/oascli-runtime-auth.tfvars`
+- Use: `../entra-oidc/envs/ocli-runtime-auth.tfvars`
 - Create in session state: `~/.copilot/session-state/7a79c9cc-b5c5-4668-8979-f3899a2d9a01/files/entra-browser-proof/entra-output-redacted.json`
 
 - [x] **Step 1: Select or create the isolated workspace**
@@ -119,20 +119,20 @@ Do **not** commit Terraform state, secrets, or session artifacts.
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/entra-oidc
-terraform workspace new oascli-runtime-auth || terraform workspace select oascli-runtime-auth
+cd /home/sbuglione/ocli/entra-oidc
+terraform workspace new ocli-runtime-auth || terraform workspace select ocli-runtime-auth
 terraform workspace show
 ```
 
-Expected: output `oascli-runtime-auth`.
+Expected: output `ocli-runtime-auth`.
 
 - [x] **Step 2: Run the plan first**
 
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/entra-oidc
-terraform plan -var-file=envs/oascli-runtime-auth.tfvars
+cd /home/sbuglione/ocli/entra-oidc
+terraform plan -var-file=envs/ocli-runtime-auth.tfvars
 ```
 
 Expected: the plan creates a new Entra application/password resources in the isolated workspace and does not propose changes to the default workspace state.
@@ -142,8 +142,8 @@ Expected: the plan creates a new Entra application/password resources in the iso
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/entra-oidc
-terraform apply -auto-approve -var-file=envs/oascli-runtime-auth.tfvars
+cd /home/sbuglione/ocli/entra-oidc
+terraform apply -auto-approve -var-file=envs/ocli-runtime-auth.tfvars
 ```
 
 Expected: apply succeeds.
@@ -153,7 +153,7 @@ Expected: apply succeeds.
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/entra-oidc
+cd /home/sbuglione/ocli/entra-oidc
 terraform output -json > ~/.copilot/session-state/7a79c9cc-b5c5-4668-8979-f3899a2d9a01/files/entra-browser-proof/entra-output.json
 ```
 
@@ -164,7 +164,7 @@ Then create a redacted copy that omits or masks `client_secret` before using the
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/entra-oidc
+cd /home/sbuglione/ocli/entra-oidc
 terraform state list
 ```
 
@@ -192,7 +192,7 @@ https://auth.oremuslabs.app/application/o/source/<source-slug>/callback/
 
 - [x] **Step 2: Create the Authentik Microsoft Entra source**
 
-Use the isolated Entra `application_id`, `client_secret`, and tenant ID to create a new Authentik source dedicated to this proof, for example `oascli-entra`.
+Use the isolated Entra `application_id`, `client_secret`, and tenant ID to create a new Authentik source dedicated to this proof, for example `ocli-entra`.
 
 Expected fields:
 
@@ -249,7 +249,7 @@ curl -sS "<runtime-url>/v1/auth/browser-config?config=<path>" > ~/.copilot/sessi
 Run:
 
 ```bash
-go run ./cmd/oascli --config <rendered-runtime-config> catalog list --format json
+go run ./cmd/ocli --config <rendered-runtime-config> catalog list --format json
 ```
 
 Expected: Authentik redirects to Entra, login succeeds, and the command returns the filtered catalog.
@@ -284,7 +284,7 @@ Live proof evidence captured so far:
 
 Live proof result summary:
 
-- `oascli catalog list --format json` completed successfully against the isolated Authentik -> Entra browser-login flow.
+- `ocli catalog list --format json` completed successfully against the isolated Authentik -> Entra browser-login flow.
 - The returned catalog only exposed the authorized `tickets:listTickets` tool.
 - Direct runtime execution with the same issued token succeeded for `tickets:listTickets` and failed closed with `authz_denied` for `users:listUsers`.
 - The accepted Authentik token carried the expected issuer, audience, and scoped authorization envelope claims.
@@ -299,10 +299,10 @@ Important follow-up discovered during the live run:
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/oas-cli-go
-go test ./cmd/oascli ./internal/runtime ./product-tests/tests -count=1
+cd /home/sbuglione/ocli/open-cli
+go test ./cmd/ocli ./internal/runtime ./product-tests/tests -count=1
 
-cd /home/sbuglione/oascli/oas-cli-go/website
+cd /home/sbuglione/ocli/open-cli/website
 npm ci
 npm run build
 ```
@@ -315,7 +315,7 @@ Expected:
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /home/sbuglione/oascli/oas-cli-go
+cd /home/sbuglione/ocli/open-cli
 git add README.md examples/runtime-auth-broker/authentik/README.md examples/runtime-auth-broker/authentik/entra-federation.md examples/runtime-auth-broker/authentik/evidence-checklist.md product-tests/README.md website/docs/runtime/authentik-reference.md website/docs/runtime/deployment-models.md website/docs/security/overview.md product-tests/tests/helpers/authentik_runtime.go product-tests/tests/capability_runtime_auth_authentik_test.go product-tests/tests/capability_auth_policy_test.go
 git commit -m "feat: prove isolated Entra browser auth"
 ```

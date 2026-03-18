@@ -1,11 +1,11 @@
-# OAS-CLI CLI Profile 0.1.0
+# Open CLI CLI Profile 0.1.0
 
 ## Command Shape
 
 The CLI command shape is:
 
 ```text
-oascli <service> <group> <command> [args...] [flags...]
+ocli <service> <group> <command> [args...] [flags...]
 ```
 
 ## Group Derivation

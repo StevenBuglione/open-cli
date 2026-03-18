@@ -91,7 +91,7 @@ Tool set patterns use Go's `path.Match` behavior plus one implementation-specifi
 
 Remember the separation:
 
-- the selected view controls which dynamic commands `oascli` renders
+- the selected view controls which dynamic commands `ocli` renders
 - execution-time policy still runs inside the runtime
 
 So a tool can be hidden from the CLI tree, inspected by ID, or rejected at execution time depending on the combination of view and policy.

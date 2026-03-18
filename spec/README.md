@@ -1,8 +1,8 @@
 # oas-cli-spec
 
-Normative specification and JSON schemas for OAS-CLI.
+Normative specification and JSON schemas for Open CLI.
 
-> **Monorepo note:** This directory is a first-class subproject of [oas-cli-go](../README.md). It is the single source of truth for the OAS-CLI public contract. The Go implementation and the conformance suite both consume the schemas from this directory.
+> **Monorepo note:** This directory is a first-class subproject of [open-cli](../README.md). It is the single source of truth for the Open CLI public contract. The Go implementation and the conformance suite both consume the schemas from this directory.
 
 ## Contents
 

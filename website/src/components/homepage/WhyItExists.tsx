@@ -46,7 +46,7 @@ export default function WhyItExists(): ReactNode {
           ))}
         </div>
         <p className={styles.whySolution}>
-          <strong>oasclird</strong> closes all three gaps — discovery, auth
+          <strong>oclird</strong> closes all three gaps — discovery, auth
           resolution, policy enforcement, and audit — before any command reaches
           the wire.
         </p>

@@ -4,7 +4,7 @@
   "publishedAt": "2026-03-13T12:00:00Z",
   "implementations": [
     {
-      "repo": "https://github.com/StevenBuglione/oas-cli-go",
+      "repo": "https://github.com/StevenBuglione/open-cli",
       "version": "main",
       "status": "partial",
       "features": {
@@ -17,7 +17,7 @@
       },
       "notes": [
         "Reference implementation status after the native MCP + OAuth implementation pass.",
-        "oas-cli-go runtime verification is green, but oas-cli-conformance does not yet mechanically enforce those runtime checks."
+        "open-cli runtime verification is green, but oas-cli-conformance does not yet mechanically enforce those runtime checks."
       ]
     }
   ]

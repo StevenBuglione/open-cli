@@ -65,7 +65,7 @@ The current implementation keeps track of visited catalogs and detects simple cy
 Important nuance:
 
 - cycles are treated as warnings internally, not hard failures
-- those warnings are not currently surfaced through `oascli` or the runtime HTTP API
+- those warnings are not currently surfaced through `ocli` or the runtime HTTP API
 
 ## Duplicate services
 

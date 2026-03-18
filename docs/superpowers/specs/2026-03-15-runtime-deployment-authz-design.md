@@ -2,14 +2,14 @@
 
 ## Problem statement
 
-`oascli` and `oasclird` currently support embedded execution, local daemon execution, and remote-style execution patterns, but the effective runtime behavior is still determined by a mix of flags, environment variables, daemon discovery, and operational convention. That creates ambiguity for agent-first usage, especially when local MCP servers need to stay warm across many tool calls and when future remote execution must enforce least-privilege access.
+`ocli` and `oclird` currently support embedded execution, local daemon execution, and remote-style execution patterns, but the effective runtime behavior is still determined by a mix of flags, environment variables, daemon discovery, and operational convention. That creates ambiguity for agent-first usage, especially when local MCP servers need to stay warm across many tool calls and when future remote execution must enforce least-privilege access.
 
 We need a runtime model that:
 
 - makes execution mode a first-class part of `.cli.json`
 - keeps zero-config behavior for the common case
 - automatically promotes to a managed local daemon when local MCP servers are present
-- supports remote `oasclird` instances as real policy-enforcing execution boundaries
+- supports remote `oclird` instances as real policy-enforcing execution boundaries
 - uses ephemeral OAuth2 session tokens to restrict what a given agent can discover and execute
 - cleans up local managed runtimes when the owning terminal or session exits
 
@@ -17,7 +17,7 @@ We need a runtime model that:
 
 - Preserve simple, low-friction local usage for agents.
 - Ensure local MCP-backed services stay warm and responsive across repeated tool calls.
-- Avoid orphaned `oasclird` and MCP child processes.
+- Avoid orphaned `oclird` and MCP child processes.
 - Make remote execution a first-class deployment mode in `.cli.json`.
 - Enforce fine-grained remote authorization before both catalog discovery and execution.
 - Support future microVM-based agent isolation with short-lived access tokens.
@@ -34,7 +34,7 @@ We need a runtime model that:
 This design chooses an embedded-first configuration model with explicit runtime overrides:
 
 - default to embedded execution when `.cli.json` does not require a persistent runtime
-- auto-promote to a managed local `oasclird` when local MCP servers are present
+- auto-promote to a managed local `oclird` when local MCP servers are present
 - allow explicit `runtime.mode=local` or `runtime.mode=remote`
 - use ephemeral OAuth2 session tokens for remote runtime access
 - compute visible tools as the intersection of granted scopes, configured services/tools, and server policy/profile rules
@@ -60,8 +60,8 @@ Resolution semantics:
 - `auto` keeps embedded execution for simple cases that do not require a persistent runtime.
 - `auto` must promote to managed local-daemon mode when the effective configuration contains local MCP server definitions.
 - `embedded` always executes in-process.
-- `local` always uses a managed local `oasclird`.
-- `remote` always delegates discovery and execution to a configured remote `oasclird`.
+- `local` always uses a managed local `oclird`.
+- `remote` always delegates discovery and execution to a configured remote `oclird`.
 
 Runtime selection must follow a deterministic precedence order:
 
@@ -80,12 +80,12 @@ Operational definitions:
 
 ### 2. Local managed runtime behavior
 
-When the effective runtime mode is local, `oascli` must ensure a compatible `oasclird` instance is running and attach to it automatically.
+When the effective runtime mode is local, `ocli` must ensure a compatible `oclird` instance is running and attach to it automatically.
 
 Local managed runtime requirements:
 
 - local MCP servers remain warm between tool calls
-- `oasclird` supervises the MCP processes and transports it launched
+- `oclird` supervises the MCP processes and transports it launched
 - ownership is session-scoped, not merely machine-scoped
 - the runtime records an owner identity, session ID, and lease or heartbeat
 - if the owning terminal/session exits or heartbeats expire, the managed runtime shuts down and cleans up its MCP children
@@ -162,7 +162,7 @@ Manual shutdown semantics:
 
 ### 3. Remote runtime authorization model
 
-Remote `oasclird` is treated as the execution boundary and policy enforcement point.
+Remote `oclird` is treated as the execution boundary and policy enforcement point.
 
 Every remote agent session should authenticate with an ephemeral OAuth2 access token minted specifically for that agent/session, such as a microVM lifetime token. That token is the primary identity for remote runtime access.
 
@@ -269,7 +269,7 @@ The exact schema can evolve during implementation, but the interface should be s
     "remote": {
       "url": "https://runtime.example.com",
       "oauth": {
-        "audience": "oasclird",
+        "audience": "oclird",
         "scopes": [
           "bundle:payments",
           "tool:users.get",
@@ -344,7 +344,7 @@ Audit destinations:
 
 ### 8. Client and daemon contract
 
-The `oascli` and `oasclird` boundary needs a minimal, explicit contract so runtime resolution, attach rules, and authorization are plannable as independent units.
+The `ocli` and `oclird` boundary needs a minimal, explicit contract so runtime resolution, attach rules, and authorization are plannable as independent units.
 
 The contract must include:
 
@@ -410,7 +410,7 @@ The intended defaults are:
 
 - no `runtime` block: behave as `auto`
 - `auto` + no local MCP: stay embedded
-- `auto` + local MCP present: use managed local `oasclird`
+- `auto` + local MCP present: use managed local `oclird`
 - explicit `local`: auto-start or attach to a matching local daemon
 - explicit `remote`: use the configured remote runtime and enforce remote authz
 - local managed runtimes are owner-scoped and cleaned up when the owner exits
@@ -446,4 +446,4 @@ Implementation should be considered complete only when product tests cover:
 
 ## Outcome
 
-This design keeps `oascli` easy for agents to use by default, makes local MCP-backed workflows fast and persistent when needed, and establishes a path toward remotely hosted, least-privilege `oasclird` deployments for microVM-based agent execution.
+This design keeps `ocli` easy for agents to use by default, makes local MCP-backed workflows fast and persistent when needed, and establishes a path toward remotely hosted, least-privilege `oclird` deployments for microVM-based agent execution.

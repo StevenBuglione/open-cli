@@ -74,7 +74,7 @@ Executes one normalized tool.
 Notes:
 
 - `body` is `[]byte` in Go, so JSON clients typically send it as base64 when talking to the runtime directly.
-- the stock `oascli` client handles marshaling for you.
+- the stock `ocli` client handles marshaling for you.
 - the runtime accepts either the slugified CLI flag name or the original parameter name when it looks up values in `flags`.
 
 ### Success response
@@ -187,7 +187,7 @@ Each audit record is newline-delimited JSON with fields such as:
 
 ## `GET /v1/auth/browser-config`
 
-Returns the browser-login metadata that `oascli` uses for `runtime.remote.oauth.mode: "browserLogin"`.
+Returns the browser-login metadata that `ocli` uses for `runtime.remote.oauth.mode: "browserLogin"`.
 
 Example response:
 
@@ -195,8 +195,8 @@ Example response:
 {
   "authorizationURL": "https://auth.example.com/authorize",
   "tokenURL": "https://auth.example.com/token",
-  "clientId": "oascli-browser",
-  "audience": "oasclird",
+  "clientId": "ocli-browser",
+  "audience": "oclird",
   "required": true,
   "scopePrefixes": ["bundle:", "profile:", "tool:"],
   "tokenValidationProfiles": ["oidc_jwks"],
@@ -238,7 +238,7 @@ Example response:
   "cacheDir": "/cache/instances/team-a/http",
   "auth": {
     "required": true,
-    "audience": "oasclird",
+    "audience": "oclird",
     "scopePrefixes": ["bundle:", "profile:", "tool:"],
     "tokenValidationProfiles": ["oidc_jwks"],
     "browserLogin": {
@@ -267,13 +267,13 @@ Example response:
 
 Notes:
 
-- `contractVersion` and top-level `capabilities` are the runtime handshake surface used by `oascli` compatibility checks.
+- `contractVersion` and top-level `capabilities` are the runtime handshake surface used by `ocli` compatibility checks.
 - `auth.required`, `auth.tokenValidationProfiles`, and `auth.browserLogin` tell remote clients whether they must attach a bearer token and whether browser login discovery is available. Common profiles are `oidc_jwks` and `oauth2_introspection`.
 - `auth.principal` is echoed only when the runtime already resolved an authenticated subject for the current request.
 - `auth.authorizationEnvelope.version` and `auth.scopePrefixes` let operators diagnose catalog/execution parity when runtime scopes are involved.
 - `runtimeMode` is typically `embedded` or `local` in the current implementation.
 - `shareKeyPresent` is only a boolean marker; the daemon never echoes the raw `shareKey`.
-- The `lifecycle` block is present for lease-aware managed local runtimes and is what `oascli` uses to validate reuse before attaching.
+- The `lifecycle` block is present for lease-aware managed local runtimes and is what `ocli` uses to validate reuse before attaching.
 
 ## `POST /v1/runtime/heartbeat`
 

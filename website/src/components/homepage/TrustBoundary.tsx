@@ -59,8 +59,8 @@ export default function TrustBoundary(): ReactNode {
             <thead>
               <tr>
                 <th scope="col">Concern</th>
-                <th scope="col">CLI (oascli)</th>
-                <th scope="col">Runtime (oasclird)</th>
+                <th scope="col">CLI (ocli)</th>
+                <th scope="col">Runtime (oclird)</th>
               </tr>
             </thead>
             <tbody>

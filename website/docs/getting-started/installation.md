@@ -19,26 +19,26 @@ title: Installation
 From the repository root, run:
 
 ```bash
-go build -o ./bin/oascli ./cmd/oascli
-go build -o ./bin/oasclird ./cmd/oasclird
+go build -o ./bin/ocli ./cmd/ocli
+go build -o ./bin/oclird ./cmd/oclird
 ```
 
-That produces `./bin/oascli` and `./bin/oasclird`. **If you only need binaries to follow the quickstart, stop here** and continue to [Quickstart](./quickstart).
+That produces `./bin/ocli` and `./bin/oclird`. **If you only need binaries to follow the quickstart, stop here** and continue to [Quickstart](./quickstart).
 
 ## Alternative: install into your Go bin directory
 
 ```bash
-go install ./cmd/oascli
-go install ./cmd/oasclird
+go install ./cmd/ocli
+go install ./cmd/oclird
 ```
 
-This puts the binaries on your `$PATH` via `$GOPATH/bin`. Use this if you want to run `oascli` without the `./bin/` prefix.
+This puts the binaries on your `$PATH` via `$GOPATH/bin`. Use this if you want to run `ocli` without the `./bin/` prefix.
 
 ## Alternative: run directly from source (no build step)
 
 ```bash
-go run ./cmd/oasclird --help
-go run ./cmd/oascli --embedded --config /path/to/.cli.json catalog list
+go run ./cmd/oclird --help
+go run ./cmd/ocli --embedded --config /path/to/.cli.json catalog list
 ```
 
 Useful for a one-off check. Slower than a compiled binary because Go compiles on each invocation.

@@ -31,7 +31,7 @@ If your answers to these questions are acceptable, continue with the phases belo
 
 - [ ] Read [Deployment Models](../runtime/deployment-models) and choose one of: embedded, local daemon, or remote runtime.
 - [ ] Confirm whether multiple isolated instances (`--instance-id`) are needed for your environment.
-- [ ] Review the stale-registry fallback behavior to understand how `oascli` handles a dead daemon.
+- [ ] Review the stale-registry fallback behavior to understand how `ocli` handles a dead daemon.
 
 **Reference:** [Deployment Models](../runtime/deployment-models), [Runtime Overview](../runtime/overview)
 
@@ -39,7 +39,7 @@ If your answers to these questions are acceptable, continue with the phases belo
 
 ## Phase 2 — Enable and validate runtime auth
 
-- [ ] Enable `runtime.server.auth` on `oasclird` with a suitable `validationProfile`.
+- [ ] Enable `runtime.server.auth` on `oclird` with a suitable `validationProfile`.
 - [ ] Verify that catalog filtering and execution denial work under authenticated access.
 - [ ] Confirm token validation covers issuer, audience, expiry, and signature checks.
 - [ ] Document which auth flows are needed: `providedToken`, `oauthClient`, or `browserLogin`.
@@ -73,7 +73,7 @@ If your answers to these questions are acceptable, continue with the phases belo
 
 ## Phase 5 — Run fleet validation
 
-- [ ] Run `make product-test-fleet` from the repo root and inspect artifacts under `/tmp/oascli-fleet/`.
+- [ ] Run `make product-test-fleet` from the repo root and inspect artifacts under `/tmp/ocli-fleet/`.
 - [ ] Confirm the `rubric.json` and `transcript.log` artifacts for each lane that covers your deployment scenario.
 - [ ] For remote runtime auth scenarios, verify the `remote-runtime-oauth-client` lane passes.
 - [ ] For browser-login or Entra federation, review `product-tests/testdata/fleet/live-proof-matrix.yaml` and plan live proof execution against your identity infrastructure.
@@ -93,7 +93,7 @@ If your answers to these questions are acceptable, continue with the phases belo
 
 ## Phase 7 — Plan external operational controls
 
-These items are not provided by `oas-cli-go`. Each requires operator-owned infrastructure or process before a production deployment is credible.
+These items are not provided by `open-cli`. Each requires operator-owned infrastructure or process before a production deployment is credible.
 
 - [ ] **Token revocation** — confirm your risk model accepts expiry-based validity windows, or plan an external revocation check in your network path.
 - [ ] **Audit log rotation and retention** — confirm `logrotate`, a log sidecar, or a log forwarder is in place against the audit path.

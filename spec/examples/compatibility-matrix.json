@@ -4,7 +4,7 @@
   "publishedAt": "2026-03-13T12:00:00Z",
   "implementations": [
     {
-      "repo": "https://github.com/StevenBuglione/oas-cli-go",
+      "repo": "https://github.com/StevenBuglione/open-cli",
       "version": "main",
       "status": "passing",
       "features": {

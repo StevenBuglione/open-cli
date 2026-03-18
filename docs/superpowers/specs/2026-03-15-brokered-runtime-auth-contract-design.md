@@ -2,21 +2,21 @@
 
 ## Problem
 
-The current remote-runtime design assumes that `oasclird` can validate remote bearer tokens using an RFC7662-style introspection endpoint. That is too narrow for the real provider landscape:
+The current remote-runtime design assumes that `oclird` can validate remote bearer tokens using an RFC7662-style introspection endpoint. That is too narrow for the real provider landscape:
 
 - Microsoft Entra ID does not expose a standard RFC7662 introspection endpoint for normal access tokens.
 - Google and GitHub also do not give us one uniform runtime-token validation model.
-- Different organizations will want to use different brokers, reverse proxies, token validators, or custom `oasclird` implementations.
+- Different organizations will want to use different brokers, reverse proxies, token validators, or custom `oclird` implementations.
 
 We still need a standard contract so that:
 
-- `oascli` knows how to acquire a runtime token and talk to a compatible runtime
-- `oasclird` implementations know what token semantics and metadata they must expose
+- `ocli` knows how to acquire a runtime token and talk to a compatible runtime
+- `oclird` implementations know what token semantics and metadata they must expose
 - organizations are free to choose their own internal validation/broker implementation as long as they honor the external contract
 
 ## Goals
 
-- Standardize the **client-visible remote auth contract** for `oascli`.
+- Standardize the **client-visible remote auth contract** for `ocli`.
 - Decouple that contract from any one daemon-side validation mechanism.
 - Support brokered login flows that can federate Microsoft, Google, GitHub, or other upstream IdPs.
 - Keep remote runtime least-privilege authorization based on runtime scopes such as `bundle:*`, `tool:*`, and `profile:*`.
@@ -25,9 +25,9 @@ We still need a standard contract so that:
 ## Non-goals
 
 - Mandating one broker product or one hosted control plane.
-- Requiring every organization to run the same `oasclird` implementation.
+- Requiring every organization to run the same `oclird` implementation.
 - Standardizing how an organization maps upstream identities into internal RBAC.
-- Supporting direct use of every upstream provider's native token format inside `oasclird`.
+- Supporting direct use of every upstream provider's native token format inside `oclird`.
 
 ## Selected approach
 
@@ -37,8 +37,8 @@ The important distinction is:
 
 - upstream login providers such as Microsoft, Google, and GitHub are **identity sources**
 - a broker, issuer, or compatible runtime deployment turns those identities into a **runtime-compatible bearer token**
-- `oascli` only needs to understand the standard runtime auth metadata and bearer-token acquisition flow
-- `oasclird` only needs to enforce the standard runtime token semantics and observable authorization behavior
+- `ocli` only needs to understand the standard runtime auth metadata and bearer-token acquisition flow
+- `oclird` only needs to enforce the standard runtime token semantics and observable authorization behavior
 
 The daemon's internal token-validation implementation remains operator-defined. A compatible implementation may use:
 
@@ -53,7 +53,7 @@ As long as the observable client-facing contract remains the same.
 
 ### 1. Contract over implementation
 
-`oascli` should not need to know whether a runtime validates tokens through JWKS, introspection, or a reverse proxy.
+`ocli` should not need to know whether a runtime validates tokens through JWKS, introspection, or a reverse proxy.
 
 It should only rely on:
 
@@ -100,9 +100,9 @@ There are three layers:
    - a broker, gateway, auth service, or runtime-integrated issuer that turns upstream identity into a runtime-compatible token
 
 3. **Compatible runtime**
-   - any `oasclird` implementation that honors this contract
+   - any `oclird` implementation that honors this contract
 
-`oascli` interoperates with layer 2 and layer 3 through the standard contract. It does not need provider-specific logic for each upstream IdP beyond normal OAuth2/OIDC browser or client-credential flows.
+`ocli` interoperates with layer 2 and layer 3 through the standard contract. It does not need provider-specific logic for each upstream IdP beyond normal OAuth2/OIDC browser or client-credential flows.
 
 ## Client-visible auth contract
 
@@ -118,21 +118,21 @@ These modes are broker-facing, not provider-facing.
 
 #### `providedToken`
 
-The operator provides a pre-issued runtime token. `oascli` forwards it as-is.
+The operator provides a pre-issued runtime token. `ocli` forwards it as-is.
 
 #### `oauthClient`
 
-`oascli` obtains a runtime token from a configured token endpoint using client credentials or another non-interactive broker-supported flow.
+`ocli` obtains a runtime token from a configured token endpoint using client credentials or another non-interactive broker-supported flow.
 
 #### `browserLogin`
 
-`oascli` learns browser-login metadata from the runtime and completes an authorization-code + PKCE flow against the broker/issuer selected by that runtime deployment.
+`ocli` learns browser-login metadata from the runtime and completes an authorization-code + PKCE flow against the broker/issuer selected by that runtime deployment.
 
 ## Runtime metadata contract
 
 ### `GET /v1/auth/browser-config`
 
-The runtime must expose browser-login metadata sufficient for `oascli` to authenticate against the broker/issuer chosen by that runtime.
+The runtime must expose browser-login metadata sufficient for `ocli` to authenticate against the broker/issuer chosen by that runtime.
 
 Minimum fields:
 
@@ -140,8 +140,8 @@ Minimum fields:
 {
   "authorizationURL": "https://auth.example.com/authorize",
   "tokenURL": "https://auth.example.com/token",
-  "clientId": "oascli-browser",
-  "audience": "oasclird"
+  "clientId": "ocli-browser",
+  "audience": "oclird"
 }
 ```
 
@@ -173,7 +173,7 @@ Recommended auth block:
   "capabilities": ["catalog", "execute", "refresh", "audit", "browser-login"],
   "auth": {
     "required": true,
-    "audience": "oasclird",
+    "audience": "oclird",
     "scopePrefixes": ["bundle:", "tool:", "profile:"],
     "tokenValidationProfiles": ["oidc_jwks"],
     "browserLogin": true
@@ -217,7 +217,7 @@ Illustrative JWT payload:
 ```json
 {
   "iss": "https://auth.example.com",
-  "aud": "oasclird",
+  "aud": "oclird",
   "sub": "user-or-session",
   "exp": 1773599999,
   "scope": "bundle:payments tool:users.get"
@@ -333,8 +333,8 @@ A brokered OIDC deployment where:
 - Microsoft Entra ID, Google, and GitHub are upstream login providers
 - a central broker federates those providers
 - the broker issues a standard runtime JWT access token
-- `oascli` uses `browserLogin` or `oauthClient` against that broker
-- `oasclird` validates the broker-issued token through `oidc_jwks`
+- `ocli` uses `browserLogin` or `oauthClient` against that broker
+- `oclird` validates the broker-issued token through `oidc_jwks`
 
 ### Why this example
 
@@ -348,10 +348,10 @@ This proves:
 
 The example broker is not normative. The contract only requires that the example deployment:
 
-- expose OIDC/OAuth endpoints usable by `oascli`
+- expose OIDC/OAuth endpoints usable by `ocli`
 - mint runtime-compatible tokens
 - preserve runtime audience and scope semantics
-- let `oasclird` validate tokens with a standard validation profile
+- let `oclird` validate tokens with a standard validation profile
 
 ## Configuration direction
 
@@ -366,12 +366,12 @@ Illustrative direction:
       "auth": {
         "required": true,
         "validationProfile": "oidc_jwks",
-        "audience": "oasclird",
+        "audience": "oclird",
         "issuer": "https://auth.example.com",
         "jwksURL": "https://auth.example.com/.well-known/jwks.json",
         "authorizationURL": "https://auth.example.com/authorize",
         "tokenURL": "https://auth.example.com/token",
-        "browserClientId": "oascli-browser"
+        "browserClientId": "ocli-browser"
       }
     }
   }
@@ -387,7 +387,7 @@ An introspection-based deployment may use a different profile and fields:
       "auth": {
         "required": true,
         "validationProfile": "oauth2_introspection",
-        "audience": "oasclird",
+        "audience": "oclird",
         "introspectionURL": "https://auth.example.com/introspect",
         "clientId": { "type": "env", "value": "OAS_INTROSPECT_CLIENT_ID" },
         "clientSecret": { "type": "env", "value": "OAS_INTROSPECT_CLIENT_SECRET" }
@@ -399,7 +399,7 @@ An introspection-based deployment may use a different profile and fields:
 
 ## Security and portability rules
 
-- `oascli` must not hard-code Microsoft-, Google-, or GitHub-specific token semantics into the runtime contract
+- `ocli` must not hard-code Microsoft-, Google-, or GitHub-specific token semantics into the runtime contract
 - the runtime contract must be broker-oriented and standards-oriented
 - organizations may implement a custom runtime or auth bridge as long as the observable behavior matches this contract
 - the reference example must not imply exclusivity or product lock-in

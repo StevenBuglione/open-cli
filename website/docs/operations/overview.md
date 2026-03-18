@@ -4,9 +4,9 @@ title: Operations Overview
 
 # Operations Overview
 
-**Read this if** you are managing a running `oasclird` installation and need to understand the state layout, how to inspect cache and audit data, or how to isolate multiple instances. This page answers: where does state live, what does the runtime persist, and which pages go deeper on each operational concern.
+**Read this if** you are managing a running `oclird` installation and need to understand the state layout, how to inspect cache and audit data, or how to isolate multiple instances. This page answers: where does state live, what does the runtime persist, and which pages go deeper on each operational concern.
 
-Operationally, `oas-cli-go` is mostly about **state management**:
+Operationally, `open-cli` is mostly about **state management**:
 
 - where the runtime is registered
 - where cache entries live
@@ -34,7 +34,7 @@ Without overrides:
 - state root: `$XDG_STATE_HOME/oas-cli` or `~/.local/state/oas-cli`
 - cache root: `$XDG_CACHE_HOME/oas-cli` or `~/.cache/oas-cli`
 
-If `oascli` is given `--state-dir`, it also derives the cache root under `<state-dir>/cache`.
+If `ocli` is given `--state-dir`, it also derives the cache root under `<state-dir>/cache`.
 
 ## Core operational tasks
 

@@ -2,12 +2,12 @@
 
 ## Problem
 
-The brokered runtime auth contract is implemented and locally verified, including a live broker-shaped smoke using real `oascli` and `oasclird` binaries. What is still missing is an enterprise-grade external proof that demonstrates the contract works with a real identity stack, not just an in-process reference broker fixture.
+The brokered runtime auth contract is implemented and locally verified, including a live broker-shaped smoke using real `ocli` and `oclird` binaries. What is still missing is an enterprise-grade external proof that demonstrates the contract works with a real identity stack, not just an in-process reference broker fixture.
 
 The project needs one official reference deployment that:
 
 - proves the contract can be adopted by real organizations
-- preserves the broker-neutral design of `oascli`
+- preserves the broker-neutral design of `ocli`
 - demonstrates strong enterprise integration with a common upstream identity provider
 - avoids turning the spec into a product-specific requirement
 
@@ -30,7 +30,7 @@ The project needs one official reference deployment that:
 
 Use a two-layer model:
 
-1. **Normative contract:** `oascli` and compatible runtimes remain broker-neutral.
+1. **Normative contract:** `ocli` and compatible runtimes remain broker-neutral.
 2. **Official reference proof:** Authentik is the single documented reference broker, with Microsoft Entra ID as the documented upstream federation example.
 
 This gives the project one concrete, enterprise-relevant reference implementation without coupling the contract to a single vendor product.
@@ -60,9 +60,9 @@ The official proof architecture is:
 
 1. A user or workload authenticates against **Microsoft Entra ID**.
 2. **Authentik** federates that upstream identity and applies organization-defined policy.
-3. Authentik issues a **runtime-compatible token** for audience `oasclird`.
-4. `oascli` acquires that token through the standard runtime contract.
-5. `oasclird` validates the token using the configured validation profile, expected to be `oidc_jwks` for the reference deployment.
+3. Authentik issues a **runtime-compatible token** for audience `oclird`.
+4. `ocli` acquires that token through the standard runtime contract.
+5. `oclird` validates the token using the configured validation profile, expected to be `oidc_jwks` for the reference deployment.
 6. The runtime derives the authorization envelope from normalized runtime scopes and enforces catalog filtering plus execution denial.
 
 For clarity, the reference deployment uses **two trust chains**, not one:
@@ -78,24 +78,24 @@ The official reference proof must verify two equally required end-to-end paths.
 
 This path proves that a real user can authenticate through the standard runtime browser flow:
 
-- `oascli` reads runtime metadata from `GET /v1/runtime/info`
-- `oascli` reads browser-login metadata from `GET /v1/auth/browser-config`
-- `oascli` completes `browserLogin` with authorization-code + PKCE
+- `ocli` reads runtime metadata from `GET /v1/runtime/info`
+- `ocli` reads browser-login metadata from `GET /v1/auth/browser-config`
+- `ocli` completes `browserLogin` with authorization-code + PKCE
 - Authentik federates the login to Entra
 - Authentik returns a runtime-compatible token
-- `oasclird` validates the token and enforces runtime authz
+- `oclird` validates the token and enforces runtime authz
 
 ### 2. Workload path
 
 This path proves that non-interactive service access works as well:
 
-- `oascli` uses `runtime.remote.oauth.mode: "oauthClient"`
+- `ocli` uses `runtime.remote.oauth.mode: "oauthClient"`
 - Authentik is the reference **runtime token issuer** for the workload path as well
-- the token endpoint used by `oascli` is therefore Authentik's token endpoint or an Authentik-owned endpoint with equivalent behavior
+- the token endpoint used by `ocli` is therefore Authentik's token endpoint or an Authentik-owned endpoint with equivalent behavior
 - the resulting runtime token satisfies the same audience, expiry, identity, and scope semantics
-- `oasclird` validates the token and enforces the same authorization envelope behavior
+- `oclird` validates the token and enforces the same authorization envelope behavior
 
-For the reference deployment, the workload path does **not** rely on handing raw Entra access tokens directly to `oasclird`. Entra is the upstream identity provider for the human path, while Authentik remains the runtime-token broker visible to `oascli` in both paths.
+For the reference deployment, the workload path does **not** rely on handing raw Entra access tokens directly to `oclird`. Entra is the upstream identity provider for the human path, while Authentik remains the runtime-token broker visible to `ocli` in both paths.
 
 ### Workload credential lifecycle and failure behavior
 
@@ -103,8 +103,8 @@ For the reference deployment:
 
 - workload credentials presented to Authentik are Authentik-managed operator credentials for the runtime client
 - Authentik is responsible for issuing short-lived runtime-compatible access tokens
-- `oascli` consumes those tokens through the existing `oauthClient` path
-- `oasclird` must fail closed when the issuer, JWKS, audience, expiry, or scopes are invalid
+- `ocli` consumes those tokens through the existing `oauthClient` path
+- `oclird` must fail closed when the issuer, JWKS, audience, expiry, or scopes are invalid
 - verification must include at least one negative case showing that an invalid or insufficient workload token is rejected
 
 The reference proof does **not** require Entra-backed workload credentials in phase one. Entra federation is required for the human interactive path; the workload path is required to prove non-interactive runtime-token issuance and validation through the same broker, but it uses Authentik-managed client credentials as the documented reference.
@@ -119,12 +119,12 @@ The project should not claim full enterprise E2E verification until all of the f
 - a real Entra application registration exists
 - Entra-to-Authentik federation is configured and documented
 - Authentik is configured to issue runtime-compatible tokens
-- `oasclird` is configured to validate those tokens using discovery/JWKS
+- `oclird` is configured to validate those tokens using discovery/JWKS
 
 ### Human-flow evidence
 
 - a real browser-based sign-in completes successfully
-- `oascli` obtains the token using the runtime metadata contract
+- `ocli` obtains the token using the runtime metadata contract
 - authenticated catalog output shows only authorized tools
 - an authorized tool execution succeeds
 - an unauthorized tool execution is denied
@@ -150,7 +150,7 @@ The spec remains clear on these boundaries:
 - **Normative:** runtime metadata contract, runtime token semantics, authorization behavior, fail-closed expectations
 - **Illustrative:** Authentik deployment shape, Entra federation wiring, claim mapping examples
 
-Organizations may replace Authentik with another broker, gateway, or compatible custom implementation as long as they preserve the external contract expected by `oascli`.
+Organizations may replace Authentik with another broker, gateway, or compatible custom implementation as long as they preserve the external contract expected by `ocli`.
 
 ## Ownership and interface boundaries
 
@@ -160,7 +160,7 @@ To keep the example understandable and replaceable, the reference deployment is 
 
 - authenticates the human principal for the interactive reference path
 - remains provider-specific and illustrative
-- is not directly consumed by `oascli`
+- is not directly consumed by `ocli`
 
 For the reference deployment, this unit is required for the **human** path and not required for the workload path.
 
@@ -168,16 +168,16 @@ For the reference deployment, this unit is required for the **human** path and n
 
 - federates Entra identity
 - maps upstream identity into normalized runtime claims and scopes
-- exposes the browser and token endpoints consumed by `oascli`
+- exposes the browser and token endpoints consumed by `ocli`
 - issues the runtime-compatible token used at the runtime boundary
 
-### 3. Client unit: `oascli`
+### 3. Client unit: `ocli`
 
 - consumes only the standard runtime metadata and broker-facing OAuth surfaces
 - must not require Entra-specific logic
 - must behave the same way with another compatible broker
 
-### 4. Runtime unit: `oasclird`
+### 4. Runtime unit: `oclird`
 
 - validates the runtime token according to the configured validation profile
 - derives the authorization envelope from normalized runtime scopes
@@ -200,7 +200,7 @@ The official Authentik example should include:
 ### Already proven
 
 - the broker-neutral contract is implemented
-- `oascli` and `oasclird` interoperate with a live broker-shaped OIDC/JWKS issuer
+- `ocli` and `oclird` interoperate with a live broker-shaped OIDC/JWKS issuer
 - the runtime enforces catalog filtering and fail-closed authorization
 - the project has one executable reference broker fixture
 
@@ -255,7 +255,7 @@ The reference proof is complete only when all of the following are produced from
 - both flows show filtered catalog behavior consistent with the granted scopes
 - both flows show fail-closed denial for an unauthorized tool or insufficient scopes
 - runtime handshake metadata matches the documented contract
-- no step depends on provider-specific client logic inside `oascli`
+- no step depends on provider-specific client logic inside `ocli`
 
 ## Risks and mitigations
 

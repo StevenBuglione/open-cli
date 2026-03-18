@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move the standalone `oas-cli-spec` and `oas-cli-conformance` repositories into `oas-cli-go` as root-level sibling subprojects so the project is maintained from one repository going forward.
+**Goal:** Move the standalone `oas-cli-spec` and `oas-cli-conformance` repositories into `open-cli` as root-level sibling subprojects so the project is maintained from one repository going forward.
 
 **Architecture:** Preserve the Go implementation as the repo root while importing the spec and conformance repositories as first-class top-level directories named `spec/` and `conformance/`. Keep spec and conformance independently understandable and runnable, then rewire the root CI, verification commands, and documentation so contract verification happens in-repo instead of across repositories.
 
@@ -41,8 +41,8 @@
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/oas-cli-go/.worktrees/monorepo-consolidation
-git remote add spec-local /home/sbuglione/oascli/oas-cli-spec
+cd /home/sbuglione/ocli/open-cli/.worktrees/monorepo-consolidation
+git remote add spec-local /home/sbuglione/ocli/oas-cli-spec
 ```
 
 - [ ] **Step 2: Import the repo with history preserved**
@@ -90,8 +90,8 @@ Expected: files exist and `git log` shows imported history for `spec/`.
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/oas-cli-go/.worktrees/monorepo-consolidation
-git remote add conformance-local /home/sbuglione/oascli/oas-cli-conformance
+cd /home/sbuglione/ocli/open-cli/.worktrees/monorepo-consolidation
+git remote add conformance-local /home/sbuglione/ocli/oas-cli-conformance
 ```
 
 - [ ] **Step 2: Import the repo with history preserved**
@@ -211,7 +211,7 @@ Delete any `actions/checkout` step that fetches `StevenBuglione/oas-cli-spec` in
 
 - [ ] **Step 3: Keep existing implementation and docs validation**
 
-Retain the existing Go verification and docs build jobs from `oas-cli-go`.
+Retain the existing Go verification and docs build jobs from `open-cli`.
 
 - [ ] **Step 4: Validate the workflow syntax locally**
 
@@ -289,7 +289,7 @@ Expected: the site builds successfully with the updated docs.
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/oas-cli-go/.worktrees/monorepo-consolidation
+cd /home/sbuglione/ocli/open-cli/.worktrees/monorepo-consolidation
 make verify-all
 cd website && npm ci && npm run build
 ```
@@ -324,9 +324,9 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/oas-cli-go/.worktrees/monorepo-consolidation
+cd /home/sbuglione/ocli/open-cli/.worktrees/monorepo-consolidation
 git push -u origin feature/monorepo-consolidation
-cd /home/sbuglione/oascli/oas-cli-go
+cd /home/sbuglione/ocli/open-cli
 git checkout main
 git pull --ff-only origin main
 git merge --no-ff feature/monorepo-consolidation
@@ -340,7 +340,7 @@ Expected: the feature branch is pushed, merged, and `origin/main` contains the m
 Run:
 
 ```bash
-gh run list --repo StevenBuglione/oas-cli-go --limit 5
+gh run list --repo StevenBuglione/open-cli --limit 5
 ```
 
 Expected: the post-merge `ci` run on `main` succeeds with in-repo spec and conformance validation.

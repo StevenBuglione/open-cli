@@ -1,8 +1,8 @@
-# OAS-CLI Core 0.1.0
+# Open CLI Core 0.1.0
 
 ## Scope
 
-OAS-CLI standardizes how OpenAPI-described HTTP services and native MCP servers become agent-usable CLI tools without requiring users to invent a second catalog by hand. The core specification defines:
+Open CLI standardizes how OpenAPI-described HTTP services and native MCP servers become agent-usable CLI tools without requiring users to invent a second catalog by hand. The core specification defines:
 
 - discovery inputs and provenance requirements
 - normalized tool catalog structure

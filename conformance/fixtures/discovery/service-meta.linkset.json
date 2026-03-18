@@ -2,11 +2,11 @@
   "linkset": [
     {
       "href": "https://api.example.com/v1/tickets.skill.json",
-      "rel": "https://oascli.dev/rel/skill-manifest"
+      "rel": "https://open-cli.dev/rel/skill-manifest"
     },
     {
       "href": "https://api.example.com/v1/tickets.arazzo.yaml",
-      "rel": "https://oascli.dev/rel/workflows"
+      "rel": "https://open-cli.dev/rel/workflows"
     }
   ]
 }

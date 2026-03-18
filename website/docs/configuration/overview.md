@@ -6,7 +6,7 @@ title: Configuration Overview
 
 **Read this if** you are an operator writing or tuning `.cli.json` for your environment. This page answers: what does each top-level config block control, how do sources and services relate, and what is the minimum viable config vs a fully curated one.
 
-`oascli` and `oasclird` are driven by **JSON config files** named `.cli.json` (plus optional scope variants described in [Scope merging](./scope-merging)).
+`ocli` and `oclird` are driven by **JSON config files** named `.cli.json` (plus optional scope variants described in [Scope merging](./scope-merging)).
 
 ## What the config controls
 
@@ -93,10 +93,10 @@ The default runtime mode. Current meaningful values are:
 
 ### `runtime`
 
-Controls how `oascli` reaches execution:
+Controls how `ocli` reaches execution:
 
 - `embedded`: run the runtime in-process
-- `local`: talk to a local `oasclird`
+- `local`: talk to a local `oclird`
 - `remote`: talk to an explicitly configured remote runtime
 - `auto`: stay embedded unless local MCP sources require a managed local runtime
 

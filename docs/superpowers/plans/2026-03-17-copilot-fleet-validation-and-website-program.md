@@ -12,7 +12,7 @@ The gap-closure plan supersedes this file as the day-to-day execution tracker.
 
 ## Goal
 
-Implement a validation and documentation program that proves `oas-cli-go` across:
+Implement a validation and documentation program that proves `open-cli` across:
 
 - local daemon mode
 - remote runtime mode

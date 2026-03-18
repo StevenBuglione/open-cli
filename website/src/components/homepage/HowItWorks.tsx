@@ -22,14 +22,14 @@ const steps: Step[] = [
     number: 2,
     label: 'Runtime governs the catalog',
     detail:
-      'oasclird deduplicates and normalises tool IDs, applies OpenAPI overlays, evaluates policy rules, and resolves per-request credentials — before any execution occurs.',
+      'oclird deduplicates and normalises tool IDs, applies OpenAPI overlays, evaluates policy rules, and resolves per-request credentials — before any execution occurs.',
     href: '/docs/runtime/deployment-models',
   },
   {
     number: 3,
     label: 'Execute with confidence',
     detail:
-      'Use oascli commands or the built-in MCP server. Every tool call, approval gate decision, and auth event is appended to a structured audit log.',
+      'Use ocli commands or the built-in MCP server. Every tool call, approval gate decision, and auth event is appended to a structured audit log.',
     href: '/docs/cli/overview',
   },
 ];
@@ -65,7 +65,7 @@ export default function HowItWorks(): ReactNode {
           <figure className={styles.howItWorksDiagram}>
             <img
               src="/img/runtime-flow.svg"
-              alt="Flow: OpenAPI sources feed into oasclird (discover, normalise, policy, auth, audit), which exposes the governed catalog to oascli commands and the MCP server."
+              alt="Flow: OpenAPI sources feed into oclird (discover, normalise, policy, auth, audit), which exposes the governed catalog to ocli commands and the MCP server."
               width="420"
               height="200"
               loading="lazy"

@@ -13,7 +13,7 @@ Dynamic tool commands are generated from normalized catalog entries, then execut
 OpenAPI `in: path` parameters become positional arguments:
 
 ```bash
-oascli helpdesk tickets get-ticket T-100
+ocli helpdesk tickets get-ticket T-100
 ```
 
 If a tool path is `/tickets/{id}`, `T-100` fills `{id}`.
@@ -28,7 +28,7 @@ Non-path parameters become string flags:
 
 The runtime preserves the original parameter location when constructing the upstream request.
 
-If a parameter has `x-cli-name`, that override becomes the flag name. Otherwise `oascli` slugifies the original parameter name.
+If a parameter has `x-cli-name`, that override becomes the flag name. Otherwise `ocli` slugifies the original parameter name.
 
 ### Request bodies
 
@@ -36,13 +36,13 @@ The CLI supports three body forms:
 
 ```bash
 # inline JSON
-./bin/oascli ... create --body '{"title":"Printer jam"}'
+./bin/ocli ... create --body '{"title":"Printer jam"}'
 
 # from a file
-./bin/oascli ... create --body @ticket.json
+./bin/ocli ... create --body @ticket.json
 
 # from stdin
-cat ticket.json | ./bin/oascli ... create --body -
+cat ticket.json | ./bin/ocli ... create --body -
 ```
 
 ## Example
@@ -56,7 +56,7 @@ Given a tool with:
 an execution command can look like this:
 
 ```bash
-HELPDESK_TOKEN=token-abc ./bin/oascli   --runtime http://127.0.0.1:8765   --config ./.cli.json   --approval   helpdesk tickets create   --body @ticket.json
+HELPDESK_TOKEN=token-abc ./bin/ocli   --runtime http://127.0.0.1:8765   --config ./.cli.json   --approval   helpdesk tickets create   --body @ticket.json
 ```
 
 ## What the runtime does during execution
@@ -78,7 +78,7 @@ When the runtime returns a response:
 
 - valid JSON bodies are returned as JSON data
 - non-JSON bodies are returned as text
-- `oascli --format json` prints the JSON body directly when possible
+- `ocli --format json` prints the JSON body directly when possible
 - other formats serialize the execute response wrapper
 
 ## Important implementation nuances

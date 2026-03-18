@@ -2,13 +2,13 @@
 
 ## Goal
 
-Complete the remaining admitted gaps in `spec/oascli-spec.md` while also fixing any directly adjacent spec shortfalls exposed in the same codepaths. The primary targets are HTTP caching and revalidation, structured observability and tracing hooks, and a published conformance compatibility matrix.
+Complete the remaining admitted gaps in `spec/ocli-spec.md` while also fixing any directly adjacent spec shortfalls exposed in the same codepaths. The primary targets are HTTP caching and revalidation, structured observability and tracing hooks, and a published conformance compatibility matrix.
 
 ## Scope
 
 This design covers the three existing repositories:
 
-- `oas-cli-go` for executable behavior, runtime wiring, and tests
+- `open-cli` for executable behavior, runtime wiring, and tests
 - `oas-cli-spec` for normative documentation, schemas, and examples
 - `oas-cli-conformance` for compatibility publication, conformance artifacts, and CI validation
 
@@ -18,7 +18,7 @@ The work is intentionally bounded to the discovery, catalog-loading, remote-refe
 
 Use a targeted completion pass with an adjacent-gap sweep:
 
-1. Add real cache and observability infrastructure in `oas-cli-go`.
+1. Add real cache and observability infrastructure in `open-cli`.
 2. Wire those subsystems through the fetch and runtime paths that the spec already defines.
 3. Update `oas-cli-spec` only where external behavior, provenance, or examples need to match the implemented contract.
 4. Publish and validate a compatibility matrix in `oas-cli-conformance`.
@@ -29,7 +29,7 @@ This keeps the work bounded while avoiding another partial implementation that l
 
 ### Repository Responsibilities
 
-- `oas-cli-go` remains the reference implementation.
+- `open-cli` remains the reference implementation.
   - Add `pkg/cache` for persistent HTTP response caching, metadata tracking, and conditional revalidation.
   - Add `pkg/obs` for structured logging plus optional tracing hooks behind a narrow interface.
   - Route discovery, remote catalog input, overlay fetches, OpenAPI reference loading, runtime requests, and refresh behavior through these shared facilities.
@@ -140,7 +140,7 @@ Conditional revalidation failures must not be reported as fresh hits. Refresh re
 
 Verification must be test-first and layered.
 
-### `oas-cli-go`
+### `open-cli`
 
 - unit tests for cache metadata parsing and persistence
 - unit tests for freshness and stale policy decisions

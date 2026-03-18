@@ -13,9 +13,9 @@ export default function Hero(): ReactNode {
           <span className={styles.heroTitleAccent}>end to end.</span>
         </Heading>
         <p className={clsx('hero__subtitle', styles.heroLead)}>
-          <strong>oasclird</strong> discovers your APIs, normalises them, resolves
+          <strong>oclird</strong> discovers your APIs, normalises them, resolves
           credentials, enforces policy, and writes an audit log — so{' '}
-          <strong>oascli</strong> and your agents always work against a clean,
+          <strong>ocli</strong> and your agents always work against a clean,
           governed catalog.
         </p>
         <div className={styles.heroButtons}>

@@ -17,7 +17,7 @@ Unless you override paths programmatically, `pkg/config.DiscoverScopePaths` look
 | Project | `<working-dir>/.cli.json` |
 | Local | `<working-dir>/.cli.local.json` |
 
-`oasclird` and the runtime API typically load a project config by explicit path, but the same merge rules still apply inside the config package.
+`oclird` and the runtime API typically load a project config by explicit path, but the same merge rules still apply inside the config package.
 
 ## Load order
 

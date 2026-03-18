@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Preserve OpenAPI security OR-of-AND semantics from catalog build through runtime execution so `oascli` chooses the first satisfiable auth alternative, prefers non-interactive auth first, and applies a normalized auth plan without conflicting targets.
+**Goal:** Preserve OpenAPI security OR-of-AND semantics from catalog build through runtime execution so `ocli` chooses the first satisfiable auth alternative, prefers non-interactive auth first, and applies a normalized auth plan without conflicting targets.
 
 **Architecture:** Add a first-class auth-alternatives model to `pkg/catalog`, then add an internal runtime auth resolver that evaluates alternatives in two passes and emits a normalized executor-facing application plan. Keep the rollout low-risk by introducing the new alternatives model alongside the current flat `auth` field for compatibility, but migrate first-party runtime execution to use the alternatives model immediately.
 
@@ -664,7 +664,7 @@ func TestCapabilityAuthResolutionPrefersNonInteractiveAlternative(t *testing.T) 
 ```go
 func TestCapabilityAuthResolutionFallsBackToInteractiveAlternative(t *testing.T) {
     dir := t.TempDir()
-    installFakeBrowserOpener(t, dir) // copy the PATH-based opener approach from cmd/oascli/main_test.go
+    installFakeBrowserOpener(t, dir) // copy the PATH-based opener approach from cmd/ocli/main_test.go
 
     oauthAPI := newAuthorizationCodeOAuthServer(t, "interactive-token")
     defer oauthAPI.Close()

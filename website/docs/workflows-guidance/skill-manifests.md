@@ -14,7 +14,7 @@ The current loader expects JSON with a `toolGuidance` object keyed by tool ID.
 {
   "oasCliSkill": "1.0.0",
   "serviceId": "tickets",
-  "summary": "Guidance for using the Helpdesk API via OAS-CLI",
+  "summary": "Guidance for using the Helpdesk API via Open CLI",
   "toolGuidance": {
     "tickets:listTickets": {
       "whenToUse": [
@@ -26,7 +26,7 @@ The current loader expects JSON with a `toolGuidance` object keyed by tool ID.
       "examples": [
         {
           "goal": "List only open tickets",
-          "command": "oascli helpdesk tickets list-tickets --status open"
+          "command": "ocli helpdesk tickets list-tickets --status open"
         }
       ]
     }

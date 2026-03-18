@@ -1,4 +1,4 @@
-# OAS-CLI Config 0.1.0
+# Open CLI Config 0.1.0
 
 ## File Locations
 
@@ -87,7 +87,7 @@ Each `mcpServers.<name>` entry is normalized into:
 - `sources.<name>` with `type: "mcp"`
 - `services.<name>` bound to that source when no explicit service exists yet
 
-This lets existing MCP configs move into OAS-CLI with minimal structural change while keeping the canonical merged form centered on `sources` and `services`.
+This lets existing MCP configs move into Open CLI with minimal structural change while keeping the canonical merged form centered on `sources` and `services`.
 
 ## MCP Transport Authentication
 

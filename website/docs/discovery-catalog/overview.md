@@ -4,9 +4,9 @@ title: Discovery and Catalog Overview
 
 # Discovery and Catalog Overview
 
-**Read this if** you need to understand how `oasclird` finds API descriptions and turns them into the normalized catalog that `oascli` works from. This page answers: what source types exist, what the catalog contains after the pipeline runs, and how unreferenced sources behave.
+**Read this if** you need to understand how `oclird` finds API descriptions and turns them into the normalized catalog that `ocli` works from. This page answers: what source types exist, what the catalog contains after the pipeline runs, and how unreferenced sources behave.
 
-Discovery is how `oasclird` finds API descriptions. Catalog building is how it turns those descriptions into stable tool metadata for `oascli`.
+Discovery is how `oclird` finds API descriptions. Catalog building is how it turns those descriptions into stable tool metadata for `ocli`.
 
 ## The pipeline
 
@@ -76,7 +76,7 @@ Remote discovery and document fetches go through the cache layer. Provenance rec
 | --- | --- |
 | Walk an RFC 9727 API catalog or RFC 8631 service root | [API catalog discovery](./api-catalog-discovery) |
 | Understand how overlays rename or hide operations before catalog build | [Service discovery and overlays](./service-discovery-and-overlays) |
-| Inspect the normalized tool shape that `oascli` receives | [Normalized tool catalog](./normalized-tool-catalog) |
+| Inspect the normalized tool shape that `ocli` receives | [Normalized tool catalog](./normalized-tool-catalog) |
 | Refresh sources and see cache outcomes | [Cache and refresh](../operations/cache-and-refresh) |
 
 For deeper details, continue with:

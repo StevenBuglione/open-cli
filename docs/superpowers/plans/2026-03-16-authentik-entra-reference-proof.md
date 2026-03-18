@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the runtime contract broker-neutral while making Authentik the single reference broker. Split execution into an automated Authentik workload-proof chunk that runs inside repo-managed test infrastructure, and a human-proof chunk that documents and verifies the Entra-federated browser flow with a reproducible runbook and captured evidence format.
 
-**Tech Stack:** Go, existing `oascli`/`oasclird` runtime auth stack, Docker Compose, Authentik, Microsoft Entra ID, Docusaurus docs, Go product tests
+**Tech Stack:** Go, existing `ocli`/`oclird` runtime auth stack, Docker Compose, Authentik, Microsoft Entra ID, Docusaurus docs, Go product tests
 
 ---
 
@@ -86,8 +86,8 @@ Add a “success looks like” section that requires:
 
 ```md
 - Authentik serves discovery/JWKS/browser/token endpoints
-- oasclird validates Authentik-issued runtime tokens with oidc_jwks
-- oascli oauthClient can acquire a runtime token and list the filtered catalog
+- oclird validates Authentik-issued runtime tokens with oidc_jwks
+- ocli oauthClient can acquire a runtime token and list the filtered catalog
 - runtime info reports auth.required=true and tokenValidationProfiles including oidc_jwks
 ```
 
@@ -330,7 +330,7 @@ The runbook must include the specific operator actions to reproduce federation:
 2. configure redirect URIs and required scopes/claims
 3. configure Authentik upstream/provider settings for Entra
 4. map Entra claims/groups into normalized runtime scopes
-5. configure the Authentik application/provider that oascli will actually use
+5. configure the Authentik application/provider that ocli will actually use
 ```
 
 Expected: an operator can reproduce federation without reverse-engineering the example.
@@ -340,12 +340,12 @@ Expected: an operator can reproduce federation without reverse-engineering the e
 Include the exact sequence:
 
 ```md
-1. oascli reads /v1/runtime/info
-2. oascli reads /v1/auth/browser-config
+1. ocli reads /v1/runtime/info
+2. ocli reads /v1/auth/browser-config
 3. browser redirects to Authentik
 4. Authentik federates to Entra
 5. Authentik issues runtime token
-6. oasclird validates token and enforces scopes
+6. oclird validates token and enforces scopes
 ```
 
 - [ ] **Step 4: Add the evidence checklist**
@@ -465,7 +465,7 @@ Expected:
 
 ```md
 - browserLogin completes successfully
-- runtime token is accepted by oasclird
+- runtime token is accepted by oclird
 - filtered catalog output is captured
 - allowed execution output is captured
 - denied execution output is captured
@@ -491,7 +491,7 @@ Expected: PASS.
 Run:
 
 ```bash
-go test ./cmd/oascli ./internal/runtime ./product-tests/tests -count=1
+go test ./cmd/ocli ./internal/runtime ./product-tests/tests -count=1
 ```
 
 Expected: PASS.

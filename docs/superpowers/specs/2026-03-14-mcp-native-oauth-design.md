@@ -2,14 +2,14 @@
 
 ## Problem
 
-`oas-cli-go` currently assumes that toolable services already exist as HTTP/OpenAPI surfaces. That leaves a major adoption gap for users who already have MCP servers and `.mcp.json`-style configuration but do not yet have an OpenAPI service catalog to point `oascli` at. At the same time, the runtime only supports static auth material for `http` and `apiKey` schemes, so OpenAPI `oauth2` and `openIdConnect` security schemes cannot be executed correctly.
+`open-cli` currently assumes that toolable services already exist as HTTP/OpenAPI surfaces. That leaves a major adoption gap for users who already have MCP servers and `.mcp.json`-style configuration but do not yet have an OpenAPI service catalog to point `ocli` at. At the same time, the runtime only supports static auth material for `http` and `apiKey` schemes, so OpenAPI `oauth2` and `openIdConnect` security schemes cannot be executed correctly.
 
 The design must solve both gaps without forcing users into an external wrapper or a second configuration system.
 
 ## Goals
 
 - Let users register MCP servers natively in `.cli.json` with configuration that is as close as possible to a normal `.mcp.json`.
-- Make MCP-backed tools appear as normal `oascli` services and tools, so overlays, guidance, workflows, policy, caching, and audit remain first-class.
+- Make MCP-backed tools appear as normal `ocli` services and tools, so overlays, guidance, workflows, policy, caching, and audit remain first-class.
 - Keep the canonical internal model aligned with existing `sources` and `services`, rather than inventing a second runtime model.
 - Add real runtime support for OpenAPI `oauth2` and `openIdConnect` schemes, including token acquisition and refresh.
 - Preserve multi-instance isolation by storing MCP runtime state and OAuth token state under existing per-instance paths.
@@ -42,11 +42,11 @@ OAuth support is added as a real token-management subsystem that can satisfy Ope
 
 This is the chosen approach.
 
-It keeps `.cli.json` easy for `.mcp.json` users, preserves the existing internal model, and avoids a Python or sidecar dependency. It does require new discovery, execution, and auth layers, but those changes land in clear seams that already exist in `oas-cli-go`.
+It keeps `.cli.json` easy for `.mcp.json` users, preserves the existing internal model, and avoids a Python or sidecar dependency. It does require new discovery, execution, and auth layers, but those changes land in clear seams that already exist in `open-cli`.
 
 ### 2. Spawn `mcpo` as a managed sidecar and consume its generated OpenAPI
 
-This would be faster to wire initially because `oas-cli-go` could continue to see only HTTP/OpenAPI. It was rejected because it makes `mcpo` a hidden runtime dependency, turns a native feature into process orchestration, complicates lifecycle management, and still does not solve OAuth for ordinary OpenAPI services inside `oas-cli-go`.
+This would be faster to wire initially because `open-cli` could continue to see only HTTP/OpenAPI. It was rejected because it makes `mcpo` a hidden runtime dependency, turns a native feature into process orchestration, complicates lifecycle management, and still does not solve OAuth for ordinary OpenAPI services inside `open-cli`.
 
 ### 3. One-time MCP import to a static OpenAPI snapshot
 
@@ -339,10 +339,10 @@ The transport client owns wire-level MCP concerns only. It does not know about O
 **Adapter to catalog metadata handoff:**
 
 - Synthetic operations carry these vendor extensions:
-  - `x-oascli-backend-kind: "mcp"`
-  - `x-oascli-mcp-source: <source-name>`
-  - `x-oascli-mcp-tool: <original-tool-name>`
-  - `x-oascli-mcp-input-wrapper: true|false`
+  - `x-ocli-backend-kind: "mcp"`
+  - `x-ocli-mcp-source: <source-name>`
+  - `x-ocli-mcp-tool: <original-tool-name>`
+  - `x-ocli-mcp-input-wrapper: true|false`
 - `pkg/catalog/build.go` copies those fields into normalized execution metadata without reinterpretation.
 - `pkg/exec/mcp.go` reads only the normalized execution metadata, never raw vendor extensions.
 
@@ -589,7 +589,7 @@ The documentation and examples must show both lookup shapes:
 
 ### MCP tool execution
 
-1. `oascli` asks the runtime to execute a tool.
+1. `ocli` asks the runtime to execute a tool.
 2. Runtime resolves the normalized tool and its source transport auth metadata.
 3. Policy and curation checks run as usual.
 4. The execution router sees `backend.kind == "mcp"`.
@@ -663,7 +663,7 @@ For MCP catalog caching, the normalized auth identity inputs are exactly:
 
 ### Cross-repo verification
 
-- `oas-cli-go`: Go tests, builds, docs build, and MCP/OAuth integration tests
+- `open-cli`: Go tests, builds, docs build, and MCP/OAuth integration tests
 - `oas-cli-spec`: schema and prose updates for `mcpServers`, `type: "mcp"`, transport OAuth, and OAuth-backed tool auth
 - `oas-cli-conformance`: fixtures and expected outputs for MCP sources, generated services, OAuth-backed tools, and auth scheme coverage
 
@@ -682,7 +682,7 @@ For MCP catalog caching, the normalized auth identity inputs are exactly:
 - Compatibility `mcpServers` exists to remove migration friction, not to create a second runtime model.
 - Existing OpenAPI users keep working unchanged.
 - MCP and OAuth state is per-instance from day one to preserve multi-terminal safety.
-- The implementation should start from `origin/main` and land as one coordinated feature set across `oas-cli-go`, `oas-cli-spec`, and `oas-cli-conformance`.
+- The implementation should start from `origin/main` and land as one coordinated feature set across `open-cli`, `oas-cli-spec`, and `oas-cli-conformance`.
 
 ## Implementation Scope for This Spec
 

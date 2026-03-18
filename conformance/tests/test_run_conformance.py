@@ -42,7 +42,7 @@ class RunConformanceTests(unittest.TestCase):
                 "publishedAt": "2026-03-13T12:00:00Z",
                 "implementations": [
                     {
-                        "repo": "https://github.com/example/oas-cli-go",
+                        "repo": "https://github.com/example/open-cli",
                         "version": "main",
                         "status": "passing",
                         "features": {

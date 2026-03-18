@@ -5,13 +5,13 @@ import CodeBlock from '@theme/CodeBlock';
 import styles from './homepage.module.css';
 
 const snippet = `# Embedded mode — no daemon needed for a first run
-oascli --embedded --config .cli.json catalog list
+ocli --embedded --config .cli.json catalog list
 
 # Inspect a tool's schema and usage guidance
-oascli --embedded --config .cli.json explain tickets:listTickets
+ocli --embedded --config .cli.json explain tickets:listTickets
 
 # Execute a tool — dynamic commands are shaped by your OpenAPI spec
-oascli --embedded --config .cli.json helpdesk tickets list-tickets --status open`.trim();
+ocli --embedded --config .cli.json helpdesk tickets list-tickets --status open`.trim();
 
 const deepLinks = [
   {label: 'Quickstart', href: '/docs/getting-started/quickstart'},

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fully complete the remaining `spec/oascli-spec.md` gaps by adding shared HTTP caching and refresh behavior, structured observability hooks, and a published conformance compatibility matrix, while fixing adjacent spec shortfalls exposed in the same execution paths.
+**Goal:** Fully complete the remaining `spec/ocli-spec.md` gaps by adding shared HTTP caching and refresh behavior, structured observability hooks, and a published conformance compatibility matrix, while fixing adjacent spec shortfalls exposed in the same execution paths.
 
-**Architecture:** Add cache and observability as shared infrastructure in `oas-cli-go`, then wire those packages through discovery, OpenAPI loading, catalog build, and runtime refresh flows so one fetch path governs provenance and revalidation. Update `oas-cli-spec` only where the public contract changes, and extend `oas-cli-conformance` so the compatibility matrix and any visible output changes are validated in standalone CI.
+**Architecture:** Add cache and observability as shared infrastructure in `open-cli`, then wire those packages through discovery, OpenAPI loading, catalog build, and runtime refresh flows so one fetch path governs provenance and revalidation. Update `oas-cli-spec` only where the public contract changes, and extend `oas-cli-conformance` so the compatibility matrix and any visible output changes are validated in standalone CI.
 
 **Tech Stack:** Go (`net/http`, Cobra, kin-openapi), Python 3.12 (`jsonschema`, `PyYAML`), JSON Schema 2020-12, GitHub Actions
 
@@ -12,7 +12,7 @@
 
 ## File Structure
 
-### `oas-cli-go`
+### `open-cli`
 
 - Create: `pkg/cache/types.go`
   - shared cache result, metadata, and policy types
@@ -48,7 +48,7 @@
   - add cache/obs wiring, real `/v1/refresh`, and structured lifecycle events
 - Modify: `internal/runtime/server_test.go`
   - refresh endpoint, stale fallback, and observability coverage
-- Modify: `cmd/oasclird/main.go`
+- Modify: `cmd/oclird/main.go`
   - plumb cache and observability options into the runtime entrypoint if needed by the final design
 
 ### `oas-cli-spec`
@@ -90,9 +90,9 @@
 ### Task 1: Prepare isolated repos and capture the clean baseline
 
 **Files:**
-- Modify if needed: `/home/sbuglione/oascli/oas-cli-go/.gitignore`
-- Modify if needed: `/home/sbuglione/oascli/oas-cli-spec/.gitignore`
-- Modify if needed: `/home/sbuglione/oascli/oas-cli-conformance/.gitignore`
+- Modify if needed: `/home/sbuglione/ocli/open-cli/.gitignore`
+- Modify if needed: `/home/sbuglione/ocli/oas-cli-spec/.gitignore`
+- Modify if needed: `/home/sbuglione/ocli/oas-cli-conformance/.gitignore`
 
 - [ ] **Step 1: Create isolated worktrees for each repo before code changes**
 
@@ -101,7 +101,7 @@ Use `superpowers:using-git-worktrees`.
 Recommended branch names:
 
 ```bash
-oas-cli-go: feature/spec-completion
+open-cli: feature/spec-completion
 oas-cli-spec: feature/spec-completion
 oas-cli-conformance: feature/spec-completion
 ```
@@ -111,8 +111,8 @@ oas-cli-conformance: feature/spec-completion
 Run:
 
 ```bash
-git -C /path/to/oas-cli-go status --short --branch
-git -C /path/to/oas-cli-go make verify
+git -C /path/to/open-cli status --short --branch
+git -C /path/to/open-cli make verify
 git -C /path/to/oas-cli-spec status --short --branch
 cd /path/to/oas-cli-spec && python3 scripts/validate_examples.py
 git -C /path/to/oas-cli-conformance status --short --branch
@@ -137,12 +137,12 @@ Expected:
 
 - no repo accidentally tracks worktree contents
 
-## Chunk 2: Shared Cache Infrastructure in `oas-cli-go`
+## Chunk 2: Shared Cache Infrastructure in `open-cli`
 
 ### Task 2: Write failing tests for cache semantics first
 
 **Files:**
-- Create: `/home/sbuglione/oascli/oas-cli-go/pkg/cache/cache_test.go`
+- Create: `/home/sbuglione/ocli/open-cli/pkg/cache/cache_test.go`
 
 - [ ] **Step 1: Write the failing cache tests**
 
@@ -160,7 +160,7 @@ func TestFetcherDropsCorruptEntriesAndRefetches(t *testing.T) {}
 Run:
 
 ```bash
-cd /path/to/oas-cli-go && go test ./pkg/cache -run TestFetcher -v
+cd /path/to/open-cli && go test ./pkg/cache -run TestFetcher -v
 ```
 
 Expected:
@@ -170,10 +170,10 @@ Expected:
 ### Task 3: Implement the minimal cache package
 
 **Files:**
-- Create: `/home/sbuglione/oascli/oas-cli-go/pkg/cache/types.go`
-- Create: `/home/sbuglione/oascli/oas-cli-go/pkg/cache/store.go`
-- Create: `/home/sbuglione/oascli/oas-cli-go/pkg/cache/http.go`
-- Test: `/home/sbuglione/oascli/oas-cli-go/pkg/cache/cache_test.go`
+- Create: `/home/sbuglione/ocli/open-cli/pkg/cache/types.go`
+- Create: `/home/sbuglione/ocli/open-cli/pkg/cache/store.go`
+- Create: `/home/sbuglione/ocli/open-cli/pkg/cache/http.go`
+- Test: `/home/sbuglione/ocli/open-cli/pkg/cache/cache_test.go`
 
 - [ ] **Step 1: Define the cache types**
 
@@ -224,7 +224,7 @@ Implement a cache-aware fetch path that:
 Run:
 
 ```bash
-cd /path/to/oas-cli-go && go test ./pkg/cache -v
+cd /path/to/open-cli && go test ./pkg/cache -v
 ```
 
 Expected:
@@ -236,8 +236,8 @@ Expected:
 Run:
 
 ```bash
-git -C /path/to/oas-cli-go add pkg/cache
-git -C /path/to/oas-cli-go commit -m "feat: add shared HTTP cache"
+git -C /path/to/open-cli add pkg/cache
+git -C /path/to/open-cli commit -m "feat: add shared HTTP cache"
 ```
 
 ## Chunk 3: Wire Cache Through Discovery and Catalog Build
@@ -245,9 +245,9 @@ git -C /path/to/oas-cli-go commit -m "feat: add shared HTTP cache"
 ### Task 4: Add failing integration tests for cached discovery and OpenAPI loading
 
 **Files:**
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/discovery/discovery_test.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/catalog/discovery_integration_test.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/catalog/catalog_test.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/discovery/discovery_test.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/catalog/discovery_integration_test.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/catalog/catalog_test.go`
 
 - [ ] **Step 1: Write the failing discovery and catalog tests**
 
@@ -264,7 +264,7 @@ func TestBuildReusesCachedRemoteOpenAPIAndMarksStaleFallback(t *testing.T) {}
 Run:
 
 ```bash
-cd /path/to/oas-cli-go && go test ./pkg/discovery ./pkg/catalog -run 'TestDiscover|TestBuildReusesCached' -v
+cd /path/to/open-cli && go test ./pkg/discovery ./pkg/catalog -run 'TestDiscover|TestBuildReusesCached' -v
 ```
 
 Expected:
@@ -274,15 +274,15 @@ Expected:
 ### Task 5: Pass cache context through discovery, OpenAPI loading, and the NTC
 
 **Files:**
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/openapi/load.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/discovery/types.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/discovery/api_catalog.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/discovery/service.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/catalog/build.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/pkg/catalog/types.go`
-- Test: `/home/sbuglione/oascli/oas-cli-go/pkg/discovery/discovery_test.go`
-- Test: `/home/sbuglione/oascli/oas-cli-go/pkg/catalog/discovery_integration_test.go`
-- Test: `/home/sbuglione/oascli/oas-cli-go/pkg/catalog/catalog_test.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/openapi/load.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/discovery/types.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/discovery/api_catalog.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/discovery/service.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/catalog/build.go`
+- Modify: `/home/sbuglione/ocli/open-cli/pkg/catalog/types.go`
+- Test: `/home/sbuglione/ocli/open-cli/pkg/discovery/discovery_test.go`
+- Test: `/home/sbuglione/ocli/open-cli/pkg/catalog/discovery_integration_test.go`
+- Test: `/home/sbuglione/ocli/open-cli/pkg/catalog/catalog_test.go`
 
 - [ ] **Step 1: Introduce a shared remote-read dependency**
 
@@ -305,7 +305,7 @@ Ensure:
 Run:
 
 ```bash
-cd /path/to/oas-cli-go && go test ./pkg/discovery ./pkg/catalog ./pkg/openapi -v
+cd /path/to/open-cli && go test ./pkg/discovery ./pkg/catalog ./pkg/openapi -v
 ```
 
 Expected:
@@ -317,8 +317,8 @@ Expected:
 Run:
 
 ```bash
-git -C /path/to/oas-cli-go add pkg/openapi/load.go pkg/discovery pkg/catalog
-git -C /path/to/oas-cli-go commit -m "feat: wire cache through discovery and catalog build"
+git -C /path/to/open-cli add pkg/openapi/load.go pkg/discovery pkg/catalog
+git -C /path/to/open-cli commit -m "feat: wire cache through discovery and catalog build"
 ```
 
 ## Chunk 4: Observability and Runtime Refresh
@@ -326,8 +326,8 @@ git -C /path/to/oas-cli-go commit -m "feat: wire cache through discovery and cat
 ### Task 6: Add failing tests for runtime refresh and observability hooks
 
 **Files:**
-- Create: `/home/sbuglione/oascli/oas-cli-go/pkg/obs/obs_test.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/internal/runtime/server_test.go`
+- Create: `/home/sbuglione/ocli/open-cli/pkg/obs/obs_test.go`
+- Modify: `/home/sbuglione/ocli/open-cli/internal/runtime/server_test.go`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -344,7 +344,7 @@ func TestServerRefreshEndpointReportsStaleFallback(t *testing.T) {}
 Run:
 
 ```bash
-cd /path/to/oas-cli-go && go test ./pkg/obs ./internal/runtime -run 'TestObserver|TestServerRefresh' -v
+cd /path/to/open-cli && go test ./pkg/obs ./internal/runtime -run 'TestObserver|TestServerRefresh' -v
 ```
 
 Expected:
@@ -354,11 +354,11 @@ Expected:
 ### Task 7: Implement `pkg/obs` and wire it through the runtime
 
 **Files:**
-- Create: `/home/sbuglione/oascli/oas-cli-go/pkg/obs/obs.go`
-- Create: `/home/sbuglione/oascli/oas-cli-go/pkg/obs/obs_test.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/internal/runtime/server.go`
-- Modify: `/home/sbuglione/oascli/oas-cli-go/internal/runtime/server_test.go`
-- Modify if needed: `/home/sbuglione/oascli/oas-cli-go/cmd/oasclird/main.go`
+- Create: `/home/sbuglione/ocli/open-cli/pkg/obs/obs.go`
+- Create: `/home/sbuglione/ocli/open-cli/pkg/obs/obs_test.go`
+- Modify: `/home/sbuglione/ocli/open-cli/internal/runtime/server.go`
+- Modify: `/home/sbuglione/ocli/open-cli/internal/runtime/server_test.go`
+- Modify if needed: `/home/sbuglione/ocli/open-cli/cmd/oclird/main.go`
 
 - [ ] **Step 1: Add a narrow observer interface**
 
@@ -409,7 +409,7 @@ Instrument:
 Run:
 
 ```bash
-cd /path/to/oas-cli-go && go test ./pkg/obs ./internal/runtime -v
+cd /path/to/open-cli && go test ./pkg/obs ./internal/runtime -v
 ```
 
 Expected:
@@ -421,7 +421,7 @@ Expected:
 Run:
 
 ```bash
-cd /path/to/oas-cli-go && make verify
+cd /path/to/open-cli && make verify
 ```
 
 Expected:
@@ -433,8 +433,8 @@ Expected:
 Run:
 
 ```bash
-git -C /path/to/oas-cli-go add pkg/obs internal/runtime cmd/oasclird
-git -C /path/to/oas-cli-go commit -m "feat: add runtime refresh and observability hooks"
+git -C /path/to/open-cli add pkg/obs internal/runtime cmd/oclird
+git -C /path/to/open-cli commit -m "feat: add runtime refresh and observability hooks"
 ```
 
 ## Chunk 5: Update the Published Spec Contract
@@ -442,9 +442,9 @@ git -C /path/to/oas-cli-go commit -m "feat: add runtime refresh and observabilit
 ### Task 8: Add failing validation inputs for new public artifacts
 
 **Files:**
-- Create: `/home/sbuglione/oascli/oas-cli-spec/schemas/compatibility-matrix.schema.json`
-- Create: `/home/sbuglione/oascli/oas-cli-spec/examples/compatibility-matrix.json`
-- Modify if needed: `/home/sbuglione/oascli/oas-cli-spec/examples/ntc.json`
+- Create: `/home/sbuglione/ocli/oas-cli-spec/schemas/compatibility-matrix.schema.json`
+- Create: `/home/sbuglione/ocli/oas-cli-spec/examples/compatibility-matrix.json`
+- Modify if needed: `/home/sbuglione/ocli/oas-cli-spec/examples/ntc.json`
 
 - [ ] **Step 1: Draft the new schema/example pair**
 
@@ -471,13 +471,13 @@ Expected:
 ### Task 9: Update the spec, schemas, and examples
 
 **Files:**
-- Modify: `/home/sbuglione/oascli/oas-cli-spec/spec/core.md`
-- Modify: `/home/sbuglione/oascli/oas-cli-spec/spec/config.md`
-- Modify: `/home/sbuglione/oascli/oas-cli-spec/schemas/ntc.schema.json`
-- Create: `/home/sbuglione/oascli/oas-cli-spec/schemas/compatibility-matrix.schema.json`
-- Modify: `/home/sbuglione/oascli/oas-cli-spec/examples/ntc.json`
-- Create: `/home/sbuglione/oascli/oas-cli-spec/examples/compatibility-matrix.json`
-- Modify: `/home/sbuglione/oascli/oas-cli-spec/README.md`
+- Modify: `/home/sbuglione/ocli/oas-cli-spec/spec/core.md`
+- Modify: `/home/sbuglione/ocli/oas-cli-spec/spec/config.md`
+- Modify: `/home/sbuglione/ocli/oas-cli-spec/schemas/ntc.schema.json`
+- Create: `/home/sbuglione/ocli/oas-cli-spec/schemas/compatibility-matrix.schema.json`
+- Modify: `/home/sbuglione/ocli/oas-cli-spec/examples/ntc.json`
+- Create: `/home/sbuglione/ocli/oas-cli-spec/examples/compatibility-matrix.json`
+- Modify: `/home/sbuglione/ocli/oas-cli-spec/README.md`
 
 - [ ] **Step 1: Update the normative text**
 
@@ -519,7 +519,7 @@ git -C /path/to/oas-cli-spec commit -m "docs: publish cache and compatibility sp
 ### Task 10: Add failing conformance tests for the compatibility matrix
 
 **Files:**
-- Modify: `/home/sbuglione/oascli/oas-cli-conformance/tests/test_run_conformance.py`
+- Modify: `/home/sbuglione/ocli/oas-cli-conformance/tests/test_run_conformance.py`
 
 - [ ] **Step 1: Add tests for matrix validation**
 
@@ -546,13 +546,13 @@ Expected:
 ### Task 11: Publish the matrix and extend the runner
 
 **Files:**
-- Create: `/home/sbuglione/oascli/oas-cli-conformance/compatibility-matrix.json`
-- Create: `/home/sbuglione/oascli/oas-cli-conformance/COMPATIBILITY.md`
-- Modify: `/home/sbuglione/oascli/oas-cli-conformance/README.md`
-- Modify: `/home/sbuglione/oascli/oas-cli-conformance/scripts/run_conformance.py`
-- Modify: `/home/sbuglione/oascli/oas-cli-conformance/tests/test_run_conformance.py`
-- Modify if needed: `/home/sbuglione/oascli/oas-cli-conformance/expected/tickets.ntc.json`
-- Modify if needed: `/home/sbuglione/oascli/oas-cli-conformance/.github/workflows/ci.yml`
+- Create: `/home/sbuglione/ocli/oas-cli-conformance/compatibility-matrix.json`
+- Create: `/home/sbuglione/ocli/oas-cli-conformance/COMPATIBILITY.md`
+- Modify: `/home/sbuglione/ocli/oas-cli-conformance/README.md`
+- Modify: `/home/sbuglione/ocli/oas-cli-conformance/scripts/run_conformance.py`
+- Modify: `/home/sbuglione/ocli/oas-cli-conformance/tests/test_run_conformance.py`
+- Modify if needed: `/home/sbuglione/ocli/oas-cli-conformance/expected/tickets.ntc.json`
+- Modify if needed: `/home/sbuglione/ocli/oas-cli-conformance/.github/workflows/ci.yml`
 
 - [ ] **Step 1: Publish the machine-readable and human-readable matrix**
 
@@ -606,7 +606,7 @@ git -C /path/to/oas-cli-conformance commit -m "docs: publish conformance compati
 Run:
 
 ```bash
-cd /path/to/oas-cli-go && make verify
+cd /path/to/open-cli && make verify
 cd /path/to/oas-cli-spec && python3 scripts/validate_examples.py
 cd /path/to/oas-cli-conformance && python3 -m unittest tests.test_run_conformance -v
 cd /path/to/oas-cli-conformance && python3 scripts/run_conformance.py --schema-root /path/to/oas-cli-spec/schemas
@@ -623,8 +623,8 @@ Run the reference runtime and compare a generated catalog against the conformanc
 Example:
 
 ```bash
-cd /path/to/oas-cli-go && go build ./cmd/oasclird ./cmd/oascli
-# start oasclird in a background shell
+cd /path/to/open-cli && go build ./cmd/oclird ./cmd/ocli
+# start oclird in a background shell
 cd /path/to/oas-cli-conformance && python3 scripts/run_conformance.py --schema-root /path/to/oas-cli-spec/schemas --candidate /tmp/generated.ntc.json
 ```
 
@@ -638,7 +638,7 @@ Expected:
 Run:
 
 ```bash
-git -C /path/to/oas-cli-go push -u origin <branch>
+git -C /path/to/open-cli push -u origin <branch>
 git -C /path/to/oas-cli-spec push -u origin <branch>
 git -C /path/to/oas-cli-conformance push -u origin <branch>
 ```

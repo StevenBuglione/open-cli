@@ -1,10 +1,10 @@
-# oas-cli-go
+# open-cli
 
-**`oascli`** and **`oasclird`** turn OpenAPI descriptions and MCP servers into a local, policy-aware command surface. Discovery, auth resolution, policy enforcement, and audit logging happen inside the runtime — not spread across callers.
+**`ocli`** and **`oclird`** turn OpenAPI descriptions and MCP servers into a local, policy-aware command surface. Discovery, auth resolution, policy enforcement, and audit logging happen inside the runtime — not spread across callers.
 
-This is the Go reference implementation of the [OAS-CLI specification](spec/).
+This is the Go reference implementation of the [Open CLI specification](spec/).
 
-**Full docs:** https://stevenbuglione.github.io/oas-cli-go/
+**Full docs:** https://open-cli.dev/
 
 ---
 
@@ -14,10 +14,10 @@ The project ships two binaries with a deliberate split:
 
 | Binary | Role |
 |--------|------|
-| `oascli` | Operator-facing CLI. Renders the effective catalog, exposes dynamic commands derived from your OpenAPI or MCP sources, and forwards execution requests. |
-| `oasclird` | Runtime daemon. Loads config, performs discovery, normalizes catalogs, resolves auth, enforces policy, executes upstream HTTP requests, and records audit events. |
+| `ocli` | Operator-facing CLI. Renders the effective catalog, exposes dynamic commands derived from your OpenAPI or MCP sources, and forwards execution requests. |
+| `oclird` | Runtime daemon. Loads config, performs discovery, normalizes catalogs, resolves auth, enforces policy, executes upstream HTTP requests, and records audit events. |
 
-`oascli` always needs a runtime. In **embedded mode** it starts one in-process — no separate process required. In **local daemon mode** it connects to a running `oasclird`. In either case the same runtime server logic executes.
+`ocli` always needs a runtime. In **embedded mode** it starts one in-process — no separate process required. In **local daemon mode** it connects to a running `oclird`. In either case the same runtime server logic executes.
 
 ---
 
@@ -28,8 +28,8 @@ The project ships two binaries with a deliberate split:
 Build the binaries from the repository root:
 
 ```bash
-go build -o ./bin/oascli ./cmd/oascli
-go build -o ./bin/oasclird ./cmd/oasclird
+go build -o ./bin/ocli ./cmd/ocli
+go build -o ./bin/oclird ./cmd/oclird
 ```
 
 Create a minimal `.cli.json` pointing at an OpenAPI document:
@@ -57,7 +57,7 @@ Create a minimal `.cli.json` pointing at an OpenAPI document:
 Inspect the catalog — no daemon, no upstream calls:
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json catalog list --format pretty
+./bin/ocli --embedded --config ./.cli.json catalog list --format pretty
 ```
 
 This prints the normalized catalog: service aliases, tools, and generated command names derived from your OpenAPI document. Nothing contacts any upstream service.
@@ -65,17 +65,17 @@ This prints the normalized catalog: service aliases, tools, and generated comman
 Inspect a specific tool before executing it:
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
-./bin/oascli --embedded --config ./.cli.json explain tickets:listTickets --format pretty
+./bin/ocli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
+./bin/ocli --embedded --config ./.cli.json explain tickets:listTickets --format pretty
 ```
 
 Preview the generated command tree:
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json helpdesk tickets --help
+./bin/ocli --embedded --config ./.cli.json helpdesk tickets --help
 ```
 
-For a complete walkthrough including a sample OpenAPI document, see the [quickstart](https://stevenbuglione.github.io/oas-cli-go/docs/getting-started/quickstart).
+For a complete walkthrough including a sample OpenAPI document, see the [quickstart](https://open-cli.dev/docs/getting-started/quickstart).
 
 ---
 
@@ -84,16 +84,16 @@ For a complete walkthrough including a sample OpenAPI document, see the [quickst
 | Mode | Description | When to use |
 |------|-------------|-------------|
 | **Embedded** | Runtime runs in-process per invocation. No daemon required. | Local dev, scripting, CI |
-| **Local daemon** | Single `oasclird` shared across CLI invocations. Warmed catalog cache. | Local MCP servers, persistent session, shared cache |
-| **Remote runtime** | Centrally hosted `oasclird` with network-controlled access. | Team-shared enforcement point, brokered access control |
+| **Local daemon** | Single `oclird` shared across CLI invocations. Warmed catalog cache. | Local MCP servers, persistent session, shared cache |
+| **Remote runtime** | Centrally hosted `oclird` with network-controlled access. | Team-shared enforcement point, brokered access control |
 
 **Starting a local daemon:**
 
 ```bash
-./bin/oasclird --config ./.cli.json --addr 127.0.0.1:8765
+./bin/oclird --config ./.cli.json --addr 127.0.0.1:8765
 
 # In another shell:
-./bin/oascli --runtime http://127.0.0.1:8765 --config ./.cli.json catalog list --format pretty
+./bin/ocli --runtime http://127.0.0.1:8765 --config ./.cli.json catalog list --format pretty
 ```
 
 **Config-driven selection** — avoid flags by declaring mode in `.cli.json`:
@@ -111,7 +111,7 @@ For a complete walkthrough including a sample OpenAPI document, see the [quickst
 }
 ```
 
-`mode: auto` stays embedded unless local MCP sources are present, in which case `oascli` promotes to local-daemon mode automatically. Managed local runtimes register a session lease and shut down when the owning session exits.
+`mode: auto` stays embedded unless local MCP sources are present, in which case `ocli` promotes to local-daemon mode automatically. Managed local runtimes register a session lease and shut down when the owning session exits.
 
 ---
 
@@ -121,7 +121,7 @@ Auth and policy enforcement live inside the runtime, not in the CLI layer.
 
 **Per-request auth resolution** — OpenAPI `oauth2` and `openIdConnect` flows; MCP `streamable-http` with `clientCredentials` OAuth and `headerSecrets`; MCP transports `stdio`, legacy `sse`, and `streamable-http`; per-instance token caching under the runtime state directory.
 
-**Remote runtime bearer auth** — when `oasclird` is deployed with `runtime.server.auth` configured, it:
+**Remote runtime bearer auth** — when `oclird` is deployed with `runtime.server.auth` configured, it:
 
 - validates bearer tokens against `oidc_jwks` or `oauth2_introspection`
 - filters the visible catalog by `bundle:*`, `profile:*`, and `tool:*` scopes
@@ -134,7 +134,7 @@ Remote client auth modes — `providedToken` (forward a bearer token from an env
 **Reference proof** — the repository ships an Authentik-based reference proof for both `oauthClient` and `browserLogin` runtime auth paths:
 
 - Repo assets: `examples/runtime-auth-broker/authentik/`
-- Docs: [Authentik reference proof](https://stevenbuglione.github.io/oas-cli-go/docs/runtime/authentik-reference)
+- Docs: [Authentik reference proof](https://open-cli.dev/docs/runtime/authentik-reference)
 - Microsoft Entra is documented as an upstream federation target in that same proof
 
 ---
@@ -143,24 +143,24 @@ Remote client auth modes — `providedToken` (forward a bearer token from an env
 
 | Goal | Link |
 |------|------|
-| Quickstart with a sample OpenAPI document | [Quickstart](https://stevenbuglione.github.io/oas-cli-go/docs/getting-started/quickstart) |
-| Choose embedded, local daemon, or remote runtime | [Deployment models](https://stevenbuglione.github.io/oas-cli-go/docs/runtime/deployment-models) |
-| Configuration reference | [Configuration overview](https://stevenbuglione.github.io/oas-cli-go/docs/configuration/overview) |
-| Full CLI command model | [CLI overview](https://stevenbuglione.github.io/oas-cli-go/docs/cli/overview) |
-| Auth, policy, and secret sources | [Security overview](https://stevenbuglione.github.io/oas-cli-go/docs/security/overview) |
-| Enterprise readiness checklist | [Enterprise overview](https://stevenbuglione.github.io/oas-cli-go/docs/enterprise/overview) |
-| Contributing and development | [Development guide](https://stevenbuglione.github.io/oas-cli-go/docs/development/overview) |
+| Quickstart with a sample OpenAPI document | [Quickstart](https://open-cli.dev/docs/getting-started/quickstart) |
+| Choose embedded, local daemon, or remote runtime | [Deployment models](https://open-cli.dev/docs/runtime/deployment-models) |
+| Configuration reference | [Configuration overview](https://open-cli.dev/docs/configuration/overview) |
+| Full CLI command model | [CLI overview](https://open-cli.dev/docs/cli/overview) |
+| Auth, policy, and secret sources | [Security overview](https://open-cli.dev/docs/security/overview) |
+| Enterprise readiness checklist | [Enterprise overview](https://open-cli.dev/docs/enterprise/overview) |
+| Contributing and development | [Development guide](https://open-cli.dev/docs/development/overview) |
 
 ---
 
 ## Repository layout
 
 ```
-cmd/oascli        CLI entrypoint and runtime client
-cmd/oasclird      Daemon entrypoint
+cmd/ocli        CLI entrypoint and runtime client
+cmd/oclird      Daemon entrypoint
 internal/runtime  Runtime HTTP API and wiring
 pkg/              Config, discovery, catalog, policy, execution, caching, audit, observability
-spec/             Normative OAS-CLI specification and JSON schemas (single source of truth)
+spec/             Normative Open CLI specification and JSON schemas (single source of truth)
 conformance/      Language-neutral conformance fixtures and expected outputs
 website/          Docusaurus site content, navigation, and landing page
 .github/          CI and Pages automation

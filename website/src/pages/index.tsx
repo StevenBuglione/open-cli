@@ -13,8 +13,8 @@ import FirstRunSnippet from '../components/homepage/FirstRunSnippet';
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="oascli &amp; oasclird"
-      description="Governed OpenAPI execution — discovery, policy, auth, and audit in a single local runtime. Documentation for oascli and oasclird.">
+      title="ocli &amp; oclird"
+      description="Governed OpenAPI execution — discovery, policy, auth, and audit in a single local runtime. Documentation for ocli and oclird.">
       <Hero />
       <main>
         <WhyItExists />

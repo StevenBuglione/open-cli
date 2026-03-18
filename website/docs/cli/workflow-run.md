@@ -4,10 +4,10 @@ title: Workflow Run
 
 # Workflow Run
 
-`oascli workflow run <workflow-id>` is a **validation and planning** command, not a workflow engine.
+`ocli workflow run <workflow-id>` is a **validation and planning** command, not a workflow engine.
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json workflow run triageTicket --format pretty
+./bin/ocli --embedded --config ./.cli.json workflow run triageTicket --format pretty
 ```
 
 ## What it does

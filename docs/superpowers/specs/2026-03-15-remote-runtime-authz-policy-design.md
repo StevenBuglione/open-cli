@@ -2,7 +2,7 @@
 
 ## Problem statement
 
-Remote `oasclird` needs to act as a real execution boundary for agents. That means it cannot simply proxy a full tool catalog to every caller. It must authenticate each agent session, compute what that session may discover and execute, and enforce least-privilege access using short-lived credentials.
+Remote `oclird` needs to act as a real execution boundary for agents. That means it cannot simply proxy a full tool catalog to every caller. It must authenticate each agent session, compute what that session may discover and execute, and enforce least-privilege access using short-lived credentials.
 
 This is the foundation for future microVM-based agent execution where each agent receives an ephemeral token that authorizes only a bounded set of tools.
 
@@ -25,7 +25,7 @@ This is the foundation for future microVM-based agent execution where each agent
 
 The selected model is:
 
-- `runtime.mode=remote` routes discovery and execution through a remote `oasclird`
+- `runtime.mode=remote` routes discovery and execution through a remote `oclird`
 - each agent/session uses an ephemeral OAuth2 bearer token
 - the server computes the final authorization envelope
 - bundle scopes and profile scopes union together before explicit `tool:` filtering and final deny rules
@@ -42,7 +42,7 @@ Representative shape:
     "remote": {
       "url": "https://runtime.example.com",
       "oauth": {
-        "audience": "oasclird",
+        "audience": "oclird",
         "scopes": [
           "bundle:payments",
           "tool:users.get",

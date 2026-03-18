@@ -76,7 +76,7 @@ paths:
 ## 3. Inspect the catalog — your first win ✓
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json catalog list --format pretty
+./bin/ocli --embedded --config ./.cli.json catalog list --format pretty
 ```
 
 **What to expect:**
@@ -93,14 +93,14 @@ If you see catalog output, the binary is working and discovery succeeded. **If y
 These are the safest first commands because they do **not** call the upstream API:
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
-./bin/oascli --embedded --config ./.cli.json explain tickets:listTickets --format pretty
+./bin/ocli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
+./bin/ocli --embedded --config ./.cli.json explain tickets:listTickets --format pretty
 ```
 
 ## 5. Preview the dynamic command tree
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json helpdesk tickets --help
+./bin/ocli --embedded --config ./.cli.json helpdesk tickets --help
 ```
 
 This help renders correctly because the runtime and config are already available. Without `--embedded` and a valid config path, top-level help can fail before Cobra renders anything — that is expected behavior, not a bug.
@@ -108,23 +108,23 @@ This help renders correctly because the runtime and config are already available
 ## 6. Start the daemon when you want a reusable runtime
 
 ```bash
-./bin/oasclird --config ./.cli.json --addr 127.0.0.1:8765
+./bin/oclird --config ./.cli.json --addr 127.0.0.1:8765
 ```
 
 In another shell:
 
 ```bash
-./bin/oascli --runtime http://127.0.0.1:8765 --config ./.cli.json catalog list --format pretty
+./bin/ocli --runtime http://127.0.0.1:8765 --config ./.cli.json catalog list --format pretty
 ```
 
-`oasclird` writes instance metadata to `runtime.json`, so later `oascli` commands can resolve the runtime automatically when the instance ID and state directory line up. See [Deployment models](../runtime/deployment-models) and [Tracing and instances](../operations/tracing-and-instances).
+`oclird` writes instance metadata to `runtime.json`, so later `ocli` commands can resolve the runtime automatically when the instance ID and state directory line up. See [Deployment models](../runtime/deployment-models) and [Tracing and instances](../operations/tracing-and-instances).
 
 ## 7. Execute a real tool only when the upstream API is reachable
 
 With the sample config, a dynamic command looks like this:
 
 ```bash
-./bin/oascli --runtime http://127.0.0.1:8765 --config ./.cli.json helpdesk tickets list-tickets --status open
+./bin/ocli --runtime http://127.0.0.1:8765 --config ./.cli.json helpdesk tickets list-tickets --status open
 ```
 
 This calls the first OpenAPI server URL (`https://api.example.com` in this sample). Replace it with a real service before expecting a successful response.

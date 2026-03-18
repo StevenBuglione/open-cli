@@ -47,7 +47,7 @@ These are the issues this plan must close.
 
 3. **Local daemon lane is not a real daemon proof**
    - File: `product-tests/tests/campaign_local_daemon_matrix_test.go`
-   - Problem: uses in-process test runtime helpers; does not prove real `oasclird` process lifecycle, restart behavior, or actual CLI/runtime attach behavior.
+   - Problem: uses in-process test runtime helpers; does not prove real `oclird` process lifecycle, restart behavior, or actual CLI/runtime attach behavior.
    - Required outcome: add at least one process-backed daemon fleet lane.
 
 4. **Remote API lane overclaims**
@@ -208,7 +208,7 @@ If implementing transport OAuth, write a test that proves an unauthenticated req
 Run:
 
 ```bash
-cd /home/sbuglione/oascli/oas-cli-go/.worktrees/copilot-fleet-validation
+cd /home/sbuglione/ocli/open-cli/.worktrees/copilot-fleet-validation
 go test ./product-tests/tests/... -run TestCapabilityMatrixMCPRemoteLaneIsHonest -count=1
 ```
 
@@ -368,14 +368,14 @@ git commit -m "test: add failure and audit proof to remote API fleet lanes"
 **Files:**
 - Create: `product-tests/tests/campaign_local_daemon_process_test.go`
 - Modify: `product-tests/testdata/fleet/capability-matrix.yaml`
-- Test: `cmd/oasclird`, `cmd/oascli`, product tests
+- Test: `cmd/oclird`, `cmd/ocli`, product tests
 
 - [x] **Step 1: Write the failing process-backed campaign**
 
 The test should:
 
-1. start a real `oasclird` process against a temp config
-2. invoke `oascli` against it with `--runtime`
+1. start a real `oclird` process against a temp config
+2. invoke `ocli` against it with `--runtime`
 3. prove at least one attach/use path
 4. stop the daemon cleanly
 
@@ -728,7 +728,7 @@ git commit -m "docs: restore fleet planning artifacts"
 - [x] **Step 1: Run baseline verification**
 
 ```bash
-cd /home/sbuglione/oascli/oas-cli-go/.worktrees/copilot-fleet-validation
+cd /home/sbuglione/ocli/open-cli/.worktrees/copilot-fleet-validation
 make verify
 ```
 
@@ -750,8 +750,8 @@ cd website && npm run build
 
 Check:
 
-- `/tmp/oascli-fleet/**/rubric.json`
-- `/tmp/oascli-fleet/**/transcript.log`
+- `/tmp/ocli-fleet/**/rubric.json`
+- `/tmp/ocli-fleet/**/transcript.log`
 - any new evidence artifacts
 
 - [x] **Step 5: Record what still remains**

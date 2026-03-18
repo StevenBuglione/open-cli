@@ -11,7 +11,7 @@ This project supports two kinds of operator-supplied guidance on top of raw Open
 - **skill manifests** add usage guidance to tools
 - **Arazzo workflows** group tools into named multi-step flows
 
-Neither feature changes the upstream HTTP contract. They enrich the catalog that `oascli` and `oasclird` work with.
+Neither feature changes the upstream HTTP contract. They enrich the catalog that `ocli` and `oclird` work with.
 
 ## Where these documents come from
 

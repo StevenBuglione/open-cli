@@ -50,7 +50,7 @@ Write the design-principles section and the three-layer compatibility model:
 2. runtime auth broker / issuer
 3. compatible runtime
 
-Make clear that `oascli` interoperates with the broker/runtime contract, not each upstream provider directly.
+Make clear that `ocli` interoperates with the broker/runtime contract, not each upstream provider directly.
 
 - [ ] **Step 5: Define the client-visible auth modes**
 
@@ -71,7 +71,7 @@ And define the normalized JWT claim model:
 ```json
 {
   "iss": "https://auth.example.com",
-  "aud": "oasclird",
+  "aud": "oclird",
   "sub": "user-or-session",
   "scope": "bundle:payments tool:users.get"
 }
@@ -333,8 +333,8 @@ git commit -m "feat: expose brokered runtime auth metadata"
 ### Task 5: Align client auth flows with the brokered contract
 
 **Files:**
-- Modify: `cmd/oascli/main.go`
-- Modify: `cmd/oascli/main_test.go`
+- Modify: `cmd/ocli/main.go`
+- Modify: `cmd/ocli/main_test.go`
 - Modify: `pkg/auth/oauth.go`
 - Modify: `pkg/auth/oauth_test.go`
 
@@ -348,7 +348,7 @@ Add tests for:
 
 - [ ] **Step 2: Run the client tests to verify they fail**
 
-Run: `go test ./cmd/oascli ./pkg/auth -run 'TestRootCommandUsesOAuthClientRemoteRuntimeBearerToken|TestRootCommandUsesRemoteBrowserLoginBearerToken|TestRootCommandCompletesRemoteBrowserLoginAuthorizationCodeFlow|TestResolveOAuthAccessToken.*' -count=1`
+Run: `go test ./cmd/ocli ./pkg/auth -run 'TestRootCommandUsesOAuthClientRemoteRuntimeBearerToken|TestRootCommandUsesRemoteBrowserLoginBearerToken|TestRootCommandCompletesRemoteBrowserLoginAuthorizationCodeFlow|TestResolveOAuthAccessToken.*' -count=1`
 
 Expected: FAIL because the client does not fully align to the generalized contract yet.
 
@@ -358,14 +358,14 @@ Update the runtime token acquisition path and auth helpers to honor the contract
 
 - [ ] **Step 4: Run the client tests to verify they pass**
 
-Run: `go test ./cmd/oascli ./pkg/auth -run 'TestRootCommandUsesOAuthClientRemoteRuntimeBearerToken|TestRootCommandUsesRemoteBrowserLoginBearerToken|TestRootCommandCompletesRemoteBrowserLoginAuthorizationCodeFlow|TestResolveOAuthAccessToken.*' -count=1`
+Run: `go test ./cmd/ocli ./pkg/auth -run 'TestRootCommandUsesOAuthClientRemoteRuntimeBearerToken|TestRootCommandUsesRemoteBrowserLoginBearerToken|TestRootCommandCompletesRemoteBrowserLoginAuthorizationCodeFlow|TestResolveOAuthAccessToken.*' -count=1`
 
 Expected: PASS
 
 - [ ] **Step 5: Commit the client slice**
 
 ```bash
-git add cmd/oascli/main.go cmd/oascli/main_test.go pkg/auth/oauth.go pkg/auth/oauth_test.go
+git add cmd/ocli/main.go cmd/ocli/main_test.go pkg/auth/oauth.go pkg/auth/oauth_test.go
 git commit -m "feat: align client runtime auth flows with broker contract"
 ```
 
@@ -405,7 +405,7 @@ This deliverable is:
 
 - a documentation-backed reference example under `examples/runtime-auth-broker/reference/`
 - a runnable product-test fixture in `product-tests/tests/helpers/runtime_auth_broker.go`
-- not a production broker implementation bundled into `oascli`
+- not a production broker implementation bundled into `ocli`
 
 The fixture contract should be explicit:
 
@@ -431,7 +431,7 @@ The fixture should stand up:
 The issued runtime JWT should include at least:
 
 - `iss: http://broker.test`
-- `aud: oasclird`
+- `aud: oclird`
 - `sub: user-or-session`
 - `scope: bundle:payments tool:users.get`
 - `exp: <future unix timestamp>`
@@ -480,7 +480,7 @@ Document:
 Run:
 
 ```bash
-go test ./internal/runtime ./cmd/oascli ./pkg/auth ./product-tests/tests -count=1
+go test ./internal/runtime ./cmd/ocli ./pkg/auth ./product-tests/tests -count=1
 ```
 
 Expected: PASS

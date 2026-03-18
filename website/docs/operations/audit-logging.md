@@ -19,7 +19,7 @@ For a resolved instance, the default audit path is:
 You can override it in daemon mode with:
 
 ```bash
-oasclird --audit-path /var/log/oascli/team-a.audit.log
+oclird --audit-path /var/log/ocli/team-a.audit.log
 ```
 
 ## File format

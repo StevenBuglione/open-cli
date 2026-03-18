@@ -4,14 +4,14 @@ title: Catalog and Explain
 
 # Catalog and Explain
 
-The safest way to understand an `oascli` setup is to inspect the catalog before executing tools.
+The safest way to understand an `ocli` setup is to inspect the catalog before executing tools.
 
 ## `catalog list`
 
 `catalog list` prints the runtime response from `GET /v1/catalog/effective`:
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json catalog list --format pretty
+./bin/ocli --embedded --config ./.cli.json catalog list --format pretty
 ```
 
 The payload has two major sections:
@@ -26,7 +26,7 @@ That split matters because the catalog is broader than the command tree you can 
 Use this command when you need machine-readable detail for one tool:
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json tool schema tickets:createTicket --format pretty
+./bin/ocli --embedded --config ./.cli.json tool schema tickets:createTicket --format pretty
 ```
 
 The schema includes fields such as:
@@ -44,7 +44,7 @@ The schema includes fields such as:
 Use `explain` when skill manifests or overlays added operator guidance:
 
 ```bash
-./bin/oascli --embedded --config ./.cli.json explain tickets:createTicket --format pretty
+./bin/ocli --embedded --config ./.cli.json explain tickets:createTicket --format pretty
 ```
 
 The response contains:
@@ -63,7 +63,7 @@ That means you can sometimes inspect a tool by ID even when it is not present in
 
 Practical implications:
 
-- a tool may be visible to `tool schema` but absent from `oascli <service> <group> ...`
+- a tool may be visible to `tool schema` but absent from `ocli <service> <group> ...`
 - `tool schema` does **not** imply that execution will be allowed
 - approval requirements and curated restrictions are still enforced during execution
 
@@ -71,7 +71,7 @@ Practical implications:
 
 Tool IDs are always based on the **service ID**, not the service alias. For example:
 
-- command path: `oascli helpdesk tickets list-tickets`
+- command path: `ocli helpdesk tickets list-tickets`
 - tool ID: `tickets:listTickets`
 
 Use tool IDs with `tool schema`, `explain`, policy patterns, and workflow bindings.

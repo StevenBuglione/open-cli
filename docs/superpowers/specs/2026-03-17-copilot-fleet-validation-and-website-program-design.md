@@ -12,7 +12,7 @@ That gap-closure tracker is the operational source of truth for what was impleme
 
 ## Problem
 
-`oas-cli-go` needed one program that could prove the product the way real operators use it while also making the docs site usable for both first-time users and enterprise evaluators.
+`open-cli` needed one program that could prove the product the way real operators use it while also making the docs site usable for both first-time users and enterprise evaluators.
 
 Two failures had to be avoided:
 

@@ -1,8 +1,8 @@
-# OAS-CLI Agent Profile 0.1.0
+# Open CLI Agent Profile 0.1.0
 
 ## Skill Manifest
 
-The OAS-CLI Skill Manifest is a machine-readable advisory document that maps tool IDs to usage guidance, caveats, and examples.
+The Open CLI Skill Manifest is a machine-readable advisory document that maps tool IDs to usage guidance, caveats, and examples.
 
 ## Required Fields
 

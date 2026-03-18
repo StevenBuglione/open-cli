@@ -4,12 +4,12 @@ title: Development Overview
 
 # Development Overview
 
-**Read this if** you are contributing to `oas-cli-go` or evaluating the maturity of the implementation. This page answers: how is the repo organized, what is the contributor workflow, and why fleet validation and the product test harness are the primary signals that the implementation is production-ready — not just design intent.
+**Read this if** you are contributing to `open-cli` or evaluating the maturity of the implementation. This page answers: how is the repo organized, what is the contributor workflow, and why fleet validation and the product test harness are the primary signals that the implementation is production-ready — not just design intent.
 
 The repository is organized around a clear split:
 
-- **CLI surface** in `cmd/oascli`
-- **runtime daemon** in `cmd/oasclird` and `internal/runtime`
+- **CLI surface** in `cmd/ocli`
+- **runtime daemon** in `cmd/oclird` and `internal/runtime`
 - **library packages** under `pkg/` for config, discovery, catalog building, execution, caching, audit, instance handling, and observability
 - **docs site** under `website/` for the published Docusaurus documentation and contributor guides
 
@@ -43,7 +43,7 @@ Each bucket has a natural owner package; resist the urge to push behavior into `
 
 ## Current design constraints worth respecting
 
-- `oascli` is thin and runtime-backed by design
+- `ocli` is thin and runtime-backed by design
 - the runtime is the enforcement point for policy, auth, cache, and audit
 - instance isolation is file-system based
 - observability is abstracted behind `pkg/obs.Observer`

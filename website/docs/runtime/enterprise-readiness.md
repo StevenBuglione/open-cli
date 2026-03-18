@@ -4,7 +4,7 @@ title: Enterprise Readiness
 
 # Enterprise Readiness
 
-This page is the shortest honest route through the parts of `oas-cli-go` that matter during an enterprise evaluation.
+This page is the shortest honest route through the parts of `open-cli` that matter during an enterprise evaluation.
 
 ## Proof boundary summary
 
@@ -84,7 +84,7 @@ These pages explain what operators can inspect after execution and how separate 
 By the time you finish the pages above, you should be able to answer:
 
 - which deployment model fits a workstation, CI runner, or hosted runtime
-- how remote callers authenticate to `oasclird`
+- how remote callers authenticate to `oclird`
 - how runtime scopes limit what a caller can see and execute
 - what proof is reproducible in CI versus what needs a live external environment
 - what logs and artifacts remain after a fleet validation run

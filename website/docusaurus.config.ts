@@ -3,15 +3,15 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'oas-cli-go',
+  title: 'open-cli',
   tagline: 'A stateless CLI and local runtime for OpenAPI discovery, policy, and execution.',
   favicon: 'img/favicon.ico',
 
-  url: 'https://stevenbuglione.github.io',
-  baseUrl: '/oas-cli-go/',
+  url: 'https://open-cli.dev',
+  baseUrl: '/',
 
   organizationName: 'StevenBuglione',
-  projectName: 'oas-cli-go',
+  projectName: 'open-cli',
   trailingSlash: false,
 
   onBrokenLinks: 'throw',
@@ -28,7 +28,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/StevenBuglione/oas-cli-go/edit/main/website/',
+          editUrl: 'https://github.com/StevenBuglione/open-cli/edit/main/website/',
         },
         blog: false,
         theme: {
@@ -41,9 +41,9 @@ const config: Config = {
   themeConfig: {
     image: 'img/social-card.svg',
     navbar: {
-      title: 'oas-cli-go',
+      title: 'open-cli',
       logo: {
-        alt: 'oas-cli-go logo',
+        alt: 'open-cli logo',
         src: 'img/logo.svg',
       },
       items: [
@@ -101,7 +101,7 @@ const config: Config = {
           ],
         },
         {
-          href: 'https://github.com/StevenBuglione/oas-cli-go',
+          href: 'https://github.com/StevenBuglione/open-cli',
           label: 'GitHub',
           position: 'right',
         },
@@ -123,8 +123,8 @@ const config: Config = {
         {
           title: 'Project',
           items: [
-            {label: 'GitHub', href: 'https://github.com/StevenBuglione/oas-cli-go'},
-            {label: 'Issues', href: 'https://github.com/StevenBuglione/oas-cli-go/issues'},
+            {label: 'GitHub', href: 'https://github.com/StevenBuglione/open-cli'},
+            {label: 'Issues', href: 'https://github.com/StevenBuglione/open-cli/issues'},
           ],
         },
       ],

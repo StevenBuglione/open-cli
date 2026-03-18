@@ -6,7 +6,7 @@ title: Fleet Validation
 
 **Read this whether you are an operator evaluating production-readiness or a contributor adding capability proof.** For operators: the fleet matrix is the executable evidence that the runtime works the way the docs describe. For contributors: the matrix is how new capability becomes part of the baseline record.
 
-`oas-cli-go` now has two complementary validation layers for product-style proof:
+`open-cli` now has two complementary validation layers for product-style proof:
 
 - a **reproducible fleet matrix** for CI-safe lanes we can execute in ephemeral environments
 - a **live proof matrix** for enterprise-only flows that require real external identity or remote runtime infrastructure
@@ -41,7 +41,7 @@ Or from inside `product-tests/`:
 make fleet-matrix-ci
 ```
 
-Artifacts are written under `/tmp/oascli-fleet/` by default. Each lane gets its own directory with:
+Artifacts are written under `/tmp/ocli-fleet/` by default. Each lane gets its own directory with:
 
 - `transcript.log`
 - `rubric.json`
@@ -66,7 +66,7 @@ Example `transcript.log` excerpt:
 
 ```text
 [run-agent-campaign] lane='remote-runtime-oauth-client' pattern='^TestCampaignRemoteRuntimeMatrix$' timeout=120s
-[run-agent-campaign] wrote rubric → /tmp/oascli-fleet/remote-runtime-oauth-client/rubric.json
+[run-agent-campaign] wrote rubric → /tmp/ocli-fleet/remote-runtime-oauth-client/rubric.json
 ```
 
 If you are reviewing enterprise-oriented proof rather than implementation mechanics, continue to [Enterprise readiness](../runtime/enterprise-readiness) or the [Authentik reference proof](../runtime/authentik-reference).

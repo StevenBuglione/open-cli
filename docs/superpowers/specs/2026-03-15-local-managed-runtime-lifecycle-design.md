@@ -2,7 +2,7 @@
 
 ## Problem statement
 
-`oascli` currently supports embedded execution and local daemon-style execution, but the lifecycle rules for when a managed local `oasclird` should start, attach, stay warm, share, and shut down are not yet defined as a first-class part of `.cli.json`.
+`ocli` currently supports embedded execution and local daemon-style execution, but the lifecycle rules for when a managed local `oclird` should start, attach, stay warm, share, and shut down are not yet defined as a first-class part of `.cli.json`.
 
 This is especially important for local MCP servers. If they are launched from `npx`, Docker, or other local transports, agents need a warm managed runtime so repeated tool calls do not pay repeated startup latency. At the same time, that managed runtime must not leave orphaned daemons or child MCP processes behind after the owning session exits.
 
@@ -12,7 +12,7 @@ This is especially important for local MCP servers. If they are launched from `n
 - Auto-promote to a managed local daemon when local MCP sources are present.
 - Keep local MCP transports warm across repeated tool calls.
 - Define clean ownership, sharing, attach, and shutdown rules.
-- Prevent orphaned `oasclird` and MCP child processes.
+- Prevent orphaned `oclird` and MCP child processes.
 - Reuse current instance/state isolation where possible.
 
 ## Non-goals

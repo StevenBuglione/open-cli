@@ -4,14 +4,14 @@ title: Authentik Reference Proof
 
 # Authentik Reference Proof
 
-`oas-cli-go` keeps the **runtime auth contract broker-neutral**, but this repository now ships one official, working reference proof built around **Authentik**.
+`open-cli` keeps the **runtime auth contract broker-neutral**, but this repository now ships one official, working reference proof built around **Authentik**.
 
 That reference proof covers two paths:
 
 - **automated workload proof** with `oauthClient`
 - **operator-run browser proof** with Authentik federating to Microsoft Entra ID
 
-Authentik is the example, not the requirement. Any broker or gateway is acceptable as long as it satisfies the runtime auth contract expected by `oascli` and `oasclird`.
+Authentik is the example, not the requirement. Any broker or gateway is acceptable as long as it satisfies the runtime auth contract expected by `ocli` and `oclird`.
 
 ## Proof boundary
 
@@ -29,8 +29,8 @@ The automated proof is the reproducible CI artifact. The browser-login and Entra
 The automated Authentik product test proves that:
 
 - Authentik serves discovery, JWKS, authorization, and token endpoints
-- `oascli` can acquire a runtime token through `oauthClient`
-- `oasclird` validates that token with `oidc_jwks`
+- `ocli` can acquire a runtime token through `oauthClient`
+- `oclird` validates that token with `oidc_jwks`
 - catalog visibility is filtered by runtime scopes
 - allowed execution succeeds
 - denied execution fails closed
@@ -45,12 +45,12 @@ The implementation lives in:
 
 The manual proof is the human path:
 
-1. `oascli` discovers runtime auth requirements from `/v1/runtime/info`
-2. `oascli` reads `/v1/auth/browser-config`
+1. `ocli` discovers runtime auth requirements from `/v1/runtime/info`
+2. `ocli` reads `/v1/auth/browser-config`
 3. the browser redirects to Authentik
 4. Authentik federates to Entra
 5. Authentik issues the runtime token
-6. `oasclird` validates the token and enforces scopes
+6. `oclird` validates the token and enforces scopes
 
 That proof is documented rather than auto-executed because it requires a real Entra tenant, application, and test identity.
 
@@ -84,7 +84,7 @@ The shipped product proof validated these Authentik-specific details:
 Validated scope-mapping expression:
 
 ```python
-audience = "oasclird"
+audience = "oclird"
 return {
     "scope": " ".join(token.scope),
     "aud": audience,

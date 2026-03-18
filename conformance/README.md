@@ -1,8 +1,8 @@
 # oas-cli-conformance
 
-Language-neutral fixtures and expected outputs for validating OAS-CLI implementations.
+Language-neutral fixtures and expected outputs for validating Open CLI implementations.
 
-> **Monorepo note:** This directory is a first-class subproject of [oas-cli-go](../README.md). The runner uses `spec/schemas/` (the sibling subproject) as the default schema root, so you do not need to check out a separate repository.
+> **Monorepo note:** This directory is a first-class subproject of [open-cli](../README.md). The runner uses `spec/schemas/` (the sibling subproject) as the default schema root, so you do not need to check out a separate repository.
 
 ## Contents
 

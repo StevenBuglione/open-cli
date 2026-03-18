@@ -47,15 +47,15 @@ The service metadata document is loaded as JSON and must expose a `linkset` arra
   "linkset": [
     {
       "href": "./skills/tickets.skill.json",
-      "rel": "https://oascli.dev/rel/skill-manifest"
+      "rel": "https://open-cli.dev/rel/skill-manifest"
     },
     {
       "href": "./workflows/tickets.arazzo.yaml",
-      "rel": "https://oascli.dev/rel/workflows"
+      "rel": "https://open-cli.dev/rel/workflows"
     },
     {
       "href": "./overlays/tickets.overlay.yaml",
-      "rel": "https://oascli.dev/rel/schema-overlay"
+      "rel": "https://open-cli.dev/rel/schema-overlay"
     }
   ]
 }

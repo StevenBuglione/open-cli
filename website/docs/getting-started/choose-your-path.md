@@ -32,8 +32,8 @@ title: Choose Your Path
 
 **First commands to run:**
 ```bash
-./bin/oascli --embedded --config ./.cli.json catalog list --format pretty
-./bin/oascli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
+./bin/ocli --embedded --config ./.cli.json catalog list --format pretty
+./bin/ocli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
 ```
 
 **Read this next:** [CLI overview](../cli/overview) to understand the full command model.
@@ -44,7 +44,7 @@ title: Choose Your Path
 
 **Choose this if:** You expect repeated CLI use, a warmed catalog cache, or multiple commands against the same config.
 
-**What you get:** `oasclird` running as a local control plane; `oascli` points at it by URL.
+**What you get:** `oclird` running as a local control plane; `ocli` points at it by URL.
 
 **Reading order:**
 1. Complete [Path 1](#1-first-successful-run) first
@@ -73,7 +73,7 @@ title: Choose Your Path
 
 ## 4. MCP integrations
 
-**Choose this if:** You care about MCP stdio or streamable HTTP servers connecting to `oasclird`.
+**Choose this if:** You care about MCP stdio or streamable HTTP servers connecting to `oclird`.
 
 **What you get:** Understanding of which MCP paths are available, which are proven in CI, and how to configure them.
 

@@ -4,9 +4,9 @@ title: Runtime Overview
 
 # Runtime Overview
 
-**Read this if** you are deploying `oasclird`, debugging policy or auth behavior, or evaluating the runtime as a shared enforcement point. This page answers: what does the runtime own, what is its HTTP surface, and how does the request lifecycle work end to end.
+**Read this if** you are deploying `oclird`, debugging policy or auth behavior, or evaluating the runtime as a shared enforcement point. This page answers: what does the runtime own, what is its HTTP surface, and how does the request lifecycle work end to end.
 
-`oasclird` is the execution and policy plane for `oascli`.
+`oclird` is the execution and policy plane for `ocli`.
 
 Even when you use embedded mode, the same runtime server implementation is doing the work behind the scenes.
 
@@ -41,13 +41,13 @@ See [HTTP API](./http-api) for request and response examples.
 
 ## Local-first deployment
 
-`oasclird` defaults to `127.0.0.1:0`, which means:
+`oclird` defaults to `127.0.0.1:0`, which means:
 
 - it binds only to localhost by default
 - the OS picks an available port
 - the chosen URL is written to the instance registry (`runtime.json`)
 
-This default matters because the safest baseline is still local-only access on loopback. When you do expose the daemon more broadly, `oasclird` can enforce its own runtime auth boundary through `runtime.server.auth`, and you should still keep external network controls in front of it.
+This default matters because the safest baseline is still local-only access on loopback. When you do expose the daemon more broadly, `oclird` can enforce its own runtime auth boundary through `runtime.server.auth`, and you should still keep external network controls in front of it.
 
 ## Default config path behavior
 
@@ -57,15 +57,15 @@ If you do not set a default config, runtime requests must provide one.
 
 ## Embedded mode uses the same server logic
 
-`oascli --embedded` creates `internal/runtime.Server` in-process and sends requests through an `httptest` recorder. This means:
+`ocli --embedded` creates `internal/runtime.Server` in-process and sends requests through an `httptest` recorder. This means:
 
 - catalog building, policy, auth, cache, and audit behavior match the daemon path closely
-- there is no separate `oasclird` process to manage
+- there is no separate `oclird` process to manage
 - there is also no runtime registry file to discover later
 
 ## Request lifecycle
 
-A normal `oascli` request looks like this:
+A normal `ocli` request looks like this:
 
 1. resolve runtime location or use embedded mode
 2. fetch the effective catalog
@@ -76,13 +76,13 @@ A normal `oascli` request looks like this:
 
 Because catalog resolution happens so early, runtime availability affects even CLI help and schema inspection.
 
-For remote runtimes, `oascli` can also attach runtime-level bearer auth before those HTTP calls. The current client supports:
+For remote runtimes, `ocli` can also attach runtime-level bearer auth before those HTTP calls. The current client supports:
 
 - forwarding an operator-provided token (`runtime.remote.oauth.mode: "providedToken"`)
 - acquiring a client-credentials token (`runtime.remote.oauth.mode: "oauthClient"`)
 - browser login against runtime-hosted metadata (`runtime.remote.oauth.mode: "browserLogin"`)
 
-When `runtime.server.auth` is enabled on `oasclird`, the daemon itself now becomes the authorization boundary for remote callers:
+When `runtime.server.auth` is enabled on `oclird`, the daemon itself now becomes the authorization boundary for remote callers:
 
 - bearer auth is required on runtime HTTP requests
 - the effective catalog is filtered by runtime scopes

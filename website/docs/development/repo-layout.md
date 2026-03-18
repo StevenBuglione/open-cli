@@ -14,8 +14,8 @@ The main implementation lives in a compact set of directories.
     ci.yml              Go verification, spec/conformance validation, docs build
     docs-pages.yml      GitHub Pages deployment for website/
 cmd/
-  oascli/               CLI entrypoint and runtime client
-  oasclird/             daemon entrypoint
+  ocli/               CLI entrypoint and runtime client
+  oclird/             daemon entrypoint
 internal/
   runtime/              HTTP API handlers and runtime wiring
 pkg/
@@ -30,7 +30,7 @@ pkg/
   openapi/              document loading, overlay application, reference resolution
   overlay/              overlay document model and JSONPath-based patch engine
   policy/               execution-time policy decisions
-spec/                   normative OAS-CLI specification and JSON schemas
+spec/                   normative Open CLI specification and JSON schemas
   spec/                 prose specifications (core, config, profiles)
   schemas/              machine-readable JSON schemas for published artifacts
   examples/             example documents validated in spec CI
@@ -55,8 +55,8 @@ README.md               repository front door and install/verify summary
 
 | If you need to change... | Start here |
 | --- | --- |
-| CLI flags, output, runtime client behavior | `cmd/oascli/main.go` |
-| daemon startup, flags, registry writing | `cmd/oasclird/main.go` |
+| CLI flags, output, runtime client behavior | `cmd/ocli/main.go` |
+| daemon startup, flags, registry writing | `cmd/oclird/main.go` |
 | runtime endpoints | `internal/runtime/server.go` |
 | config schema or merge behavior | `pkg/config/` |
 | discovery behavior | `pkg/discovery/` |
@@ -76,7 +76,7 @@ README.md               repository front door and install/verify summary
 
 The repo keeps tests close to the packages they exercise:
 
-- `cmd/oascli/main_test.go`
+- `cmd/ocli/main_test.go`
 - `internal/runtime/server_test.go`
 - `pkg/config/config_test.go`
 - `pkg/catalog/*.go` tests

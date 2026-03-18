@@ -52,15 +52,15 @@ Then publish metadata like:
   "linkset": [
     {
       "href": "./overlays/tickets.overlay.yaml",
-      "rel": "https://oascli.dev/rel/schema-overlay"
+      "rel": "https://open-cli.dev/rel/schema-overlay"
     },
     {
       "href": "./skills/tickets.skill.json",
-      "rel": "https://oascli.dev/rel/skill-manifest"
+      "rel": "https://open-cli.dev/rel/skill-manifest"
     },
     {
       "href": "./workflows/tickets.arazzo.yaml",
-      "rel": "https://oascli.dev/rel/workflows"
+      "rel": "https://open-cli.dev/rel/workflows"
     }
   ]
 }
@@ -89,5 +89,5 @@ A practical setup is:
 
 - keep security scheme names stable so `secrets` mappings do not break
 - prefer env/file/keychain secrets over `exec` unless necessary
-- bind `oasclird` to localhost unless you have external protections
+- bind `oclird` to localhost unless you have external protections
 - test both `catalog list` and a real tool execution after changing auth or curation
