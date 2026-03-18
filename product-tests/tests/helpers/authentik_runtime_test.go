@@ -19,7 +19,7 @@ func TestResolveAuthentikFixtureAvailability(t *testing.T) {
 			enableTests: false,
 			wantReady:   false,
 			wantFatal:   false,
-			wantMessage: "live Authentik product tests are disabled; set OASCLI_RUN_AUTHENTIK_TESTS=1 or use make test-runtime-auth-authentik",
+			wantMessage: "live Authentik product tests are disabled; set OCLI_RUN_AUTHENTIK_TESTS=1 or use make test-runtime-auth-authentik",
 		},
 		{
 			name:        "fail when stack is required but absent",

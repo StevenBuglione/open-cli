@@ -60,7 +60,7 @@ If you change config semantics, catalog output, schema-facing behavior, or anyth
 
 `product-tests/` holds end-to-end tests that exercise the CLI against real infrastructure (REST API, OAuth stub, MCP servers). They are separate from `go test ./...` because they require Docker and `npx`.
 
-The live Authentik runtime-auth slice is explicitly opt-in: plain `go test ./...` skips it unless `OASCLI_RUN_AUTHENTIK_TESTS=1` is set. Use `cd product-tests && make test-runtime-auth-authentik` for the real container-backed run; CI uses that dedicated target in its own job.
+The live Authentik runtime-auth slice is explicitly opt-in: plain `go test ./...` skips it unless `OCLI_RUN_AUTHENTIK_TESTS=1` is set. Use `cd product-tests && make test-runtime-auth-authentik` for the real container-backed run; CI uses that dedicated target in its own job.
 
 The broader fleet-based validation program is documented in [Fleet Validation](./fleet-validation). Use that page for the capability matrix, live proof inventory, and rubric artifact workflow.
 

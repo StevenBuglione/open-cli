@@ -62,7 +62,7 @@ These flags exist on the root command and apply to built-in and dynamic commands
 
 | Flag | Meaning |
 | --- | --- |
-| `--runtime` | Runtime base URL. If omitted, `oascli` tries `OASCLI_RUNTIME_URL`, then the instance registry, then `http://127.0.0.1:8765`. |
+| `--runtime` | Runtime base URL. If omitted, `oascli` tries `OCLI_RUNTIME_URL`, then the instance registry, then `http://127.0.0.1:8765`. |
 | `--config` | Path to the project `.cli.json`. |
 | `--mode` | Requested mode, typically `discover` or `curated`. |
 | `--agent-profile` | Agent profile name used for the selected effective view. |

@@ -876,13 +876,13 @@ func resolveCommandOptions(options CommandOptions) (CommandOptions, error) {
 		return cachedRuntimeCfg, cachedRuntimeCfg != nil
 	}
 	if options.InstanceID == "" {
-		options.InstanceID = os.Getenv("OASCLI_INSTANCE_ID")
+		options.InstanceID = os.Getenv("OCLI_INSTANCE_ID")
 	}
 	if options.StateDir == "" {
-		options.StateDir = os.Getenv("OASCLI_STATE_DIR")
+		options.StateDir = os.Getenv("OCLI_STATE_DIR")
 	}
 	if !options.Embedded {
-		options.Embedded = envBool("OASCLI_EMBEDDED")
+		options.Embedded = envBool("OCLI_EMBEDDED")
 	}
 	if options.Embedded {
 		options.RuntimeDeployment = "embedded"
@@ -912,7 +912,7 @@ func resolveCommandOptions(options CommandOptions) (CommandOptions, error) {
 		return options, nil
 	}
 	if options.RuntimeURL == "" {
-		options.RuntimeURL = os.Getenv("OASCLI_RUNTIME_URL")
+		options.RuntimeURL = os.Getenv("OCLI_RUNTIME_URL")
 	}
 	if options.RuntimeURL == "" && options.RuntimeDeployment == "remote" {
 		if runtimeCfg, ok := loadCachedRuntimeConfig(); ok && runtimeCfg.Remote != nil && runtimeCfg.Remote.URL != "" {
@@ -1604,7 +1604,7 @@ func cacheRootForState(stateDir string) string {
 }
 
 func detectTerminalSessionIdentity() string {
-	if value := os.Getenv("OASCLI_TERMINAL_SESSION_ID"); value != "" {
+	if value := os.Getenv("OCLI_TERMINAL_SESSION_ID"); value != "" {
 		return value
 	}
 	for _, fdPath := range []string{"/proc/self/fd/0", "/proc/self/fd/1", "/proc/self/fd/2"} {
@@ -1617,7 +1617,7 @@ func detectTerminalSessionIdentity() string {
 }
 
 func detectAgentSessionIdentity() string {
-	for _, name := range []string{"OASCLI_AGENT_SESSION_ID", "COPILOT_SESSION_ID"} {
+	for _, name := range []string{"OCLI_AGENT_SESSION_ID", "COPILOT_SESSION_ID"} {
 		if value := os.Getenv(name); value != "" {
 			return value
 		}

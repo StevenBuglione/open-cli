@@ -128,7 +128,7 @@ When `--embedded` is **not** set, `oascli` resolves the runtime in this order:
 
 1. explicit runtime deployment choice from config when present
 2. `--runtime`
-3. `OASCLI_RUNTIME_URL`
+3. `OCLI_RUNTIME_URL`
 4. instance registry (`runtime.json`) for the selected instance
 5. local managed-runtime startup when config selects local mode and no live registry exists
 6. fallback to `http://127.0.0.1:8765`
@@ -138,11 +138,11 @@ For explicit lifecycle control and discovery, the daemon now also exposes `GET /
 The instance selection itself can come from:
 
 1. `--instance-id`
-2. `OASCLI_INSTANCE_ID`
+2. `OCLI_INSTANCE_ID`
 3. derived ID from the config path
 4. `default`
 
-If you pass `--state-dir` (or `OASCLI_STATE_DIR`), `oascli` also derives the cache root under that state directory.
+If you pass `--state-dir` (or `OCLI_STATE_DIR`), `oascli` also derives the cache root under that state directory.
 
 ## Stale runtime registry fallback
 

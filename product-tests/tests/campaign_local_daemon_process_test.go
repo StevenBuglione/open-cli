@@ -51,7 +51,7 @@ func TestCampaignLocalDaemonProcess(t *testing.T) {
 		oclirdBin := buildBinary(t, repoRoot, "./cmd/oclird", filepath.Join(binDir, "oclird"))
 
 		runtimeInfo := startDaemonProcess(t, repoRoot, oclirdBin, configPath, stateDir)
-		commandEnv := append(os.Environ(), "OASCLI_TERMINAL_SESSION_ID=process-lane-terminal")
+		commandEnv := append(os.Environ(), "OCLI_TERMINAL_SESSION_ID=process-lane-terminal")
 
 		catalogOutput := runCommand(t, repoRoot, commandEnv, ocliBin,
 			"--runtime", runtimeInfo.URL,

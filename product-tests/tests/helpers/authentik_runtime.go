@@ -25,7 +25,7 @@ const (
 	authentikPrimarySlug       = "ocli-runtime"
 	authentikAlternateSlug     = "ocli-runtime-alt-issuer"
 	authentikCallbackURL       = "http://127.0.0.1:8787/callback"
-	authentikRunTestsEnv       = "OASCLI_RUN_AUTHENTIK_TESTS"
+	authentikRunTestsEnv       = "OCLI_RUN_AUTHENTIK_TESTS"
 	authentikClientIDEnv       = "OAS_REMOTE_CLIENT_ID"
 	authentikClientSecretEnv   = "OAS_REMOTE_CLIENT_SECRET"
 	authentikDefaultTTL        = "hours=1"
@@ -601,7 +601,7 @@ func composeServiceContainerID(t *testing.T, composeFile, service string) string
 
 func resolveAuthentikFixtureAvailability(service, containerID string, enableTests bool) (bool, bool, string) {
 	if !enableTests {
-		return false, false, "live Authentik product tests are disabled; set OASCLI_RUN_AUTHENTIK_TESTS=1 or use make test-runtime-auth-authentik"
+		return false, false, "live Authentik product tests are disabled; set OCLI_RUN_AUTHENTIK_TESTS=1 or use make test-runtime-auth-authentik"
 	}
 	if strings.TrimSpace(containerID) == "" {
 		return false, true, fmt.Sprintf("%s container is not running; start the Authentik stack with product-tests/scripts/authentik-up.sh or make authentik-up", service)

@@ -174,7 +174,7 @@ The product harness uses a tiny local proxy in the test fixture so `oascli` and 
 
 This fixture is intentionally **workload-only**: it bootstraps a confidential Authentik provider for `oauthClient` and does **not** advertise `/v1/auth/browser-config`. The browser proof is covered separately with the public-client reference template under `examples/runtime-auth-broker/authentik/`.
 
-The live Authentik tests are also intentionally **opt-in**. Plain `go test ./...` skips them unless `OASCLI_RUN_AUTHENTIK_TESTS=1` is set, which keeps the root verification lane deterministic. The dedicated `make test-runtime-auth-authentik` target sets that flag for you after starting the Authentik stack.
+The live Authentik tests are also intentionally **opt-in**. Plain `go test ./...` skips them unless `OCLI_RUN_AUTHENTIK_TESTS=1` is set, which keeps the root verification lane deterministic. The dedicated `make test-runtime-auth-authentik` target sets that flag for you after starting the Authentik stack.
 
 ```sh
 cd product-tests

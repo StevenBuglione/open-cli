@@ -381,8 +381,8 @@ paths:
 }
 
 func TestResolveCommandOptionsFallsBackWhenRuntimeRegistryIsStale(t *testing.T) {
-	t.Setenv("OASCLI_RUNTIME_URL", "")
-	t.Setenv("OASCLI_EMBEDDED", "")
+	t.Setenv("OCLI_RUNTIME_URL", "")
+	t.Setenv("OCLI_EMBEDDED", "")
 
 	deadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -420,6 +420,82 @@ func TestResolveCommandOptionsFallsBackWhenRuntimeRegistryIsStale(t *testing.T) 
 	}
 	if _, err := os.Stat(paths.RuntimePath); !os.IsNotExist(err) {
 		t.Fatalf("expected stale runtime registry to be removed, stat err=%v", err)
+	}
+}
+
+func TestResolveCommandOptionsUsesOCLIEnvironmentVariables(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("OCLI_INSTANCE_ID", "ocli-instance")
+	t.Setenv("OCLI_STATE_DIR", stateDir)
+	t.Setenv("OCLI_RUNTIME_URL", "http://127.0.0.1:18765")
+	t.Setenv("OASCLI_INSTANCE_ID", "legacy-instance")
+	t.Setenv("OASCLI_STATE_DIR", filepath.Join(stateDir, "legacy"))
+	t.Setenv("OASCLI_RUNTIME_URL", "http://127.0.0.1:9999")
+
+	resolved, err := resolveCommandOptions(CommandOptions{})
+	if err != nil {
+		t.Fatalf("resolveCommandOptions: %v", err)
+	}
+	if resolved.InstanceID != "ocli-instance" {
+		t.Fatalf("expected instance id from OCLI_INSTANCE_ID, got %q", resolved.InstanceID)
+	}
+	if resolved.StateDir != stateDir {
+		t.Fatalf("expected state dir from OCLI_STATE_DIR, got %q", resolved.StateDir)
+	}
+	if resolved.RuntimeURL != "http://127.0.0.1:18765" {
+		t.Fatalf("expected runtime url from OCLI_RUNTIME_URL, got %q", resolved.RuntimeURL)
+	}
+}
+
+func TestResolveCommandOptionsIgnoresLegacyEnvironmentVariables(t *testing.T) {
+	t.Setenv("OASCLI_INSTANCE_ID", "legacy-instance")
+	t.Setenv("OASCLI_STATE_DIR", t.TempDir())
+	t.Setenv("OASCLI_RUNTIME_URL", "http://127.0.0.1:9999")
+
+	resolved, err := resolveCommandOptions(CommandOptions{})
+	if err != nil {
+		t.Fatalf("resolveCommandOptions: %v", err)
+	}
+	if resolved.InstanceID != "" {
+		t.Fatalf("expected legacy OASCLI_INSTANCE_ID to be ignored, got %q", resolved.InstanceID)
+	}
+	if resolved.StateDir != "" {
+		t.Fatalf("expected legacy OASCLI_STATE_DIR to be ignored, got %q", resolved.StateDir)
+	}
+	if resolved.RuntimeURL != defaultRuntimeURL {
+		t.Fatalf("expected legacy OASCLI_RUNTIME_URL to be ignored, got %q", resolved.RuntimeURL)
+	}
+}
+
+func TestResolveCommandOptionsUsesOCLIEmbeddedEnvironmentVariable(t *testing.T) {
+	t.Setenv("OCLI_EMBEDDED", "1")
+	t.Setenv("OASCLI_EMBEDDED", "0")
+
+	resolved, err := resolveCommandOptions(CommandOptions{})
+	if err != nil {
+		t.Fatalf("resolveCommandOptions: %v", err)
+	}
+	if !resolved.Embedded {
+		t.Fatalf("expected embedded mode when OCLI_EMBEDDED=1")
+	}
+	if resolved.RuntimeDeployment != "embedded" {
+		t.Fatalf("expected embedded runtime deployment, got %q", resolved.RuntimeDeployment)
+	}
+}
+
+func TestResolveCommandOptionsIgnoresLegacyEmbeddedEnvironmentVariable(t *testing.T) {
+	t.Setenv("OCLI_EMBEDDED", "")
+	t.Setenv("OASCLI_EMBEDDED", "1")
+
+	resolved, err := resolveCommandOptions(CommandOptions{})
+	if err != nil {
+		t.Fatalf("resolveCommandOptions: %v", err)
+	}
+	if resolved.Embedded {
+		t.Fatalf("expected legacy OASCLI_EMBEDDED to be ignored")
+	}
+	if resolved.RuntimeDeployment == "embedded" {
+		t.Fatalf("expected legacy OASCLI_EMBEDDED to leave runtime deployment unset")
 	}
 }
 
@@ -1971,6 +2047,25 @@ func TestResolveCommandOptionsUsesShareKeyForSharedGroupLocalRuntime(t *testing.
 	}
 	if !bytes.Contains([]byte(capturedInstanceID), []byte("team-a")) {
 		t.Fatalf("expected shared-group instance id to include share key, got %q", capturedInstanceID)
+	}
+}
+
+func TestDetectTerminalSessionIdentityUsesOCLIEnvironmentVariable(t *testing.T) {
+	t.Setenv("OCLI_TERMINAL_SESSION_ID", "ocli-terminal")
+	t.Setenv("OASCLI_TERMINAL_SESSION_ID", "legacy-terminal")
+
+	if got := detectTerminalSessionIdentity(); got != "ocli-terminal" {
+		t.Fatalf("expected OCLI terminal session id, got %q", got)
+	}
+}
+
+func TestDetectAgentSessionIdentityUsesOCLIEnvironmentVariable(t *testing.T) {
+	t.Setenv("OCLI_AGENT_SESSION_ID", "ocli-agent")
+	t.Setenv("OASCLI_AGENT_SESSION_ID", "legacy-agent")
+	t.Setenv("COPILOT_SESSION_ID", "copilot-agent")
+
+	if got := detectAgentSessionIdentity(); got != "ocli-agent" {
+		t.Fatalf("expected OCLI agent session id, got %q", got)
 	}
 }
 
