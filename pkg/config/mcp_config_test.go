@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
+	"github.com/StevenBuglione/open-cli/pkg/config"
 )
 
 func requireValidationDiagnostic(t *testing.T, err error, path, contains string) {

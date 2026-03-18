@@ -3,7 +3,7 @@ package overlay_test
 import (
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/overlay"
+	"github.com/StevenBuglione/open-cli/pkg/overlay"
 )
 
 func TestApplyUpdatesCopiesAndRemovesNodes(t *testing.T) {

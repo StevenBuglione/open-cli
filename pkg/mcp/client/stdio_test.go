@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	mcpclient "github.com/StevenBuglione/oas-cli-go/pkg/mcp/client"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	mcpclient "github.com/StevenBuglione/open-cli/pkg/mcp/client"
 )
 
 func TestOpenStdioUsesNewlineDelimitedJSONRPC(t *testing.T) {

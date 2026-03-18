@@ -1,5 +1,5 @@
 // Package helpers provides utilities for product-test scenarios that
-// require fully-isolated oasclird runtime instances.
+// require fully-isolated oclird runtime instances.
 package helpers
 
 import (
@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	"github.com/StevenBuglione/oas-cli-go/pkg/audit"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	"github.com/StevenBuglione/open-cli/pkg/audit"
 )
 
 // Instance wraps a runtime.Server backed by an httptest.Server with fully

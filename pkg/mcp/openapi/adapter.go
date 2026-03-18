@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	mcpclient "github.com/StevenBuglione/oas-cli-go/pkg/mcp/client"
+	mcpclient "github.com/StevenBuglione/open-cli/pkg/mcp/client"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 

@@ -17,13 +17,13 @@ import (
 	"testing"
 	"time"
 
-	runtimeserver "github.com/StevenBuglione/oas-cli-go/internal/runtime"
+	runtimeserver "github.com/StevenBuglione/open-cli/internal/runtime"
 )
 
 const (
-	authentikRuntimeAudience   = "oasclird"
-	authentikPrimarySlug       = "oascli-runtime"
-	authentikAlternateSlug     = "oascli-runtime-alt-issuer"
+	authentikRuntimeAudience   = "oclird"
+	authentikPrimarySlug       = "ocli-runtime"
+	authentikAlternateSlug     = "ocli-runtime-alt-issuer"
 	authentikCallbackURL       = "http://127.0.0.1:8787/callback"
 	authentikRunTestsEnv       = "OASCLI_RUN_AUTHENTIK_TESTS"
 	authentikClientIDEnv       = "OAS_REMOTE_CLIENT_ID"
@@ -407,7 +407,7 @@ func bootstrapAuthentikRuntime(t *testing.T, workerID string) authentikBootstrap
 	t.Helper()
 
 	scopeExpression := `
-audience = "wrong-audience" if "profile:wrong-audience" in token.scope else "oasclird"
+audience = "wrong-audience" if "profile:wrong-audience" in token.scope else "oclird"
 return {"scope": " ".join(token.scope), "aud": audience}
 `
 	script := fmt.Sprintf(`
@@ -442,10 +442,10 @@ def ensure_scope(name, scope_name):
     return mapping
 
 scope_mappings = [
-    ensure_scope("oascli runtime bundle:tickets", "bundle:tickets"),
-    ensure_scope("oascli runtime tool:tickets:listTickets", "tool:tickets:listTickets"),
-    ensure_scope("oascli runtime tool:users:listUsers", "tool:users:listUsers"),
-    ensure_scope("oascli runtime profile:wrong-audience", "profile:wrong-audience"),
+    ensure_scope("ocli runtime bundle:tickets", "bundle:tickets"),
+    ensure_scope("ocli runtime tool:tickets:listTickets", "tool:tickets:listTickets"),
+    ensure_scope("ocli runtime tool:users:listUsers", "tool:users:listUsers"),
+    ensure_scope("ocli runtime profile:wrong-audience", "profile:wrong-audience"),
 ]
 
 def ensure_provider(provider_name, application_name, slug):
@@ -482,8 +482,8 @@ def ensure_provider(provider_name, application_name, slug):
     }
 
 result = {
-    "primary": ensure_provider("oascli Runtime Provider", "oascli Runtime", %q),
-    "alternate": ensure_provider("oascli Runtime Provider Alt Issuer", "oascli Runtime Alt Issuer", %q),
+    "primary": ensure_provider("ocli Runtime Provider", "ocli Runtime", %q),
+    "alternate": ensure_provider("ocli Runtime Provider Alt Issuer", "ocli Runtime Alt Issuer", %q),
 }
 print("__OASCLI_JSON__=" + json.dumps(result))
 `, scopeExpression, authentikDefaultTTL, authentikCallbackURL, authentikPrimarySlug, authentikAlternateSlug)

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	mcpclient "github.com/StevenBuglione/oas-cli-go/pkg/mcp/client"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	mcpclient "github.com/StevenBuglione/open-cli/pkg/mcp/client"
 )
 
 type MCPRequest struct {

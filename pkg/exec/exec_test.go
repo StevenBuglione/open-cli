@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
-	httpexec "github.com/StevenBuglione/oas-cli-go/pkg/exec"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	httpexec "github.com/StevenBuglione/open-cli/pkg/exec"
 )
 
 func TestExecuteBuildsRequestsAndAppliesAuthAdapters(t *testing.T) {

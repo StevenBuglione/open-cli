@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/obs"
+	"github.com/StevenBuglione/open-cli/pkg/obs"
 )
 
 type Fetcher struct {

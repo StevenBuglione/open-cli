@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/instance"
-	helpers "github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/pkg/instance"
+	helpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 func TestCampaignLocalDaemonProcess(t *testing.T) {
@@ -47,13 +47,13 @@ func TestCampaignLocalDaemonProcess(t *testing.T) {
 		configPath := writeFile(t, root, ".cli.json", daemonProcessCLIConfig(openapiPath))
 		stateDir := filepath.Join(root, "state")
 		binDir := filepath.Join(root, "bin")
-		oascliBin := buildBinary(t, repoRoot, "./cmd/oascli", filepath.Join(binDir, "oascli"))
-		oasclirdBin := buildBinary(t, repoRoot, "./cmd/oasclird", filepath.Join(binDir, "oasclird"))
+		ocliBin := buildBinary(t, repoRoot, "./cmd/ocli", filepath.Join(binDir, "ocli"))
+		oclirdBin := buildBinary(t, repoRoot, "./cmd/oclird", filepath.Join(binDir, "oclird"))
 
-		runtimeInfo := startDaemonProcess(t, repoRoot, oasclirdBin, configPath, stateDir)
+		runtimeInfo := startDaemonProcess(t, repoRoot, oclirdBin, configPath, stateDir)
 		commandEnv := append(os.Environ(), "OASCLI_TERMINAL_SESSION_ID=process-lane-terminal")
 
-		catalogOutput := runCommand(t, repoRoot, commandEnv, oascliBin,
+		catalogOutput := runCommand(t, repoRoot, commandEnv, ocliBin,
 			"--runtime", runtimeInfo.URL,
 			"--config", configPath,
 			"--state-dir", stateDir,
@@ -61,9 +61,9 @@ func TestCampaignLocalDaemonProcess(t *testing.T) {
 			"--format", "json",
 			"catalog", "list",
 		)
-		fr.CheckBool("process-catalog-output", "real oascli can attach to the daemon and fetch catalog output", strings.Contains(catalogOutput, `"catalog"`), catalogOutput)
+		fr.CheckBool("process-catalog-output", "real ocli can attach to the daemon and fetch catalog output", strings.Contains(catalogOutput, `"catalog"`), catalogOutput)
 
-		listOutput := runCommand(t, repoRoot, commandEnv, oascliBin,
+		listOutput := runCommand(t, repoRoot, commandEnv, ocliBin,
 			"--runtime", runtimeInfo.URL,
 			"--config", configPath,
 			"--state-dir", stateDir,
@@ -71,14 +71,14 @@ func TestCampaignLocalDaemonProcess(t *testing.T) {
 			"--format", "json",
 			"testapi", "items", "list-items",
 		)
-		fr.CheckBool("process-tool-output", "real oascli can execute a discovered tool through the daemon", strings.Contains(listOutput, `"items"`), listOutput)
+		fr.CheckBool("process-tool-output", "real ocli can execute a discovered tool through the daemon", strings.Contains(listOutput, `"items"`), listOutput)
 
 		inst := &helpers.Instance{URL: runtimeInfo.URL, AuditPath: runtimeInfo.AuditPath}
 		events := inst.AuditEvents(t)
 		fr.Check("process-audit-events", "daemon audit log records the process-backed tool call", ">=1", fmt.Sprintf("%d", len(events)), len(events) >= 1, "")
 		fr.CheckBool("process-audit-tool-id", "daemon audit log contains the listItems tool execution", hasAuditTool(events, "testapi:listItems"), "")
 
-		stopOutput := runCommand(t, repoRoot, commandEnv, oascliBin,
+		stopOutput := runCommand(t, repoRoot, commandEnv, ocliBin,
 			"--runtime", runtimeInfo.URL,
 			"--config", configPath,
 			"--state-dir", stateDir,
@@ -86,7 +86,7 @@ func TestCampaignLocalDaemonProcess(t *testing.T) {
 			"--format", "json",
 			"runtime", "stop",
 		)
-		fr.CheckBool("process-stop-output", "real oascli can stop the daemon cleanly", strings.Contains(stopOutput, `"stopped"`) || strings.Contains(stopOutput, `"ok"`), stopOutput)
+		fr.CheckBool("process-stop-output", "real ocli can stop the daemon cleanly", strings.Contains(stopOutput, `"stopped"`) || strings.Contains(stopOutput, `"ok"`), stopOutput)
 		waitForDaemonExit(t, runtimeInfo)
 		if _, err := os.Stat(runtimeInfo.RuntimePath); !os.IsNotExist(err) {
 			t.Fatalf("expected runtime registry to be removed after daemon stop, stat err=%v", err)
@@ -163,7 +163,7 @@ func startDaemonProcess(t *testing.T, repoRoot, binary, configPath, stateDir str
 	cmd.Stdout = io.Discard
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
-		t.Fatalf("start oasclird: %v", err)
+		t.Fatalf("start oclird: %v", err)
 	}
 
 	waitDone := make(chan error, 1)
@@ -201,12 +201,12 @@ func startDaemonProcess(t *testing.T, repoRoot, binary, configPath, stateDir str
 		}
 		select {
 		case err := <-waitDone:
-			t.Fatalf("oasclird exited before becoming ready: %v stderr=%s", err, stderr.String())
+			t.Fatalf("oclird exited before becoming ready: %v stderr=%s", err, stderr.String())
 		default:
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	t.Fatalf("oasclird did not publish runtime info within deadline; stderr=%s", stderr.String())
+	t.Fatalf("oclird did not publish runtime info within deadline; stderr=%s", stderr.String())
 	return daemonRuntime{}
 }
 
@@ -216,10 +216,10 @@ func waitForDaemonExit(t *testing.T, runtime daemonRuntime) {
 	select {
 	case err := <-runtime.waitDone:
 		if err != nil {
-			t.Fatalf("oasclird exited with error: %v", err)
+			t.Fatalf("oclird exited with error: %v", err)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("oasclird did not exit after runtime stop")
+		t.Fatal("oclird did not exit after runtime stop")
 	}
 }
 

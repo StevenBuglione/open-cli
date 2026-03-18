@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
+	"github.com/StevenBuglione/open-cli/pkg/config"
 )
 
 type oidcJWKSInternalTestIssuer struct {
@@ -106,7 +106,7 @@ func TestAuthenticateRequestRejectsOIDCJWKSTokenWithoutPrincipalIdentity(t *test
 	server := NewServer(Options{})
 	request := httptest.NewRequest(http.MethodGet, "/v1/catalog/effective", nil)
 	request.Header.Set("Authorization", "Bearer "+issuer.signToken(t, map[string]any{
-		"aud":   "oasclird",
+		"aud":   "oclird",
 		"scope": "bundle:tickets",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	}))
@@ -117,7 +117,7 @@ func TestAuthenticateRequestRejectsOIDCJWKSTokenWithoutPrincipalIdentity(t *test
 					ValidationProfile: "oidc_jwks",
 					Issuer:            issuer.issuer,
 					JWKSURL:           issuer.jwksURL,
-					Audience:          "oasclird",
+					Audience:          "oclird",
 				},
 			},
 		},

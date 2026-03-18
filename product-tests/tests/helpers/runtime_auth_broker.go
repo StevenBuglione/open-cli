@@ -59,7 +59,7 @@ func NewRuntimeAuthBroker(t *testing.T) *RuntimeAuthBroker {
 	broker := &RuntimeAuthBroker{
 		keyID:           "broker-test-key",
 		privateKey:      privateKey,
-		BrowserClientID: "oascli-browser",
+		BrowserClientID: "ocli-browser",
 		ClientID:        "runtime-client",
 		ClientSecret:    "runtime-secret",
 		codes:           map[string]authorizationCodeGrant{},
@@ -221,7 +221,7 @@ func (broker *RuntimeAuthBroker) signRuntimeToken(upstream string, claims runtim
 func (broker *RuntimeAuthBroker) signRuntimeTokenWithExpiry(upstream string, claims runtimeTokenClaims, expiry time.Time) (string, error) {
 	audience := claims.Audience
 	if audience == "" {
-		audience = "oasclird"
+		audience = "oclird"
 	}
 	scope := strings.Join(claims.Scopes, " ")
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
@@ -379,7 +379,7 @@ paths:
         "validationProfile": "oidc_jwks",
         "issuer": %q,
         "jwksURL": %q,
-        "audience": "oasclird",
+        "audience": "oclird",
         "authorizationURL": %q,
         "tokenURL": %q,
         "browserClientId": %q

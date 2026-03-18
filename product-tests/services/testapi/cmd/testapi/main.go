@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/StevenBuglione/oas-cli-go/product-tests/services/testapi/internal/app"
+	"github.com/StevenBuglione/open-cli/product-tests/services/testapi/internal/app"
 )
 
 func main() {

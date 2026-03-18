@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
 )
 
 type oidcJWKSTestIssuer struct {
@@ -150,7 +150,7 @@ paths:
 	        "validationProfile": "oidc_jwks",
 	        "issuer": %q,
 	        "jwksURL": %q,
-	        "audience": "oasclird"
+	        "audience": "oclird"
 	      }
 	    }
 	  },
@@ -196,7 +196,7 @@ func TestServerAcceptsValidOIDCJWKSToken(t *testing.T) {
 
 	token := issuer.signToken(t, map[string]any{
 		"sub":   "agent-123",
-		"aud":   "oasclird",
+		"aud":   "oclird",
 		"scope": "bundle:tickets",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	})
@@ -338,7 +338,7 @@ func TestServerRejectsOIDCJWKSTokenWithoutExpiration(t *testing.T) {
 
 	token := issuer.signToken(t, map[string]any{
 		"sub":   "agent-123",
-		"aud":   "oasclird",
+		"aud":   "oclird",
 		"scope": "bundle:tickets",
 	})
 

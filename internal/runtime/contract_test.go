@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
 )
 
 // ── ContractVersion parsing ──────────────────────────────────────────────────

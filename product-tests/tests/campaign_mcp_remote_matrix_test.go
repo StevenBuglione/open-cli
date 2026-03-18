@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	mcpclient "github.com/StevenBuglione/oas-cli-go/pkg/mcp/client"
-	helpers "github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	mcpclient "github.com/StevenBuglione/open-cli/pkg/mcp/client"
+	helpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 func TestCampaignMCPRemoteMatrixLaneUsesHonestAuthPattern(t *testing.T) {

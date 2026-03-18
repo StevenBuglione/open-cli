@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/cache"
+	"github.com/StevenBuglione/open-cli/pkg/cache"
 )
 
 var ErrServiceLinksUnavailable = errors.New("service description links unavailable")

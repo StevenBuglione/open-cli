@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
 )
 
 // curatedCLIConfig returns a CLI config JSON with a curated toolSet that

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
+	"github.com/StevenBuglione/open-cli/pkg/config"
 )
 
 type streamableHTTPClient struct {

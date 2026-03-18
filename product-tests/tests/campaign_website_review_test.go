@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	helpers "github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	helpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 	"gopkg.in/yaml.v3"
 )
 

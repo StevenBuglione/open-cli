@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/cache"
-	"github.com/StevenBuglione/oas-cli-go/pkg/discovery"
+	"github.com/StevenBuglione/open-cli/pkg/cache"
+	"github.com/StevenBuglione/open-cli/pkg/discovery"
 )
 
 func TestDiscoverAPICatalogFollowsNestedCatalogsAndReportsCycles(t *testing.T) {

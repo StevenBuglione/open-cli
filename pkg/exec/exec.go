@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
 )
 
 type AuthScheme struct {

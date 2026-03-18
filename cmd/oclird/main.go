@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	"github.com/StevenBuglione/oas-cli-go/pkg/instance"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	"github.com/StevenBuglione/open-cli/pkg/instance"
 )
 
 func main() {

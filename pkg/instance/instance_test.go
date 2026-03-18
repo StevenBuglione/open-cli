@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/instance"
+	"github.com/StevenBuglione/open-cli/pkg/instance"
 )
 
 func TestDeriveIDUsesConfigPathWhenExplicitInstanceMissing(t *testing.T) {

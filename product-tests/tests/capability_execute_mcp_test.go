@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	mcpclient "github.com/StevenBuglione/oas-cli-go/pkg/mcp/client"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	mcpclient "github.com/StevenBuglione/open-cli/pkg/mcp/client"
 )
 
 // TestCapabilityExecuteMCPStdio validates stdio MCP transport using

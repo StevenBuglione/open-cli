@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	brokerhelpers "github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	brokerhelpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 func TestCapabilityRuntimeAuthBroker(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCapabilityRuntimeAuthBroker(t *testing.T) {
 
 	for _, upstream := range []string{"microsoft", "google", "github"} {
 		t.Run("client_credentials_"+upstream, func(t *testing.T) {
-			token := broker.AcquireClientCredentialsToken(t, upstream, "oasclird", []string{
+			token := broker.AcquireClientCredentialsToken(t, upstream, "oclird", []string{
 				"bundle:tickets",
 				"tool:tickets:listTickets",
 			})

@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/cache"
-	"github.com/StevenBuglione/oas-cli-go/pkg/overlay"
+	"github.com/StevenBuglione/open-cli/pkg/cache"
+	"github.com/StevenBuglione/open-cli/pkg/overlay"
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 )

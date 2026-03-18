@@ -1,6 +1,6 @@
 package tests_test
 
-// capability_multiinstance_test.go verifies that two or more oasclird
+// capability_multiinstance_test.go verifies that two or more oclird
 // runtime instances can operate concurrently while keeping all mutable
 // filesystem state (audit log, state dir, cache dir) strictly per-instance.
 
@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	"github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	"github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 // minimalOpenAPIYAML builds the smallest valid OpenAPI document that exposes a

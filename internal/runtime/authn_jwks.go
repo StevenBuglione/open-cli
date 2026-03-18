@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
+	"github.com/StevenBuglione/open-cli/pkg/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 

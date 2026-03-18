@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	brokerhelpers "github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	brokerhelpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 func TestCapabilityRuntimeAuthAuthentikOAuthClient(t *testing.T) {
@@ -34,8 +34,8 @@ func TestCapabilityRuntimeAuthAuthentikOAuthClient(t *testing.T) {
 	if got := auth["required"]; got != true {
 		t.Fatalf("expected auth.required=true, got %#v", got)
 	}
-	if got := auth["audience"]; got != "oasclird" {
-		t.Fatalf("expected auth audience oasclird, got %#v", got)
+	if got := auth["audience"]; got != "oclird" {
+		t.Fatalf("expected auth audience oclird, got %#v", got)
 	}
 	if got := auth["principal"]; got == "" || got == nil {
 		t.Fatalf("expected resolved principal in runtime info, got %#v", got)
@@ -245,14 +245,14 @@ func runOASCLI(t *testing.T, fixture *brokerhelpers.AuthentikRuntimeFixture, arg
 	if err != nil {
 		t.Fatalf("resolve repo root: %v", err)
 	}
-	cmdArgs := append([]string{"run", "./cmd/oascli", "--config", fixture.ConfigPath}, args...)
+	cmdArgs := append([]string{"run", "./cmd/ocli", "--config", fixture.ConfigPath}, args...)
 	cmd := exec.Command("go", cmdArgs...)
 	cmd.Dir = repoRoot
 	cmd.Env = append(os.Environ(), fixture.CLIEnv()...)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("oascli %v failed: %v\n%s", args, err, output)
+		t.Fatalf("ocli %v failed: %v\n%s", args, err, output)
 	}
 	return output
 }

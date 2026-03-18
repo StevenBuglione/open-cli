@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
 )
 
 // fastLeaseConfig returns a LeaseConfig tuned for fast tests.

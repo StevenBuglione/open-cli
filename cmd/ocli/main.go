@@ -23,12 +23,12 @@ import (
 	"syscall"
 	"time"
 
-	embeddedruntime "github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	oauthruntime "github.com/StevenBuglione/oas-cli-go/pkg/auth"
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
-	configpkg "github.com/StevenBuglione/oas-cli-go/pkg/config"
-	toolsexec "github.com/StevenBuglione/oas-cli-go/pkg/exec"
-	"github.com/StevenBuglione/oas-cli-go/pkg/instance"
+	embeddedruntime "github.com/StevenBuglione/open-cli/internal/runtime"
+	oauthruntime "github.com/StevenBuglione/open-cli/pkg/auth"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	configpkg "github.com/StevenBuglione/open-cli/pkg/config"
+	toolsexec "github.com/StevenBuglione/open-cli/pkg/exec"
+	"github.com/StevenBuglione/open-cli/pkg/instance"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -234,7 +234,7 @@ func NewRootCommand(options CommandOptions, args []string) (*cobra.Command, erro
 	}
 
 	root := &cobra.Command{
-		Use:           "oascli",
+		Use:           "ocli",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -1514,14 +1514,14 @@ func managedRuntimeArgs(options CommandOptions, runtimeCfg *configpkg.RuntimeCon
 func resolveDaemonBinary() (string, error) {
 	executable, err := os.Executable()
 	if err == nil {
-		sibling := filepath.Join(filepath.Dir(executable), "oasclird")
+		sibling := filepath.Join(filepath.Dir(executable), "oclird")
 		if _, statErr := os.Stat(sibling); statErr == nil {
 			return sibling, nil
 		}
 	}
-	path, err := exec.LookPath("oasclird")
+	path, err := exec.LookPath("oclird")
 	if err != nil {
-		return "", fmt.Errorf("resolve oasclird binary: %w", err)
+		return "", fmt.Errorf("resolve oclird binary: %w", err)
 	}
 	return path, nil
 }
@@ -1643,7 +1643,7 @@ func shouldSendLocalHeartbeat(cmd *cobra.Command) bool {
 		return false
 	}
 	switch cmd.CommandPath() {
-	case "oascli runtime stop", "oascli runtime session-close":
+	case "ocli runtime stop", "ocli runtime session-close":
 		return false
 	default:
 		return true

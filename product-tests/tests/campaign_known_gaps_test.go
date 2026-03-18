@@ -1,7 +1,7 @@
 package tests_test
 
 // campaign_known_gaps_test.go documents expected-failure scenarios and known
-// feature gaps in the oascli product.  These tests run during every campaign
+// feature gaps in the ocli product.  These tests run during every campaign
 // pass; failures here are captured via FindingsRecorder as "known gaps" and do
 // NOT fail the overall test suite — only if a gap unexpectedly starts passing
 // is it highlighted so engineers can promote it to a positive assertion.
@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	"github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	"github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 // TestCampaignKnownGaps exercises known-gap scenarios.  Each sub-test probes

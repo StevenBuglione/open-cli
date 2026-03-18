@@ -8,11 +8,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/cache"
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	"github.com/StevenBuglione/oas-cli-go/pkg/mcp/openapi"
-	oasopenapi "github.com/StevenBuglione/oas-cli-go/pkg/openapi"
-	overlaypkg "github.com/StevenBuglione/oas-cli-go/pkg/overlay"
+	"github.com/StevenBuglione/open-cli/pkg/cache"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	"github.com/StevenBuglione/open-cli/pkg/mcp/openapi"
+	oasopenapi "github.com/StevenBuglione/open-cli/pkg/openapi"
+	overlaypkg "github.com/StevenBuglione/open-cli/pkg/overlay"
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 )

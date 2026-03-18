@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	helpers "github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	helpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 func TestCampaignRemoteRuntimeMatrix(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCampaignRemoteRuntimeMatrix(t *testing.T) {
 	fr.SetLaneMetadata("product-validation", "remote-runtime", "ci-containerized", "oauthClient")
 	defer fr.MustEmitToTest(t)
 
-	token := broker.AcquireClientCredentialsToken(t, "microsoft", "oasclird", []string{
+	token := broker.AcquireClientCredentialsToken(t, "microsoft", "oclird", []string{
 		"bundle:tickets",
 		"tool:tickets:listTickets",
 	})
@@ -145,7 +145,7 @@ func TestCampaignRemoteRuntimeMatrix(t *testing.T) {
 			t.Fatalf("record browser-config artifact: %v", err)
 		}
 		fr.Check("browser-config-client-id", "browser metadata exposes the configured client ID", broker.BrowserClientID, browserConfig.ClientID, browserConfig.ClientID == broker.BrowserClientID, "")
-		fr.Check("browser-config-audience", "browser metadata exposes the runtime audience", "oasclird", browserConfig.Audience, browserConfig.Audience == "oasclird", "")
+		fr.Check("browser-config-audience", "browser metadata exposes the runtime audience", "oclird", browserConfig.Audience, browserConfig.Audience == "oclird", "")
 		fr.CheckBool("browser-config-authorization-url", "browser metadata exposes an authorization URL", browserConfig.AuthorizationURL != "", browserConfig.AuthorizationURL)
 		fr.CheckBool("browser-config-token-url", "browser metadata exposes a token URL", browserConfig.TokenURL != "", browserConfig.TokenURL)
 	})

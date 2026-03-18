@@ -1,4 +1,4 @@
-module github.com/StevenBuglione/oas-cli-go
+module github.com/StevenBuglione/open-cli
 
 go 1.25.1
 

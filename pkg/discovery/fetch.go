@@ -3,7 +3,7 @@ package discovery
 import (
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/cache"
+	"github.com/StevenBuglione/open-cli/pkg/cache"
 )
 
 func fetchRecordFromCache(url string, method ProvenanceMethod, result *cache.Result) FetchRecord {

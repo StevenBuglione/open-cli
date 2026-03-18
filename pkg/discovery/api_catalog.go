@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/cache"
+	"github.com/StevenBuglione/open-cli/pkg/cache"
 )
 
 type linksetDocument struct {

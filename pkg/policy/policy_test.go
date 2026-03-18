@@ -3,9 +3,9 @@ package policy_test
 import (
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	"github.com/StevenBuglione/oas-cli-go/pkg/policy"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	"github.com/StevenBuglione/open-cli/pkg/policy"
 )
 
 func TestDecideHonorsManagedDenyCuratedModeAndApproval(t *testing.T) {

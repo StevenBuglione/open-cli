@@ -7,7 +7,7 @@ test:
 	go test ./...
 
 build:
-	go build ./cmd/oascli ./cmd/oasclird
+	go build ./cmd/ocli ./cmd/oclird
 
 verify: fmt test build
 

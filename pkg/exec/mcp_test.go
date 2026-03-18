@@ -9,9 +9,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	toolsexec "github.com/StevenBuglione/oas-cli-go/pkg/exec"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	toolsexec "github.com/StevenBuglione/open-cli/pkg/exec"
 )
 
 type recordingSupervisor struct {

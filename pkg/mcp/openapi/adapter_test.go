@@ -3,7 +3,7 @@ package openapi
 import (
 	"testing"
 
-	mcpclient "github.com/StevenBuglione/oas-cli-go/pkg/mcp/client"
+	mcpclient "github.com/StevenBuglione/open-cli/pkg/mcp/client"
 )
 
 func TestBuildDocumentResultPreservesAllAndFilteredMCPToolRefs(t *testing.T) {

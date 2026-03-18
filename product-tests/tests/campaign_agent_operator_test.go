@@ -20,9 +20,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	"github.com/StevenBuglione/oas-cli-go/pkg/audit"
-	"github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	"github.com/StevenBuglione/open-cli/pkg/audit"
+	"github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 // campaignRestAPI builds an inline REST API that handles items CRUD.

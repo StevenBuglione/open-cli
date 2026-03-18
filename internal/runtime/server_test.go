@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	"github.com/StevenBuglione/oas-cli-go/pkg/audit"
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	"github.com/StevenBuglione/oas-cli-go/pkg/obs"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	"github.com/StevenBuglione/open-cli/pkg/audit"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	"github.com/StevenBuglione/open-cli/pkg/obs"
 )
 
 func writeRuntimeFile(t *testing.T, dir, name, content string) string {
@@ -439,7 +439,7 @@ paths:
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"active": true,
 			"scope":  "bundle:tickets",
-			"aud":    "oasclird",
+			"aud":    "oclird",
 			"sub":    "agent-1",
 		})
 	}))
@@ -452,7 +452,7 @@ paths:
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "`+introspectionServer.URL+`"
 	      }
 	    }
@@ -803,7 +803,7 @@ func TestServerFiltersCatalogAndExecutionByRemoteBundleScope(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"active": true,
 			"scope":  "bundle:tickets",
-			"aud":    "oasclird",
+			"aud":    "oclird",
 			"sub":    "agent-123",
 		})
 	}))
@@ -858,7 +858,7 @@ paths:
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "`+introspectionServer.URL+`/introspect"
 	      }
 	    }
@@ -963,7 +963,7 @@ paths:
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "https://auth.example.com/introspect"
 	      }
 	    }
@@ -1022,7 +1022,7 @@ paths:
 	    "server": {
 	      "auth": {
 	        "validationProfile": "oauth2_introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "https://auth.example.com/introspect"
 	      }
 	    }
@@ -1078,7 +1078,7 @@ func TestServerRejectsExpiredOIDCJWKSToken(t *testing.T) {
 
 	token := issuer.signToken(t, map[string]any{
 		"sub":   "agent-123",
-		"aud":   "oasclird",
+		"aud":   "oclird",
 		"scope": "bundle:tickets",
 		"exp":   time.Now().Add(-time.Hour).Unix(),
 	})
@@ -1125,7 +1125,7 @@ func TestServerReturnsEmptyAuthorizationEnvelopeWhenOIDCJWKSTokenMissingScopes(t
 	configPath := writeOIDCJWKSRuntimeConfig(t, dir, issuer, ticketsAPI.URL, usersAPI.URL)
 	token := issuer.signToken(t, map[string]any{
 		"sub": "agent-123",
-		"aud": "oasclird",
+		"aud": "oclird",
 		"exp": time.Now().Add(time.Hour).Unix(),
 	})
 
@@ -1194,7 +1194,7 @@ func TestServerBrowserConfigIncludesBrokeredAuthMetadata(t *testing.T) {
 	    "server": {
 	      "auth": {
 	        "validationProfile": "oauth2_introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "https://auth.example.com/introspect",
 	        "authorizationURL": "https://auth.example.com/authorize",
 	        "tokenURL": "https://auth.example.com/token",
@@ -1242,7 +1242,7 @@ func TestServerBrowserConfigIncludesBrokeredAuthMetadata(t *testing.T) {
 	if got := metadata["clientId"]; got != "browser-client" {
 		t.Fatalf("expected browser client id in metadata, got %#v", got)
 	}
-	if got := metadata["audience"]; got != "oasclird" {
+	if got := metadata["audience"]; got != "oclird" {
 		t.Fatalf("expected audience in metadata, got %#v", got)
 	}
 	if got := metadata["required"]; got != true {
@@ -1270,7 +1270,7 @@ func TestServerFiltersCatalogByProfileAndExplicitToolScopes(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"active": true,
 			"scope":  "profile:reader tool:tickets:getTicket",
-			"aud":    "oasclird",
+			"aud":    "oclird",
 			"sub":    "agent-456",
 		})
 	}))
@@ -1311,7 +1311,7 @@ paths:
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "`+introspectionServer.URL+`"
 	      }
 	    }
@@ -1388,7 +1388,7 @@ func TestServerAppliesPolicyDenyAfterRemoteScopes(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"active": true,
 			"scope":  "bundle:tickets",
-			"aud":    "oasclird",
+			"aud":    "oclird",
 		})
 	}))
 	defer introspectionServer.Close()
@@ -1428,7 +1428,7 @@ paths:
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "`+introspectionServer.URL+`"
 	      }
 	    }
@@ -1508,7 +1508,7 @@ paths:
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "https://auth.example.com/introspect"
 	      }
 	    }
@@ -1552,7 +1552,7 @@ func TestServerRejectsAuditEventsWithoutBearerTokenWhenRemoteAuthEnabled(t *test
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "https://auth.example.com/introspect"
 	      }
 	    }
@@ -1598,7 +1598,7 @@ func TestServerRuntimeInfoIncludesBrokeredAuthMetadata(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"active": true,
 			"scope":  "profile:reader tool:tickets:getTicket",
-			"aud":    "oasclird",
+			"aud":    "oclird",
 			"sub":    "agent-456",
 		})
 	}))
@@ -1611,7 +1611,7 @@ func TestServerRuntimeInfoIncludesBrokeredAuthMetadata(t *testing.T) {
 	    "server": {
 	      "auth": {
 	        "validationProfile": "oauth2_introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "`+introspectionServer.URL+`",
 	        "authorizationURL": "https://auth.example.com/authorize",
 	        "tokenURL": "https://auth.example.com/token",
@@ -1674,8 +1674,8 @@ func TestServerRuntimeInfoIncludesBrokeredAuthMetadata(t *testing.T) {
 	if got := auth["required"]; got != true {
 		t.Fatalf("expected auth.required=true, got %#v", got)
 	}
-	if got := auth["audience"]; got != "oasclird" {
-		t.Fatalf("expected auth audience oasclird, got %#v", got)
+	if got := auth["audience"]; got != "oclird" {
+		t.Fatalf("expected auth audience oclird, got %#v", got)
 	}
 	expectJSONStringSlice(t, auth["tokenValidationProfiles"], []string{"oauth2_introspection"}, "auth.tokenValidationProfiles")
 	expectJSONStringSlice(t, auth["scopePrefixes"], []string{"bundle:", "profile:", "tool:"}, "auth.scopePrefixes")
@@ -1769,7 +1769,7 @@ func TestServerReturnsRuntimeInfoHandshakeWithoutBearerTokenWhenRemoteAuthEnable
 	    "server": {
 	      "auth": {
 	        "validationProfile": "oauth2_introspection",
-	        "audience": "oasclird",
+	        "audience": "oclird",
 	        "introspectionURL": "https://auth.example.com/introspect"
 	      }
 	    }

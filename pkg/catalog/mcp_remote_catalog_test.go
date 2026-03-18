@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	"github.com/StevenBuglione/open-cli/pkg/config"
 )
 
 func TestBuildSupportsStreamableHTTPMCPSources(t *testing.T) {

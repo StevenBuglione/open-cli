@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
-	oauth "github.com/StevenBuglione/oas-cli-go/pkg/auth"
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	httpexec "github.com/StevenBuglione/oas-cli-go/pkg/exec"
+	oauth "github.com/StevenBuglione/open-cli/pkg/auth"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	httpexec "github.com/StevenBuglione/open-cli/pkg/exec"
 )
 
 type authTarget struct {

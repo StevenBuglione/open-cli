@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	helpers "github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	helpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 func TestCampaignRemoteRuntimeFailures(t *testing.T) {
@@ -47,7 +47,7 @@ func TestCampaignRemoteRuntimeFailures(t *testing.T) {
 	})
 
 	t.Run("wrong-scope-token", func(t *testing.T) {
-		token := broker.AcquireClientCredentialsToken(t, "microsoft", "oasclird", []string{"tool:users:listUsers"})
+		token := broker.AcquireClientCredentialsToken(t, "microsoft", "oclird", []string{"tool:users:listUsers"})
 		resp, body := executeRuntimeRequest(t, http.MethodPost, runtimeServer.URL+"/v1/tools/execute", token, map[string]any{
 			"configPath": configPath,
 			"toolId":     "tickets:listTickets",
@@ -58,7 +58,7 @@ func TestCampaignRemoteRuntimeFailures(t *testing.T) {
 	})
 
 	t.Run("expired-token", func(t *testing.T) {
-		expiredToken := broker.AcquireExpiredClientCredentialsToken(t, "microsoft", "oasclird", []string{"bundle:tickets", "tool:tickets:listTickets"})
+		expiredToken := broker.AcquireExpiredClientCredentialsToken(t, "microsoft", "oclird", []string{"bundle:tickets", "tool:tickets:listTickets"})
 		resp, body := executeRuntimeRequest(t, http.MethodGet, runtimeServer.URL+"/v1/catalog/effective?config="+url.QueryEscape(configPath), expiredToken, nil)
 		defer resp.Body.Close()
 		fr.Check("expired-token-status", "expired runtime bearer token is rejected", "401", http.StatusText(resp.StatusCode), resp.StatusCode == http.StatusUnauthorized, body)
@@ -66,7 +66,7 @@ func TestCampaignRemoteRuntimeFailures(t *testing.T) {
 	})
 
 	t.Run("invalid-token", func(t *testing.T) {
-		token := broker.AcquireClientCredentialsToken(t, "microsoft", "oasclird", []string{"bundle:tickets", "tool:tickets:listTickets"})
+		token := broker.AcquireClientCredentialsToken(t, "microsoft", "oclird", []string{"bundle:tickets", "tool:tickets:listTickets"})
 		invalidToken := token[:len(token)-2] + "zz"
 		resp, body := executeRuntimeRequest(t, http.MethodGet, runtimeServer.URL+"/v1/catalog/effective?config="+url.QueryEscape(configPath), invalidToken, nil)
 		defer resp.Body.Close()

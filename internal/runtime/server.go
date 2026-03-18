@@ -17,13 +17,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/pkg/audit"
-	oauth "github.com/StevenBuglione/oas-cli-go/pkg/auth"
-	"github.com/StevenBuglione/oas-cli-go/pkg/catalog"
-	"github.com/StevenBuglione/oas-cli-go/pkg/config"
-	httpexec "github.com/StevenBuglione/oas-cli-go/pkg/exec"
-	"github.com/StevenBuglione/oas-cli-go/pkg/obs"
-	"github.com/StevenBuglione/oas-cli-go/pkg/policy"
+	"github.com/StevenBuglione/open-cli/pkg/audit"
+	oauth "github.com/StevenBuglione/open-cli/pkg/auth"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	"github.com/StevenBuglione/open-cli/pkg/config"
+	httpexec "github.com/StevenBuglione/open-cli/pkg/exec"
+	"github.com/StevenBuglione/open-cli/pkg/obs"
+	"github.com/StevenBuglione/open-cli/pkg/policy"
 )
 
 type Options struct {

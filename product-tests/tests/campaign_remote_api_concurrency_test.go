@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/StevenBuglione/oas-cli-go/internal/runtime"
-	helpers "github.com/StevenBuglione/oas-cli-go/product-tests/tests/helpers"
+	"github.com/StevenBuglione/open-cli/internal/runtime"
+	helpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
 )
 
 func TestCampaignRemoteAPIConcurrencyIsolation(t *testing.T) {
