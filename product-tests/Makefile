@@ -1,6 +1,6 @@
 .PHONY: check-prereqs services-up services-down authentik-up authentik-down mcp-remote-up mcp-remote-down smoke full test-mcp-stdio test-mcp-remote test-runtime-auth-authentik fleet-matrix-ci fleet-matrix-mcp-remote test-website-review
 
-FLEET_OUTPUT_DIR ?= /tmp/oascli-fleet
+FLEET_OUTPUT_DIR ?= /tmp/open-cli-fleet
 FLEET_MATRIX ?= product-tests/testdata/fleet/capability-matrix.yaml
 
 define summarize_fleet
