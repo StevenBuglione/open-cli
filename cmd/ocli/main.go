@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -10,12 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	authpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/auth"
+	cmdspkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/commands"
 	cfgpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/config"
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
 	"github.com/StevenBuglione/open-cli/internal/version"
@@ -24,7 +22,6 @@ import (
 	toolsexec "github.com/StevenBuglione/open-cli/pkg/exec"
 	"github.com/StevenBuglione/open-cli/pkg/instance"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 type CommandOptions = cfgpkg.Options
@@ -78,301 +75,13 @@ func main() {
 }
 
 func NewRootCommand(options CommandOptions, args []string) (*cobra.Command, error) {
-	var err error
-	options, err = resolveCommandOptions(options)
-	if err != nil {
-		return nil, err
-	}
-	if options.Format == "" {
-		options.Format = "json"
-	}
-	if options.Stdout == nil {
-		options.Stdout = os.Stdout
-	}
-	if options.Stderr == nil {
-		options.Stderr = os.Stderr
-	}
-	if options.Stdin == nil {
-		options.Stdin = os.Stdin
-	}
-
-	client, err := newRuntimeClient(options)
-	if err != nil {
-		return nil, err
-	}
-	response, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{
-		ConfigPath:   options.ConfigPath,
-		Mode:         options.Mode,
-		AgentProfile: options.AgentProfile,
-		RuntimeToken: options.RuntimeToken,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	root := &cobra.Command{
-		Use:           "ocli",
-		Version:       version.Version,
-		SilenceUsage:  true,
-		SilenceErrors: true,
-	}
-	root.SetVersionTemplate(version.String() + "\n")
-	if options.RuntimeDeployment == "local" && options.HeartbeatEnabled && options.SessionID != "" {
-		root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
-			if !shouldSendLocalHeartbeat(cmd) {
-				return nil
-			}
-			_, err := client.Heartbeat(options.SessionID)
-			return err
-		}
-		root.PersistentPostRunE = func(cmd *cobra.Command, _ []string) error {
-			if !shouldSendLocalHeartbeat(cmd) {
-				return nil
-			}
-			_, err := client.Heartbeat(options.SessionID)
-			return err
-		}
-	}
-	root.SetOut(options.Stdout)
-	root.SetErr(options.Stderr)
-	root.SetIn(options.Stdin)
-	root.PersistentFlags().StringVar(&options.RuntimeURL, "runtime", options.RuntimeURL, "Runtime base URL")
-	root.PersistentFlags().StringVar(&options.ConfigPath, "config", options.ConfigPath, "Path to .cli.json")
-	root.PersistentFlags().StringVar(&options.Mode, "mode", options.Mode, "Execution mode")
-	root.PersistentFlags().StringVar(&options.AgentProfile, "agent-profile", options.AgentProfile, "Agent profile")
-	root.PersistentFlags().StringVar(&options.Format, "format", options.Format, "Output format")
-	root.PersistentFlags().BoolVar(&options.Approval, "approval", options.Approval, "Grant approval for protected tools")
-	root.PersistentFlags().StringVar(&options.InstanceID, "instance-id", options.InstanceID, "Instance id for isolated runtime resolution")
-	root.PersistentFlags().StringVar(&options.StateDir, "state-dir", options.StateDir, "State directory root for runtime metadata")
-	root.PersistentFlags().BoolVar(&options.Embedded, "embedded", options.Embedded, "Use the embedded runtime instead of an external daemon")
-
-	root.AddCommand(newCatalogCommand(options, response))
-	root.AddCommand(newToolCommand(options, response))
-	root.AddCommand(newExplainCommand(options, response))
-	root.AddCommand(newWorkflowCommand(options, client))
-	root.AddCommand(newRuntimeCommand(options, client))
-	addDynamicToolCommands(root, options, client, response.Catalog.Services, response.View.Tools)
-	root.SetArgs(args)
-	return root, nil
-}
-
-func newCatalogCommand(options CommandOptions, response runtimeCatalogResponse) *cobra.Command {
-	command := &cobra.Command{
-		Use: "catalog",
-	}
-	command.AddCommand(&cobra.Command{
-		Use:   "list",
-		Short: "List the effective catalog",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return writeOutput(options.Stdout, options.Format, response)
+	return cmdspkg.NewRootCommand(options, args, cmdspkg.RootHooks{
+		ResolveCommandOptions: resolveCommandOptions,
+		NewRuntimeClient: func(opts cfgpkg.Options) (runtimepkg.Client, error) {
+			return newRuntimeClient(opts)
 		},
+		ShouldSendHeartbeat: shouldSendLocalHeartbeat,
 	})
-	return command
-}
-
-func newToolCommand(options CommandOptions, response runtimeCatalogResponse) *cobra.Command {
-	command := &cobra.Command{Use: "tool"}
-	command.AddCommand(&cobra.Command{
-		Use:   "schema <tool-id>",
-		Args:  cobra.ExactArgs(1),
-		Short: "Render machine-readable tool schema",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			tool := findTool(response.Catalog.Tools, args[0])
-			if tool == nil {
-				return fmt.Errorf("tool %s not found", args[0])
-			}
-			return writeOutput(options.Stdout, options.Format, tool)
-		},
-	})
-	return command
-}
-
-func newExplainCommand(options CommandOptions, response runtimeCatalogResponse) *cobra.Command {
-	return &cobra.Command{
-		Use:   "explain <tool-id>",
-		Args:  cobra.ExactArgs(1),
-		Short: "Show guidance for a tool",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			tool := findTool(response.Catalog.Tools, args[0])
-			if tool == nil {
-				return fmt.Errorf("tool %s not found", args[0])
-			}
-			if tool.Guidance == nil {
-				return writeOutput(options.Stdout, options.Format, map[string]any{"toolId": tool.ID})
-			}
-			return writeOutput(options.Stdout, options.Format, map[string]any{
-				"toolId":    tool.ID,
-				"guidance":  tool.Guidance,
-				"summary":   tool.Summary,
-				"operation": tool.OperationID,
-			})
-		},
-	}
-}
-
-func newWorkflowCommand(options CommandOptions, client runtimeClient) *cobra.Command {
-	command := &cobra.Command{Use: "workflow"}
-	command.AddCommand(&cobra.Command{
-		Use:   "run <workflow-id>",
-		Args:  cobra.ExactArgs(1),
-		Short: "Run a workflow through the runtime",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := client.RunWorkflow(map[string]any{
-				"configPath":   options.ConfigPath,
-				"mode":         options.Mode,
-				"agentProfile": options.AgentProfile,
-				"workflowId":   args[0],
-				"approval":     options.Approval,
-			})
-			if err != nil {
-				return err
-			}
-			return writeOutput(options.Stdout, options.Format, result)
-		},
-	})
-	return command
-}
-
-func newRuntimeCommand(options CommandOptions, client runtimeClient) *cobra.Command {
-	command := &cobra.Command{Use: "runtime"}
-	command.AddCommand(&cobra.Command{
-		Use:   "info",
-		Short: "Show runtime metadata",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			info, err := client.RuntimeInfo()
-			if err != nil {
-				return err
-			}
-			return writeOutput(options.Stdout, options.Format, info)
-		},
-	})
-	command.AddCommand(&cobra.Command{
-		Use:   "stop",
-		Short: "Stop the runtime",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := client.Stop()
-			if err != nil {
-				return err
-			}
-			return writeOutput(options.Stdout, options.Format, result)
-		},
-	})
-	command.AddCommand(&cobra.Command{
-		Use:   "session-close",
-		Short: "Close the runtime session and clear session auth state",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := client.SessionClose()
-			if err != nil {
-				return err
-			}
-			return writeOutput(options.Stdout, options.Format, result)
-		},
-	})
-	return command
-}
-
-func addDynamicToolCommands(root *cobra.Command, options CommandOptions, client runtimeClient, services []catalog.Service, tools []catalog.Tool) {
-	serviceCommands := map[string]*cobra.Command{}
-	groupCommands := map[string]*cobra.Command{}
-	serviceAliases := map[string]string{}
-	for _, service := range services {
-		serviceAliases[service.ID] = service.Alias
-	}
-
-	for _, tool := range tools {
-		serviceAlias := serviceAliases[tool.ServiceID]
-		if serviceAlias == "" {
-			serviceAlias = tool.ServiceID
-		}
-		serviceCommand := serviceCommands[serviceAlias]
-		if serviceCommand == nil {
-			serviceCommand = &cobra.Command{Use: serviceAlias}
-			root.AddCommand(serviceCommand)
-			serviceCommands[serviceAlias] = serviceCommand
-		}
-
-		groupKey := serviceAlias + ":" + tool.Group
-		groupCommand := groupCommands[groupKey]
-		if groupCommand == nil {
-			groupCommand = &cobra.Command{Use: tool.Group}
-			serviceCommand.AddCommand(groupCommand)
-			groupCommands[groupKey] = groupCommand
-		}
-
-		toolCopy := tool
-		command := &cobra.Command{
-			Use:     tool.Command,
-			Args:    cobra.ExactArgs(len(tool.PathParams)),
-			Short:   commandSummary(toolCopy),
-			Long:    toolCopy.Description,
-			Hidden:  toolCopy.Hidden,
-			Aliases: append([]string(nil), toolCopy.Aliases...),
-			RunE: func(cmd *cobra.Command, args []string) error {
-				flags := map[string]string{}
-				for _, flag := range toolCopy.Flags {
-					value, err := cmd.Flags().GetString(flag.Name)
-					if err != nil {
-						return err
-					}
-					if value != "" {
-						flags[flag.Name] = value
-					}
-				}
-				bodyRef, _ := cmd.Flags().GetString("body")
-				body, err := loadBody(bodyRef, cmd.InOrStdin())
-				if err != nil {
-					return err
-				}
-				result, err := client.Execute(executeRequest{
-					ConfigPath:   options.ConfigPath,
-					Mode:         options.Mode,
-					AgentProfile: options.AgentProfile,
-					ToolID:       toolCopy.ID,
-					PathArgs:     args,
-					Flags:        flags,
-					Body:         body,
-					Approval:     options.Approval,
-				})
-				if err != nil {
-					return err
-				}
-				if len(result.Body) > 0 && options.Format == "json" {
-					_, err = options.Stdout.Write(append(result.Body, '\n'))
-					return err
-				}
-				if result.Text != "" {
-					_, err = fmt.Fprintln(options.Stdout, result.Text)
-					return err
-				}
-				return writeOutput(options.Stdout, options.Format, result)
-			},
-		}
-		for _, flag := range tool.Flags {
-			command.Flags().String(flag.Name, "", "parameter "+flag.OriginalName)
-		}
-		command.Flags().String("body", "", "inline request body")
-		groupCommand.AddCommand(command)
-	}
-}
-
-func commandSummary(tool catalog.Tool) string {
-	if tool.Description != "" {
-		return tool.Description
-	}
-	return tool.Summary
-}
-
-func loadBody(bodyRef string, stdin io.Reader) ([]byte, error) {
-	switch {
-	case bodyRef == "":
-		return nil, nil
-	case bodyRef == "-":
-		return io.ReadAll(stdin)
-	case strings.HasPrefix(bodyRef, "@"):
-		return os.ReadFile(strings.TrimPrefix(bodyRef, "@"))
-	default:
-		return []byte(bodyRef), nil
-	}
 }
 
 func postJSON[T any](endpoint string, payload any, token string) (T, error) {
@@ -384,31 +93,7 @@ func getJSON[T any](endpoint, token string) (T, error) {
 }
 
 func writeOutput(out io.Writer, format string, value any) error {
-	switch format {
-	case "", "json":
-		data, err := json.Marshal(value)
-		if err != nil {
-			return err
-		}
-		_, err = out.Write(append(data, '\n'))
-		return err
-	case "yaml":
-		data, err := yaml.Marshal(value)
-		if err != nil {
-			return err
-		}
-		_, err = out.Write(data)
-		return err
-	case "pretty":
-		data, err := json.MarshalIndent(value, "", "  ")
-		if err != nil {
-			return err
-		}
-		_, err = out.Write(append(data, '\n'))
-		return err
-	default:
-		return fmt.Errorf("unsupported format %q", format)
-	}
+	return cmdspkg.WriteOutput(out, format, value)
 }
 
 func bootstrapFromArgs(args []string) CommandOptions {
@@ -416,21 +101,11 @@ func bootstrapFromArgs(args []string) CommandOptions {
 }
 
 func findTool(tools []catalog.Tool, id string) *catalog.Tool {
-	for idx := range tools {
-		if tools[idx].ID == id {
-			return &tools[idx]
-		}
-	}
-	return nil
+	return cmdspkg.FindTool(tools, id)
 }
 
 func sortedServiceAliases(services []catalog.Service) []string {
-	aliases := make([]string, 0, len(services))
-	for _, service := range services {
-		aliases = append(aliases, service.Alias)
-	}
-	sort.Strings(aliases)
-	return aliases
+	return cmdspkg.SortedServiceAliases(services)
 }
 
 func resolveCommandOptions(options CommandOptions) (CommandOptions, error) {
