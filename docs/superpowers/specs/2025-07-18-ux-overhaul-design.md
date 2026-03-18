@@ -106,15 +106,21 @@ ocli init --type mcp <address>   # MCP server
 
 **Error handling:**
 - URL returns 404 → "Could not fetch <url>: HTTP 404. Check the URL and try again."
+- URL returns 401/403 → "Authentication required to fetch <url>. Use `ocli init --header 'Authorization: Bearer <token>' <url>` to provide credentials."
 - File not found → "File not found: <path>. Provide an absolute path or path relative to current directory."
 - Spec parse error → "Could not parse <path> as OpenAPI: <parse error>. Is this a valid OpenAPI 3.x document?"
 - Already has `.cli.json` → "Found existing .cli.json. Use --force to overwrite, or edit it directly."
+
+**Auto-detection validation:**
+- After fetching/reading the source, validate it contains `openapi: 3.x` or `swagger: 2.x` at the root before proceeding as OpenAPI
+- If the document is valid YAML/JSON but not OpenAPI (e.g., Kubernetes manifest), show: "Parsed <path> but it doesn't appear to be an OpenAPI document (missing `openapi` field). Use `--type openapi` to force, or check the file."
+- URLs returning HTML (e.g., documentation pages) are detected by Content-Type header and rejected: "URL returned HTML, not an API spec. Provide a direct link to the OpenAPI document (usually ending in .yaml or .json)."
 
 ### 1.3 `ocli --demo`
 
 **Behavior:**
 
-1. Embed `product-tests/testdata/specs/api.yaml` using `go:embed` at build time
+1. Embed `product-tests/testdata/openapi/testapi.openapi.yaml` using `go:embed` at build time
 2. When `--demo` flag is set:
    - Write embedded spec to a temp file
    - Generate an in-memory config pointing to it
@@ -123,6 +129,7 @@ ocli init --type mcp <address>   # MCP server
 3. Print header: "Demo mode — using built-in sample API. Run `ocli init <your-api>` to use your own."
 4. All normal commands work against the demo catalog
 5. `ocli --demo catalog list --format pretty` shows the full dynamic command tree
+6. Temp file is cleaned up via Go `defer os.Remove()` on normal exit, and via signal handler on SIGINT/SIGTERM
 
 **Implementation:**
 - `cmd/ocli/internal/demo/embed.go` holds the `//go:embed` directive
@@ -175,19 +182,21 @@ cmd/ocli/
 └── internal/
     ├── runtime/
     │   ├── client.go        # newRuntimeClient, embedded/HTTP client creation
-    │   ├── deployment.go    # resolveRuntimeDeployment, mode resolution logic
-    │   └── session.go       # localSessionHandshake, heartbeat, cleanup
+    │   ├── deployment.go    # resolveRuntimeDeployment, loadRuntimeConfig, mode resolution
+    │   ├── session.go       # localSessionHandshake, heartbeat, cleanup
+    │   └── http.go          # postJSON, getJSON, shared HTTP helpers
     ├── auth/
-    │   ├── token.go         # resolveRuntimeToken, OAuth token acquisition
-    │   └── config.go        # resolveAuthConfig, credential source resolution
+    │   ├── token.go         # resolveRuntimeToken, resolveRuntimeOAuthClientToken, resolveRuntimeOAuthSecret
+    │   └── browser.go       # fetchRuntimeBrowserLoginMetadata, acquireRuntimeBrowserLoginToken
     ├── config/
     │   └── resolve.go       # resolveCommandOptions, config file discovery
     ├── commands/
     │   ├── root.go          # NewRootCommand (thin orchestrator)
-    │   ├── dynamic.go       # addDynamicToolCommands, buildToolCommand
+    │   ├── dynamic.go       # addDynamicToolCommands, newToolCommand
     │   ├── catalog.go       # catalog list/explain subcommands
     │   ├── init.go          # ocli init command
-    │   └── demo.go          # ocli --demo handling
+    │   ├── demo.go          # ocli --demo handling
+    │   └── util.go          # writeOutput, findTool, envBool, shared helpers
     └── demo/
         └── embed.go         # go:embed for demo API spec
 ```
@@ -196,14 +205,19 @@ cmd/ocli/
 
 **Phase 1: Extract `runtime/`**
 - Move `newRuntimeClient()` → `runtime/client.go`
-- Move `resolveRuntimeDeployment()` → `runtime/deployment.go`
+- Move `resolveRuntimeDeployment()` (line 969) → `runtime/deployment.go`
+- Move `loadRuntimeConfig()` (line 998) → `runtime/deployment.go`
 - Move `localSessionHandshake()`, heartbeat logic, cleanup → `runtime/session.go`
+- Move HTTP helpers `postJSON()` (line 730), `getJSON()` (line 758) → `runtime/http.go`
 - These functions are already logically grouped in main.go (~400 lines)
 
 **Phase 2: Extract `auth/`**
-- Move `resolveRuntimeToken()` → `auth/token.go`
-- Move `resolveAuthConfig()` → `auth/config.go`
-- ~200 lines
+- Move `resolveRuntimeToken()` (line 1024) → `auth/token.go`
+- Move `resolveRuntimeOAuthClientToken()` (line 1105) → `auth/token.go`
+- Move `resolveRuntimeOAuthSecret()` (line 1159) → `auth/token.go`
+- Move `fetchRuntimeBrowserLoginMetadata()`, `acquireRuntimeBrowserLoginToken()` → `auth/browser.go`
+- Note: `auth/` depends on `runtime/` for deployment state and config types — this cross-dependency is intentional and shown in the dependency graph below
+- ~250 lines
 
 **Phase 3: Extract `config/`**
 - Move `resolveCommandOptions()` → `config/resolve.go`
@@ -211,14 +225,16 @@ cmd/ocli/
 - ~150 lines
 
 **Phase 4: Extract `commands/`**
-- Move `addDynamicToolCommands()` → `commands/dynamic.go`
+- Move `addDynamicToolCommands()` (line 405), `newToolCommand()` (line 304) → `commands/dynamic.go`
 - Move catalog subcommands → `commands/catalog.go`
 - Build new `commands/init.go` and `commands/demo.go`
 - Move `NewRootCommand()` → `commands/root.go` (thin version)
 - ~500 lines moved, new code for init/demo
 
-**Phase 5: New `demo/`**
-- `embed.go` with `//go:embed` for the test API spec
+**Phase 5: Extract utilities + new `demo/`**
+- Move `writeOutput()` (line 781), `findTool()` (line 860), `envBool()` (line 1654) and other shared helpers → `commands/util.go` or appropriate subpackage
+- `demo/embed.go` with `//go:embed` for the test API spec
+- ~100 lines of utilities
 
 ### 2.3 Dependency Graph
 
@@ -232,13 +248,15 @@ main.go
         │     └── demo/embed.go
         ├── config/resolve.go
         ├── runtime/client.go
-        │     └── runtime/deployment.go
-        │     └── runtime/session.go
+        │     ├── runtime/deployment.go
+        │     ├── runtime/session.go
+        │     └── runtime/http.go
         └── auth/token.go
-              └── auth/config.go
+              ├── auth/browser.go
+              └── (imports runtime/ for deployment state)
 ```
 
-No circular dependencies. Each package depends only on packages below it in the graph.
+No circular dependencies. `auth/` imports `runtime/` for deployment context (one-directional). Each package depends only on packages below it in the graph.
 
 ### 2.4 Rules
 
@@ -246,6 +264,7 @@ No circular dependencies. Each package depends only on packages below it in the 
 - No package exports anything that isn't needed by its consumers
 - Existing behavior is preserved exactly — this is a pure structural refactor for phases 1-3
 - Product tests (`product-tests/`) serve as integration tests and must pass after each phase
+- Test commands: `make test` (unit tests), `make product-test-smoke` (integration smoke tests), `make build` (compilation check)
 - New features (init, demo) are added in phase 4-5 after the structure is clean
 
 ---
@@ -324,13 +343,14 @@ try {
 
 ### 3.3 `package.json` Updates
 
-Add:
+Add `npm` to existing `engines` field and add new `files` field:
 ```json
 {
   "files": ["bin/ocli.js", "bin/oclird.js", "install.js", "README.md"],
   "engines": { "node": ">=16", "npm": ">=5.2.0" }
 }
 ```
+Note: `engines.node` already exists; only `engines.npm` and `files` are new.
 
 ### 3.4 `npm/README.md` Rewrite
 
