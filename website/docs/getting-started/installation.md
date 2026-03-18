@@ -4,64 +4,74 @@ title: Installation
 
 # Installation
 
-**This repository uses source-based installation.** There are no packaged installers or pre-built release binaries — you compile from source using Go.
+open-cli ships two binaries — `ocli` (the CLI) and `oclird` (the runtime daemon). Pick the installation method that fits your environment.
 
-**Time to usable binaries: ~1 minute** if you already have Go installed.
-
-## Prerequisites
-
-- **Go 1.25.1 or newer** — the version in `go.mod` is the authoritative requirement.
-- Git (to clone the repository).
-- **Node.js 18+** only if you need to build the docs site (`website/`).
-
-## Fastest path: build and go
-
-From the repository root, run:
+## npm (Recommended)
 
 ```bash
+npm install -g @sbuglione/open-cli
+```
+
+The package automatically downloads the correct pre-built binary for your platform during `postinstall`. After installation, both `ocli` and `oclird` are available on your `PATH`.
+
+## Binary Download
+
+Pre-built binaries for every supported platform are attached to each [GitHub Release](https://github.com/StevenBuglione/open-cli/releases).
+
+1. Download the archive for your OS and architecture.
+2. Extract it (`tar xzf` on macOS/Linux, or unzip on Windows).
+3. Move `ocli` and `oclird` to a directory on your `PATH`.
+
+**macOS / Linux:**
+
+```bash
+tar xzf open-cli_<os>_<arch>.tar.gz
+sudo mv ocli oclird /usr/local/bin/
+```
+
+**Windows:**
+
+Extract the `.zip` archive and add the folder containing `ocli.exe` and `oclird.exe` to your system `PATH`.
+
+## From Source
+
+Requires **Go 1.25.1+**.
+
+**Install into your Go bin directory:**
+
+```bash
+go install github.com/StevenBuglione/open-cli/cmd/ocli@latest
+go install github.com/StevenBuglione/open-cli/cmd/oclird@latest
+```
+
+**Or build from a local clone (for contributors):**
+
+```bash
+git clone https://github.com/StevenBuglione/open-cli.git
+cd open-cli
 go build -o ./bin/ocli ./cmd/ocli
 go build -o ./bin/oclird ./cmd/oclird
 ```
 
-That produces `./bin/ocli` and `./bin/oclird`. **If you only need binaries to follow the quickstart, stop here** and continue to [Quickstart](./quickstart).
-
-## Alternative: install into your Go bin directory
+## Verify Installation
 
 ```bash
-go install ./cmd/ocli
-go install ./cmd/oclird
+ocli --version
 ```
 
-This puts the binaries on your `$PATH` via `$GOPATH/bin`. Use this if you want to run `ocli` without the `./bin/` prefix.
+If the version prints, you are ready. Continue to [Quickstart](./quickstart).
 
-## Alternative: run directly from source (no build step)
+## Platform Support
 
-```bash
-go run ./cmd/oclird --help
-go run ./cmd/ocli --embedded --config /path/to/.cli.json catalog list
-```
+| OS | x64 | arm64 |
+|----|-----|-------|
+| macOS | ✅ | ✅ |
+| Linux | ✅ | ✅ |
+| Windows | ✅ | ✅ |
 
-Useful for a one-off check. Slower than a compiled binary because Go compiles on each invocation.
+## Troubleshooting
 
-## What to do after building
-
-1. **Go to [Quickstart](./quickstart)** — it walks you through creating a minimal config and running your first embedded-mode command.
-2. Once that works, return to [Choose your path](./choose-your-path) to pick the runtime model that fits your workload.
-
-## Verify the full checkout (optional)
-
-```bash
-make verify
-```
-
-This runs `gofmt`, `go test ./...`, and `go build` on the entire codebase. Run this before submitting changes. If you are only following the quickstart, you do not need it.
-
-## Docs site contributors
-
-```bash
-cd website
-npm install
-npm run build
-```
-
-The docs site uses the existing `website/package.json` toolchain; no additional site tooling is needed.
+- **`npm install` fails behind a proxy** — set `HTTPS_PROXY` before installing. The postinstall script follows standard proxy environment variables.
+- **Permission denied on global install** — use `sudo npm install -g @sbuglione/open-cli` or configure npm to use a user-writable prefix (`npm config set prefix ~/.npm-global`).
+- **Binary not found after install** — ensure your npm global `bin` directory is on your `PATH` (`npm bin -g`).
+- **Go build fails** — verify your Go version with `go version`; the minimum required is Go 1.25.1.
