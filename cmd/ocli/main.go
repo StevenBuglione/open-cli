@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
 	embeddedruntime "github.com/StevenBuglione/open-cli/internal/runtime"
 	"github.com/StevenBuglione/open-cli/internal/version"
 	oauthruntime "github.com/StevenBuglione/open-cli/pkg/auth"
@@ -115,12 +116,7 @@ type runtimeTokenSession struct {
 	refreshed bool
 }
 
-type runtimeHTTPError struct {
-	StatusCode int
-	Body       string
-}
-
-func (e *runtimeHTTPError) Error() string { return e.Body }
+type runtimeHTTPError = runtimepkg.HTTPError
 
 func newRuntimeTokenSession(token runtimeSessionToken, refresh func(context.Context) (runtimeSessionToken, error)) *runtimeTokenSession {
 	return &runtimeTokenSession{token: token, refresh: refresh}
@@ -728,54 +724,11 @@ func (client embeddedRuntimeClient) do(method, endpoint string, payload any, out
 }
 
 func postJSON[T any](endpoint string, payload any, token string) (T, error) {
-	var zero T
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return zero, err
-	}
-	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return zero, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return zero, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		data, _ := io.ReadAll(resp.Body)
-		return zero, fmt.Errorf("%s", strings.TrimSpace(string(data)))
-	}
-	var decoded T
-	err = json.NewDecoder(resp.Body).Decode(&decoded)
-	return decoded, err
+	return runtimepkg.PostJSON[T](endpoint, payload, token)
 }
 
 func getJSON[T any](endpoint, token string) (T, error) {
-	var zero T
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err != nil {
-		return zero, err
-	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return zero, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		data, _ := io.ReadAll(resp.Body)
-		return zero, fmt.Errorf("%s", strings.TrimSpace(string(data)))
-	}
-	var decoded T
-	err = json.NewDecoder(resp.Body).Decode(&decoded)
-	return decoded, err
+	return runtimepkg.GetJSON[T](endpoint, token)
 }
 
 func writeOutput(out io.Writer, format string, value any) error {
