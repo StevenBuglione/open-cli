@@ -24,7 +24,7 @@ func TestBuildSupportsServiceRootAndAPICatalogSources(t *testing.T) {
 	mux.HandleFunc("/metadata.json", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"linkset": []map[string]any{
-				{"href": server.URL + "/skills.json", "rel": "https://oascli.dev/rel/skill-manifest"},
+				{"href": server.URL + "/skills.json", "rel": "https://open-cli.dev/rel/skill-manifest"},
 			},
 		})
 	})
@@ -203,7 +203,7 @@ func TestBuildResolvesRelativeMetadataReferences(t *testing.T) {
 	mux.HandleFunc("/metadata/linkset.json", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"linkset": []map[string]any{
-				{"href": "../skills/tickets.json", "rel": "https://oascli.dev/rel/skill-manifest"},
+				{"href": "../skills/tickets.json", "rel": "https://open-cli.dev/rel/skill-manifest"},
 			},
 		})
 	})

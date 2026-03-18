@@ -245,7 +245,7 @@ application = Application.objects.get(slug=%q)
 provider = OAuth2Provider.objects.get(pk=application.provider_id)
 provider.access_token_validity = %q
 provider.save(update_fields=["access_token_validity"])
-print("__OASCLI_JSON__=" + %q)
+print("__OCLI_JSON__=" + %q)
 `, slug, validity, validity)
 	if _, err := runAuthentikManageScript(t, fixture.workerID, script); err != nil {
 		t.Fatalf("set provider access token validity for %s: %v", slug, err)
@@ -485,7 +485,7 @@ result = {
     "primary": ensure_provider("ocli Runtime Provider", "ocli Runtime", %q),
     "alternate": ensure_provider("ocli Runtime Provider Alt Issuer", "ocli Runtime Alt Issuer", %q),
 }
-print("__OASCLI_JSON__=" + json.dumps(result))
+print("__OCLI_JSON__=" + json.dumps(result))
 `, scopeExpression, authentikDefaultTTL, authentikCallbackURL, authentikPrimarySlug, authentikAlternateSlug)
 
 	var result authentikBootstrapResult
@@ -617,7 +617,7 @@ func runAuthentikManageScript(t *testing.T, workerID, script string) ([]byte, er
 	if err != nil {
 		return nil, fmt.Errorf("%v\n%s", err, output)
 	}
-	const marker = "__OASCLI_JSON__="
+	const marker = "__OCLI_JSON__="
 	index := strings.LastIndex(string(output), marker)
 	if index == -1 {
 		return nil, fmt.Errorf("marker %q not found in output\n%s", marker, output)

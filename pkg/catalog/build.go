@@ -401,7 +401,7 @@ func buildTools(service Service, document *openapi3.T, guidance map[string]Guida
 
 			var backend *ToolBackend
 			if allowBackendMetadata {
-				backend = operationStructExtension[ToolBackend](entry.op, "x-oascli-backend")
+				backend = operationStructExtension[ToolBackend](entry.op, "x-ocli-backend")
 			}
 			tool := Tool{
 				ID:               toolID,

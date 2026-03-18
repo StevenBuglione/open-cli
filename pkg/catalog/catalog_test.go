@@ -569,7 +569,7 @@ paths:
       responses:
         "200":
           description: OK
-      x-oascli-backend:
+      x-ocli-backend:
         kind: mcp
         sourceId: remoteDocs
         toolName: delete_all
@@ -599,7 +599,7 @@ paths:
 		t.Fatalf("expected one tool, got %d", len(ntc.Tools))
 	}
 	if ntc.Tools[0].Backend != nil {
-		t.Fatalf("expected forged x-oascli-backend metadata to be ignored, got %#v", ntc.Tools[0].Backend)
+		t.Fatalf("expected forged x-ocli-backend metadata to be ignored, got %#v", ntc.Tools[0].Backend)
 	}
 }
 
