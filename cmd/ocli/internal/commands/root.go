@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"errors"
+	"fmt"
 	"os"
 
 	cfgpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/config"
@@ -15,6 +17,22 @@ type RootHooks struct {
 	ResolveCommandOptions func(cfgpkg.Options) (cfgpkg.Options, error)
 	NewRuntimeClient      func(cfgpkg.Options) (runtimepkg.Client, error)
 	ShouldSendHeartbeat   func(*cobra.Command) bool
+}
+
+// isRuntimeConnectionError returns true when err indicates that the runtime
+// daemon is not reachable (connection refused, timeout, DNS failure, etc.)
+// as opposed to an application-level error from the running daemon.
+func isRuntimeConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// If the daemon responded with an HTTP status, the connection itself
+	// succeeded — this is NOT a connection error.
+	var httpErr *runtimepkg.HTTPError
+	if errors.As(err, &httpErr) {
+		return false
+	}
+	return true
 }
 
 // NewRootCommand creates the top-level cobra command tree, resolves options,
@@ -42,14 +60,22 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 	if err != nil {
 		return nil, err
 	}
-	response, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{
+
+	var response runtimepkg.CatalogResponse
+	var runtimeUnavailable bool
+	var catalogErr error
+	response, catalogErr = client.FetchCatalog(runtimepkg.CatalogFetchOptions{
 		ConfigPath:   options.ConfigPath,
 		Mode:         options.Mode,
 		AgentProfile: options.AgentProfile,
 		RuntimeToken: options.RuntimeToken,
 	})
-	if err != nil {
-		return nil, err
+	if catalogErr != nil {
+		if isRuntimeConnectionError(catalogErr) {
+			runtimeUnavailable = true
+		} else {
+			return nil, catalogErr
+		}
 	}
 
 	root := &cobra.Command{
@@ -59,6 +85,22 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 		SilenceErrors: true,
 	}
 	root.SetVersionTemplate(version.String() + "\n")
+
+	// When invoked with no subcommand, show help and a getting-started hint.
+	root.RunE = func(cmd *cobra.Command, _ []string) error {
+		_ = cmd.Help()
+		w := cmd.ErrOrStderr()
+		if runtimeUnavailable {
+			fmt.Fprintln(w)
+			fmt.Fprintf(w, "Note: Could not connect to the runtime daemon at %s\n", options.RuntimeURL)
+		}
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Getting started:")
+		fmt.Fprintln(w, "  ocli init <url>    Set up a new configuration from an API spec")
+		fmt.Fprintln(w, "  ocli --demo        Try ocli with a built-in demo API")
+		return nil
+	}
+
 	if options.RuntimeDeployment == "local" && options.HeartbeatEnabled && options.SessionID != "" {
 		root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 			if !hooks.ShouldSendHeartbeat(cmd) {
@@ -88,12 +130,14 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 	root.PersistentFlags().StringVar(&options.StateDir, "state-dir", options.StateDir, "State directory root for runtime metadata")
 	root.PersistentFlags().BoolVar(&options.Embedded, "embedded", options.Embedded, "Use the embedded runtime instead of an external daemon")
 
-	root.AddCommand(NewCatalogCommand(options, response))
-	root.AddCommand(NewToolCommand(options, response))
-	root.AddCommand(NewExplainCommand(options, response))
-	root.AddCommand(NewWorkflowCommand(options, client))
-	root.AddCommand(NewRuntimeCommand(options, client))
-	AddDynamicToolCommands(root, options, client, response.Catalog.Services, response.View.Tools)
+	if !runtimeUnavailable {
+		root.AddCommand(NewCatalogCommand(options, response))
+		root.AddCommand(NewToolCommand(options, response))
+		root.AddCommand(NewExplainCommand(options, response))
+		root.AddCommand(NewWorkflowCommand(options, client))
+		root.AddCommand(NewRuntimeCommand(options, client))
+		AddDynamicToolCommands(root, options, client, response.Catalog.Services, response.View.Tools)
+	}
 	root.SetArgs(args)
 	return root, nil
 }
