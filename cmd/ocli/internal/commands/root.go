@@ -58,7 +58,9 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 
 	client, err := hooks.NewRuntimeClient(options)
 	if err != nil {
-		return nil, err
+		return nil, FormatError(err,
+			"Could not create runtime client",
+			"Check --runtime URL or use 'ocli --embedded' for in-process mode")
 	}
 
 	var response runtimepkg.CatalogResponse
@@ -74,7 +76,9 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 		if isRuntimeConnectionError(catalogErr) {
 			runtimeUnavailable = true
 		} else {
-			return nil, catalogErr
+			return nil, FormatError(catalogErr,
+				"The runtime daemon returned an error when loading the catalog",
+				"Check your .cli.json config or run 'ocli --demo' to try the built-in demo")
 		}
 	}
 
