@@ -74,7 +74,7 @@ func TestRootCommandInvokesRuntimeToolsAndSchemas(t *testing.T) {
 		ConfigPath: "/tmp/project/.cli.json",
 		Stdout:     &stdout,
 		Stderr:     &stdout,
-	}, []string{"tickets", "tickets", "list", "--state", "open", "--format", "json"})
+	}, []string{"tickets", "list", "--state", "open", "--format", "json"})
 	if err != nil {
 		t.Fatalf("NewRootCommand returned error: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestRootCommandReadsBodyFromFileAndStdin(t *testing.T) {
 			ConfigPath: "/tmp/project/.cli.json",
 			Stdout:     &stdout,
 			Stderr:     &stdout,
-		}, []string{"tickets", "tickets", "create", "--body", "@" + bodyFile.Name()})
+		}, []string{"tickets", "create", "--body", "@" + bodyFile.Name()})
 		if err != nil {
 			t.Fatalf("NewRootCommand returned error: %v", err)
 		}
@@ -239,7 +239,7 @@ func TestRootCommandReadsBodyFromFileAndStdin(t *testing.T) {
 			Stdout:     &stdout,
 			Stderr:     &stdout,
 			Stdin:      bytes.NewBufferString(`{"title":"stdin"}`),
-		}, []string{"tickets", "tickets", "create", "--body", "-"})
+		}, []string{"tickets", "create", "--body", "-"})
 		if err != nil {
 			t.Fatalf("NewRootCommand returned error: %v", err)
 		}
@@ -370,7 +370,7 @@ paths:
 		StateDir:   filepath.Join(dir, "state"),
 		Stdout:     &stdout,
 		Stderr:     &stdout,
-	}, []string{"tickets", "tickets", "list-tickets", "--format", "json"})
+	}, []string{"tickets", "list-tickets", "--format", "json"})
 	if err != nil {
 		t.Fatalf("NewRootCommand returned error: %v", err)
 	}
