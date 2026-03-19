@@ -175,6 +175,7 @@ Add tests covering:
 - server-variable default substitution works
 - loading fails when a required server variable lacks a default
 - URL-loaded specs with no `servers` fall back to the spec origin
+- file-loaded specs with no `servers` preserve existing behavior
 - init-generated config and runtime-loaded execution use the same normalization result
 
 - [ ] **Step 2: Write failing tests for dry-run**
