@@ -18,6 +18,10 @@
 - Modify: `pkg/config/load.go`
 - Modify: `cmd/ocli/internal/runtime/deployment.go`
 - Modify: `cmd/ocli/internal/config/resolve.go`
+- Modify: `cmd/ocli/internal/commands/root.go`
+- Modify: `cmd/ocli/internal/commands/search.go`
+- Modify: `cmd/ocli/internal/commands/auth.go`
+- Modify: `cmd/ocli/internal/commands/status.go`
 - Test: `pkg/config/config_test.go`
 - Test: `cmd/ocli/internal/commands/commands_test.go`
 
@@ -29,6 +33,10 @@ Add tests covering:
 - `runtime.mode: auto` rejects config
 - `runtime.mode: local` accepts only local runtime URLs
 - `runtime.mode: remote` accepts valid absolute HTTP(S) runtime URLs
+- `--runtime` overrides `OCLI_RUNTIME_URL`, which overrides config
+- failure when no runtime URL can be resolved
+- rejection when a `local` override points to a non-local target
+- rejection when a `remote` override attempts to target a local-only endpoint class
 
 - [ ] **Step 2: Run the config tests to verify they fail**
 
@@ -61,6 +69,8 @@ Update deployment/option resolution so:
 - `--runtime` / `OCLI_RUNTIME_URL` follow strict precedence
 - local mode rejects non-local targets
 - remote mode requires an explicit reachable HTTP(S) target
+- root/help/status/search/auth messaging no longer instructs users to use `--embedded`
+- `--embedded` is removed or rejected consistently at the command layer
 
 - [ ] **Step 7: Run targeted tests to verify they pass**
 
@@ -75,6 +85,8 @@ Expected: PASS
 ```bash
 git add pkg/config/cli.schema.json pkg/config/schema.go pkg/config/load.go \
   cmd/ocli/internal/runtime/deployment.go cmd/ocli/internal/config/resolve.go \
+  cmd/ocli/internal/commands/root.go cmd/ocli/internal/commands/search.go \
+  cmd/ocli/internal/commands/auth.go cmd/ocli/internal/commands/status.go \
   pkg/config/config_test.go cmd/ocli/internal/commands/commands_test.go
 git commit -m "feat: require daemon or remote runtime config"
 ```
@@ -83,6 +95,7 @@ git commit -m "feat: require daemon or remote runtime config"
 
 **Files:**
 - Modify: `internal/runtime/server.go`
+- Modify: `internal/runtime/server_test.go`
 - Modify: `cmd/ocli/internal/runtime/client.go`
 - Modify: `cmd/ocli/internal/commands/status.go`
 - Test: `product-tests/tests/capability_runtime_auth_authentik_test.go`
@@ -96,6 +109,8 @@ Add tests covering:
 - remote catalog rejects mismatched `config`
 - remote execute ignores absent `configPath`
 - remote execute rejects mismatched `configPath`
+- remote workflow/refresh/audit/runtime-info endpoints ignore absent config selectors
+- remote workflow/refresh/audit/runtime-info endpoints reject mismatched config selectors
 - status reports actual connected runtime mode and URL
 
 - [ ] **Step 2: Run the remote/runtime tests to verify they fail**
@@ -116,6 +131,7 @@ Ensure status/runtime summaries reflect actual connected transport and URL inste
 
 Run:
 - `PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH" go test ./cmd/ocli/internal/commands/... -run 'TestStatus.*Runtime' -count=1`
+- `PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH" go test ./internal/runtime/... -run 'Test.*Remote.*Config.*|Test.*RuntimeInfo.*' -count=1`
 - `PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH" go test ./product-tests/tests/... -run 'Test.*Runtime.*|Test.*Auth.*Policy.*' -count=1`
 
 Expected: PASS
@@ -124,7 +140,7 @@ Expected: PASS
 
 ```bash
 git add internal/runtime/server.go cmd/ocli/internal/runtime/client.go \
-  cmd/ocli/internal/commands/status.go \
+  internal/runtime/server_test.go cmd/ocli/internal/commands/status.go \
   product-tests/tests/capability_runtime_auth_authentik_test.go \
   product-tests/tests/capability_auth_policy_test.go \
   cmd/ocli/internal/commands/commands_test.go
@@ -141,6 +157,8 @@ git commit -m "feat: bind remote runtime to owned config identity"
 - Modify: `cmd/ocli/internal/commands/dynamic.go`
 - Modify: `internal/runtime/server.go`
 - Modify: `pkg/audit/store.go`
+- Test: `pkg/openapi/*_test.go`
+- Test: `pkg/catalog/*_test.go`
 - Test: `cmd/ocli/main_test.go`
 - Test: `cmd/ocli/internal/commands/commands_test.go`
 - Test: `product-tests/tests/capability_refresh_audit_test.go`
@@ -151,6 +169,10 @@ Add tests covering:
 - relative top-level server URLs normalize against remote spec origin
 - normalized URLs are used during execution
 - operation/path/document server precedence follows the spec contract
+- server-variable default substitution works
+- loading fails when a required server variable lacks a default
+- URL-loaded specs with no `servers` fall back to the spec origin
+- init-generated config and runtime-loaded execution use the same normalization result
 
 - [ ] **Step 2: Write failing tests for dry-run**
 
@@ -158,6 +180,10 @@ Add tests covering:
 - dry-run prints request shape for auth-gated REST tools without resolving secrets
 - dry-run prints MCP payload preview without executing the tool
 - dry-run marks auth/approval posture as `required|not_required|unknown`
+- unreachable remote runtime degrades to config/catalog-only preview when metadata is available
+- unreachable remote runtime fails with `preview metadata unavailable` when metadata is insufficient
+- unresolved REST base prints an explicit `base unresolved` note
+- preview path performs no token acquisition, upstream HTTP, MCP calls, or daemon execution
 
 - [ ] **Step 3: Write failing tests for audit semantics**
 
@@ -165,11 +191,14 @@ Add tests covering:
 - execution failures record `execution_error`
 - policy/authz denials record `authz_denial`
 - empty audit API returns `[]`
+- required audit fields are present
+- denial reasons and execution-error reasons follow the event contract
 
 - [ ] **Step 4: Run targeted tests to verify they fail**
 
 Run:
-- `PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH" go test ./cmd/ocli/internal/commands/... -run 'Test.*DryRun.*|Test.*Explain.*' -count=1`
+- `PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH" go test ./pkg/openapi/... ./pkg/catalog/... -run 'Test.*Server.*|Test.*Relative.*|Test.*Normalize.*' -count=1`
+- `PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH" go test ./cmd/ocli/internal/commands/... -run 'Test.*DryRun.*' -count=1`
 - `PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH" go test ./product-tests/tests/... -run 'Test.*Audit.*|Test.*Refresh.*' -count=1`
 - `PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH" go test ./cmd/ocli/... -run 'Test.*Init.*|Test.*Relative.*' -count=1`
 
@@ -228,6 +257,11 @@ Add tests covering:
 - top-level scalar MCP inputs become flags
 - nested/complex inputs fall back to `--body`
 - command rejects mixing generated flags with `--body`
+- nullable scalars become flags
+- enum/default metadata propagates to generated flags
+- required vs optional top-level fields validate correctly
+- reserved flag collisions fall back to `--body`
+- mixed schemas keep scalar flags while retaining `--body`
 
 - [ ] **Step 3: Run targeted tests to verify they fail**
 
@@ -295,6 +329,7 @@ Run:
 - official MCP stdio validation using `@modelcontextprotocol/server-filesystem`
 - official MCP streamable-http validation using `@modelcontextprotocol/server-everything`
 - local daemon validation with `oclird`
+- remote auth validation using the existing Authentik-backed product path when practical
 
 Expected:
 - normal configs fail without daemon/remote runtime
