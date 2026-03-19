@@ -114,19 +114,53 @@ func runInitCommand(t *testing.T, source string) (string, map[string]any) {
 	return stdout.String(), cfg
 }
 
+func TestBuildInitSubprocessEnvStripsInheritedProxyVars(t *testing.T) {
+	baseEnv := []string{
+		"PATH=/usr/bin",
+		"HTTP_PROXY=http://127.0.0.1:1",
+		"http_proxy=http://127.0.0.1:1",
+		"HTTPS_PROXY=http://127.0.0.1:2",
+		"NO_PROXY=*",
+	}
+
+	got := buildInitSubprocessEnv(baseEnv, map[string]string{
+		"http_proxy": "http://proxy.test",
+		"HTTP_PROXY": "",
+		"NO_PROXY":   "",
+		"HOME":       "/tmp/home",
+	})
+
+	if containsEnvPrefix(got, "HTTP_PROXY=") {
+		t.Fatalf("expected HTTP_PROXY to be stripped, got %v", got)
+	}
+	if containsEnvPrefix(got, "HTTPS_PROXY=") {
+		t.Fatalf("expected HTTPS_PROXY to be stripped, got %v", got)
+	}
+	if containsEnvPrefix(got, "NO_PROXY=") {
+		t.Fatalf("expected NO_PROXY to be stripped, got %v", got)
+	}
+	if !containsEnvExact(got, "http_proxy=http://proxy.test") {
+		t.Fatalf("expected explicit http_proxy override, got %v", got)
+	}
+	if !containsEnvExact(got, "HOME=/tmp/home") {
+		t.Fatalf("expected HOME override, got %v", got)
+	}
+}
+
 func runInitCommandSubprocess(t *testing.T, source string, env map[string]string) (string, string, error) {
 	t.Helper()
 
 	homeDir := t.TempDir()
 	cmd := exec.Command(os.Args[0], "-test.run=TestInitCommandHelperProcess")
-	cmd.Env = append(os.Environ(),
-		"OCLI_HELPER_INIT=1",
-		"OCLI_HELPER_SOURCE="+source,
-		"HOME="+homeDir,
-	)
-	for key, value := range env {
-		cmd.Env = append(cmd.Env, key+"="+value)
+	childEnv := map[string]string{
+		"OCLI_HELPER_INIT":   "1",
+		"OCLI_HELPER_SOURCE": source,
+		"HOME":               homeDir,
 	}
+	for key, value := range env {
+		childEnv[key] = value
+	}
+	cmd.Env = buildInitSubprocessEnv(os.Environ(), childEnv)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -134,6 +168,58 @@ func runInitCommandSubprocess(t *testing.T, source string, env map[string]string
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	return stdout.String(), homeDir, err
+}
+
+func buildInitSubprocessEnv(baseEnv []string, overrides map[string]string) []string {
+	filtered := make([]string, 0, len(baseEnv)+len(overrides))
+	for _, entry := range baseEnv {
+		if isProxyEnvEntry(entry) {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+	for key, value := range overrides {
+		if isProxyEnvKey(key) && value == "" {
+			continue
+		}
+		filtered = append(filtered, key+"="+value)
+	}
+	return filtered
+}
+
+func isProxyEnvEntry(entry string) bool {
+	key, _, found := strings.Cut(entry, "=")
+	if !found {
+		return false
+	}
+	return isProxyEnvKey(key)
+}
+
+func isProxyEnvKey(key string) bool {
+	switch key {
+	case "HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy":
+		return true
+	default:
+		return false
+	}
+}
+
+func containsEnvPrefix(env []string, prefix string) bool {
+	for _, entry := range env {
+		if strings.HasPrefix(entry, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsEnvExact(env []string, want string) bool {
+	for _, entry := range env {
+		if entry == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestInitCommandHelperProcess(t *testing.T) {
@@ -614,6 +700,11 @@ func TestInitCommandRemoteURLFallsBackToFirstHostLabel(t *testing.T) {
 }`))
 	}))
 	defer proxy.Close()
+
+	t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
+	t.Setenv("http_proxy", "http://127.0.0.1:1")
+	t.Setenv("NO_PROXY", "*")
+	t.Setenv("no_proxy", "*")
 
 	stdout, homeDir, err := runInitCommandSubprocess(t, "http://www.billing.example.invalid/openapi.json", map[string]string{
 		"http_proxy":  proxy.URL,
