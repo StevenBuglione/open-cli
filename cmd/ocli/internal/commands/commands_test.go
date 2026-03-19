@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,6 +139,18 @@ func assertInitConfigName(t *testing.T, cfg map[string]any, want string) {
 	if got := serviceEntry["alias"]; got != want {
 		t.Fatalf("expected service %q alias %q, got %#v", want, want, got)
 	}
+}
+
+type rewriteTransport struct {
+	base   http.RoundTripper
+	target *url.URL
+}
+
+func (transport rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	cloned := req.Clone(req.Context())
+	cloned.URL.Scheme = transport.target.Scheme
+	cloned.URL.Host = transport.target.Host
+	return transport.base.RoundTrip(cloned)
 }
 
 func testCatalogResponse() runtimepkg.CatalogResponse {
@@ -505,7 +518,7 @@ func TestInitCommandDerivesNameFromGenericBasenameAndTitle(t *testing.T) {
 	assertInitConfigName(t, cfg, "billing-service")
 }
 
-func TestDeriveServiceNameFallsBackToMeaningfulHostLabel(t *testing.T) {
+func TestDeriveServiceNameFallsBackToServiceWhenFirstHostLabelIsGeneric(t *testing.T) {
 	doc := &openapi3.T{
 		Info: &openapi3.Info{
 			Title: "OpenAPI 3.0",
@@ -513,8 +526,8 @@ func TestDeriveServiceNameFallsBackToMeaningfulHostLabel(t *testing.T) {
 	}
 
 	got := deriveServiceName("https://api.staging.payments.example.com/openapi.json", doc)
-	if got != "payments" {
-		t.Fatalf("expected host fallback name payments, got %q", got)
+	if got != "service" {
+		t.Fatalf("expected service fallback, got %q", got)
 	}
 }
 
@@ -533,4 +546,61 @@ func TestInitCommandFallsBackToServiceForLocalFiles(t *testing.T) {
 		t.Fatalf("expected service next step, got: %s", stdout)
 	}
 	assertInitConfigName(t, cfg, "service")
+}
+
+func TestInitCommandRemoteURLFallsBackToFirstHostLabel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+  "openapi": "3.0.3",
+  "info": {"title": "OpenAPI 3.0", "version": "1.0.0"},
+  "paths": {}
+}`))
+	}))
+	defer server.Close()
+
+	targetURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse server url: %v", err)
+	}
+
+	originalTransport := http.DefaultTransport
+	http.DefaultTransport = rewriteTransport{base: originalTransport, target: targetURL}
+	t.Cleanup(func() {
+		http.DefaultTransport = originalTransport
+	})
+
+	stdout, cfg := runInitCommand(t, "http://www.billing.example.invalid/openapi.json")
+	if !strings.Contains(stdout, "ocli billing --help") {
+		t.Fatalf("expected billing next step, got: %s", stdout)
+	}
+	assertInitConfigName(t, cfg, "billing")
+}
+
+func TestInitCommandAuthHintsUseShellSafeEnvVarNames(t *testing.T) {
+	specPath := filepath.Join(t.TempDir(), "openapi-v2.json")
+	if err := os.WriteFile(specPath, []byte(`{
+  "openapi": "3.0.3",
+  "info": {"title": "Billing Service", "version": "1.0.0"},
+  "paths": {},
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-API-Key"},
+      "bearerAuth": {"type": "http", "scheme": "bearer"}
+    }
+  }
+}`), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	stdout, _ := runInitCommand(t, specPath)
+	if !strings.Contains(stdout, "BILLING_SERVICE_API_KEY") {
+		t.Fatalf("expected BILLING_SERVICE_API_KEY auth hint, got: %s", stdout)
+	}
+	if !strings.Contains(stdout, "BILLING_SERVICE_TOKEN") {
+		t.Fatalf("expected BILLING_SERVICE_TOKEN auth hint, got: %s", stdout)
+	}
+	if strings.Contains(stdout, "BILLING-SERVICE_API_KEY") || strings.Contains(stdout, "BILLING-SERVICE_TOKEN") {
+		t.Fatalf("unexpected hyphenated env var in auth hints: %s", stdout)
+	}
 }

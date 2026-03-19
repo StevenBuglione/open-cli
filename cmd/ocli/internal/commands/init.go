@@ -209,6 +209,7 @@ func buildOpenAPIConfig(source string, w io.Writer) (map[string]any, []string, s
 	}
 
 	var authHints []string
+	envNamePrefix := serviceNameEnvPrefix(name)
 	if doc.Components != nil && doc.Components.SecuritySchemes != nil {
 		for schemeName, schemeRef := range doc.Components.SecuritySchemes {
 			if schemeRef.Value == nil {
@@ -219,9 +220,9 @@ func buildOpenAPIConfig(source string, w io.Writer) (map[string]any, []string, s
 			case "oauth2":
 				authHints = append(authHints, fmt.Sprintf("ocli config add-secret %s --type oauth2 --token-url <url> --client-id-env <var> --client-secret-env <var>", schemeName))
 			case "apiKey":
-				authHints = append(authHints, fmt.Sprintf("ocli config add-secret %s --type env --env-value %s", schemeName, strings.ToUpper(name)+"_API_KEY"))
+				authHints = append(authHints, fmt.Sprintf("ocli config add-secret %s --type env --env-value %s_API_KEY", schemeName, envNamePrefix))
 			case "http":
-				authHints = append(authHints, fmt.Sprintf("ocli config add-secret %s --type env --env-value %s", schemeName, strings.ToUpper(name)+"_TOKEN"))
+				authHints = append(authHints, fmt.Sprintf("ocli config add-secret %s --type env --env-value %s_TOKEN", schemeName, envNamePrefix))
 			}
 		}
 	}
@@ -306,21 +307,6 @@ func validateMCPFlags(transport, command, mcpURL string) error {
 }
 
 var versionTokenPattern = regexp.MustCompile(`^(?:v)?\d+(?:\.\d+)*$`)
-var ignoredHostLabels = map[string]struct{}{
-	"api":         {},
-	"dev":         {},
-	"development": {},
-	"int":         {},
-	"internal":    {},
-	"preview":     {},
-	"prod":        {},
-	"production":  {},
-	"qa":          {},
-	"sandbox":     {},
-	"staging":     {},
-	"test":        {},
-	"uat":         {},
-}
 
 func deriveServiceName(source string, doc *openapi3.T) string {
 	if name := deriveServiceNameFromBasename(source); name != "" {
@@ -401,14 +387,11 @@ func deriveServiceNameFromHost(source string) string {
 		return ""
 	}
 
-	for _, part := range parts {
-		name := sanitizeServiceName(part)
-		if name == "" || isIgnoredHostLabel(name) {
-			continue
-		}
-		return name
+	name := sanitizeServiceName(parts[0])
+	if name == "" || isGenericServiceName(name) {
+		return ""
 	}
-	return ""
+	return name
 }
 
 func trimSpecSuffix(base string) string {
@@ -446,6 +429,10 @@ func sanitizeServiceName(raw string) string {
 	return strings.Trim(string(clean), "-")
 }
 
+func serviceNameEnvPrefix(name string) string {
+	return strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
+}
+
 func titleTokens(title string) []string {
 	matches := regexp.MustCompile(`[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*`).FindAllString(title, -1)
 	if len(matches) == 0 {
@@ -480,12 +467,4 @@ func isGenericServiceName(name string) bool {
 	default:
 		return false
 	}
-}
-
-func isIgnoredHostLabel(name string) bool {
-	if isGenericServiceName(name) || versionTokenPattern.MatchString(name) {
-		return true
-	}
-	_, ignored := ignoredHostLabels[name]
-	return ignored
 }
