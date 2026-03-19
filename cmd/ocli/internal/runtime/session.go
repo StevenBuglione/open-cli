@@ -212,9 +212,9 @@ func ConfigFingerprint(configPath string) string {
 	data, err := json.Marshal(struct {
 		RuntimeMode string                        `json:"runtimeMode"`
 		Local       *configpkg.LocalRuntimeConfig `json:"local"`
-		Sources     map[string]configpkg.Source    `json:"sources,omitempty"`
-		Services    map[string]configpkg.Service   `json:"services,omitempty"`
-		Policy      configpkg.PolicyConfig         `json:"policy,omitempty"`
+		Sources     map[string]configpkg.Source   `json:"sources,omitempty"`
+		Services    map[string]configpkg.Service  `json:"services,omitempty"`
+		Policy      configpkg.PolicyConfig        `json:"policy,omitempty"`
 	}{
 		RuntimeMode: effective.Config.Runtime.Mode,
 		Local:       effective.Config.Runtime.Local,

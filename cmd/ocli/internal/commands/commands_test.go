@@ -619,6 +619,7 @@ func TestExplainCommandUsesLayeredApprovalPolicy(t *testing.T) {
 		t.Fatalf("mkdir user config: %v", err)
 	}
 	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
 	origWD, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -769,6 +770,7 @@ func TestStatusCommandStructuredIncludesSecuritySummary(t *testing.T) {
 		t.Fatalf("mkdir user config: %v", err)
 	}
 	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
 
 	projectPath := filepath.Join(projectDir, ".cli.json")
 	if err := os.WriteFile(projectPath, []byte(`{
@@ -1126,7 +1128,7 @@ func TestStatusCommandTerminalDoesNotRenderScopePrefixesAsScopes(t *testing.T) {
 		runtimeInfoFn: func() (map[string]any, error) {
 			return map[string]any{
 				"auth": map[string]any{
-					"required":     false,
+					"required":      false,
 					"scopePrefixes": []any{"bundle:", "profile:", "tool:"},
 					"browserLogin": map[string]any{
 						"configured": false,

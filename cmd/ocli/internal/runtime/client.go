@@ -18,7 +18,7 @@ import (
 // CatalogResponse wraps the runtime catalog response.
 type CatalogResponse struct {
 	Catalog catalog.NormalizedCatalog `json:"catalog"`
-	View    catalog.EffectiveView    `json:"view"`
+	View    catalog.EffectiveView     `json:"view"`
 }
 
 // ExecuteRequest is the payload sent to the tools/execute endpoint.

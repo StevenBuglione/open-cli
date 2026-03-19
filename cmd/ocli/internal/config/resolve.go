@@ -39,14 +39,14 @@ const defaultRuntimeURL = "http://127.0.0.1:8765"
 // ResolveHooks bundles the callback functions that ResolveCommandOptions
 // delegates to for operations that live outside this package.
 type ResolveHooks struct {
-	LoadRuntimeConfig          func(Options) (*configpkg.RuntimeConfig, bool)
-	ResolveRuntimeDeployment   func(Options) string
-	ResolveLocalInstanceID     func(Options, configpkg.LocalRuntimeConfig) string
-	ResolveLocalSessionID      func(Options, configpkg.LocalRuntimeConfig) string
-	ResolveInstancePaths       func(Options) (instance.Paths, error)
-	ResolveRuntimeURLFromInst  func(Options) (string, bool, error)
-	StartManagedRuntime        func(Options) (string, error)
-	LocalSessionHandshake      func(Options) (Options, error)
+	LoadRuntimeConfig         func(Options) (*configpkg.RuntimeConfig, bool)
+	ResolveRuntimeDeployment  func(Options) string
+	ResolveLocalInstanceID    func(Options, configpkg.LocalRuntimeConfig) string
+	ResolveLocalSessionID     func(Options, configpkg.LocalRuntimeConfig) string
+	ResolveInstancePaths      func(Options) (instance.Paths, error)
+	ResolveRuntimeURLFromInst func(Options) (string, bool, error)
+	StartManagedRuntime       func(Options) (string, error)
+	LocalSessionHandshake     func(Options) (Options, error)
 }
 
 // EnvBool returns true when the named environment variable holds a truthy
