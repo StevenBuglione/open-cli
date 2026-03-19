@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	authpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/auth"
@@ -110,6 +112,47 @@ func runInitCommand(t *testing.T, source string) (string, map[string]any) {
 		t.Fatalf("unmarshal config: %v", err)
 	}
 	return stdout.String(), cfg
+}
+
+func runInitCommandSubprocess(t *testing.T, source string, env map[string]string) (string, string, error) {
+	t.Helper()
+
+	homeDir := t.TempDir()
+	cmd := exec.Command(os.Args[0], "-test.run=TestInitCommandHelperProcess")
+	cmd.Env = append(os.Environ(),
+		"OCLI_HELPER_INIT=1",
+		"OCLI_HELPER_SOURCE="+source,
+		"HOME="+homeDir,
+	)
+	for key, value := range env {
+		cmd.Env = append(cmd.Env, key+"="+value)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.String(), homeDir, err
+}
+
+func TestInitCommandHelperProcess(t *testing.T) {
+	if os.Getenv("OCLI_HELPER_INIT") != "1" {
+		return
+	}
+
+	var stdout bytes.Buffer
+	cmd := NewInitCommand()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stdout)
+	cmd.SetArgs([]string{"--global", os.Getenv("OCLI_HELPER_SOURCE")})
+	err := cmd.Execute()
+	_, _ = os.Stdout.Write(stdout.Bytes())
+	if err != nil {
+		_, _ = os.Stderr.WriteString(err.Error())
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
 
 func assertInitConfigName(t *testing.T, cfg map[string]any, want string) {
@@ -572,20 +615,60 @@ func TestInitCommandRemoteURLFallsBackToFirstHostLabel(t *testing.T) {
 	}))
 	defer proxy.Close()
 
-	t.Setenv("HTTP_PROXY", proxy.URL)
-	t.Setenv("http_proxy", proxy.URL)
-	t.Setenv("ALL_PROXY", "")
-	t.Setenv("all_proxy", "")
-	t.Setenv("HTTPS_PROXY", "")
-	t.Setenv("https_proxy", "")
-	t.Setenv("NO_PROXY", "")
-	t.Setenv("no_proxy", "")
+	stdout, homeDir, err := runInitCommandSubprocess(t, "http://www.billing.example.invalid/openapi.json", map[string]string{
+		"HTTP_PROXY":  proxy.URL,
+		"http_proxy":  proxy.URL,
+		"ALL_PROXY":   "",
+		"all_proxy":   "",
+		"HTTPS_PROXY": "",
+		"https_proxy": "",
+		"NO_PROXY":    "",
+		"no_proxy":    "",
+	})
+	if err != nil {
+		t.Fatalf("init failed: %v\n%s", err, stdout)
+	}
 
-	stdout, cfg := runInitCommand(t, "http://www.billing.example.invalid/openapi.json")
+	data, err := os.ReadFile(filepath.Join(homeDir, ".config", "oas-cli", ".cli.json"))
+	if err != nil {
+		t.Fatalf("read created config: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
 	if !strings.Contains(stdout, "ocli billing --help") {
 		t.Fatalf("expected billing next step, got: %s", stdout)
 	}
 	assertInitConfigName(t, cfg, "billing")
+}
+
+func TestInitCommandRemoteURLHonorsStandardHTTPProxyCGIGuard(t *testing.T) {
+	var proxyHits atomic.Int32
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyHits.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"unexpected":true}`))
+	}))
+	defer proxy.Close()
+
+	stdout, _, err := runInitCommandSubprocess(t, "http://www.billing.example.invalid/openapi.json", map[string]string{
+		"HTTP_PROXY":     proxy.URL,
+		"http_proxy":     proxy.URL,
+		"ALL_PROXY":      "",
+		"all_proxy":      "",
+		"HTTPS_PROXY":    "",
+		"https_proxy":    "",
+		"NO_PROXY":       "",
+		"no_proxy":       "",
+		"REQUEST_METHOD": "GET",
+	})
+	if err == nil {
+		t.Fatalf("expected init to fail under CGI HTTP_PROXY guard, got output: %s", stdout)
+	}
+	if proxyHits.Load() != 0 {
+		t.Fatalf("expected CGI guard to bypass proxy, got %d proxy requests", proxyHits.Load())
+	}
 }
 
 func TestInitCommandAuthHintsPrefixDigitLeadingEnvVarNames(t *testing.T) {
