@@ -11,7 +11,8 @@ import (
 // NewCatalogCommand returns the "catalog" sub-command.
 func NewCatalogCommand(options cfgpkg.Options, response runtimepkg.CatalogResponse) *cobra.Command {
 	command := &cobra.Command{
-		Use: "catalog",
+		Use:   "catalog",
+		Short: "Inspect the tool catalog",
 	}
 	command.AddCommand(&cobra.Command{
 		Use:   "list",
@@ -25,7 +26,7 @@ func NewCatalogCommand(options cfgpkg.Options, response runtimepkg.CatalogRespon
 
 // NewToolCommand returns the "tool" sub-command.
 func NewToolCommand(options cfgpkg.Options, response runtimepkg.CatalogResponse) *cobra.Command {
-	command := &cobra.Command{Use: "tool"}
+	command := &cobra.Command{Use: "tool", Short: "Tool schema and metadata"}
 	command.AddCommand(&cobra.Command{
 		Use:   "schema <tool-id>",
 		Args:  cobra.ExactArgs(1),
@@ -90,7 +91,7 @@ func NewExplainCommand(options cfgpkg.Options, response runtimepkg.CatalogRespon
 
 // NewWorkflowCommand returns the "workflow" sub-command.
 func NewWorkflowCommand(options cfgpkg.Options, client runtimepkg.Client) *cobra.Command {
-	command := &cobra.Command{Use: "workflow"}
+	command := &cobra.Command{Use: "workflow", Short: "Run multi-step workflows"}
 	command.AddCommand(&cobra.Command{
 		Use:   "run <workflow-id>",
 		Args:  cobra.ExactArgs(1),
@@ -114,7 +115,7 @@ func NewWorkflowCommand(options cfgpkg.Options, client runtimepkg.Client) *cobra
 
 // NewRuntimeCommand returns the "runtime" sub-command.
 func NewRuntimeCommand(options cfgpkg.Options, client runtimepkg.Client) *cobra.Command {
-	command := &cobra.Command{Use: "runtime"}
+	command := &cobra.Command{Use: "runtime", Short: "Manage the runtime daemon"}
 	command.AddCommand(&cobra.Command{
 		Use:   "info",
 		Short: "Show runtime metadata",

@@ -26,7 +26,10 @@ func AddDynamicToolCommands(root *cobra.Command, options cfgpkg.Options, client 
 		}
 		serviceCommand := serviceCommands[serviceAlias]
 		if serviceCommand == nil {
-			serviceCommand = &cobra.Command{Use: serviceAlias}
+			serviceCommand = &cobra.Command{
+				Use:   serviceAlias,
+				Short: fmt.Sprintf("Commands for the %s service", serviceAlias),
+			}
 			root.AddCommand(serviceCommand)
 			serviceCommands[serviceAlias] = serviceCommand
 		}
@@ -34,7 +37,10 @@ func AddDynamicToolCommands(root *cobra.Command, options cfgpkg.Options, client 
 		groupKey := serviceAlias + ":" + tool.Group
 		groupCommand := groupCommands[groupKey]
 		if groupCommand == nil {
-			groupCommand = &cobra.Command{Use: tool.Group}
+			groupCommand = &cobra.Command{
+				Use:   tool.Group,
+				Short: fmt.Sprintf("%s operations", tool.Group),
+			}
 			serviceCommand.AddCommand(groupCommand)
 			groupCommands[groupKey] = groupCommand
 		}
