@@ -138,6 +138,7 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 		root.AddCommand(NewRuntimeCommand(options, client))
 		AddDynamicToolCommands(root, options, client, response.Catalog.Services, response.View.Tools)
 	}
+	root.AddCommand(NewInitCommand())
 	root.SetArgs(args)
 	return root, nil
 }
