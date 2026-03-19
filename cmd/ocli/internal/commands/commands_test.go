@@ -89,28 +89,19 @@ func testOptions(stdout, stderr *bytes.Buffer) cfgpkg.Options {
 func runInitCommand(t *testing.T, source string) (string, map[string]any) {
 	t.Helper()
 
-	dir := t.TempDir()
-	origWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd: %v", err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("Chdir: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(origWD)
-	})
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
 
 	var stdout bytes.Buffer
 	cmd := NewInitCommand()
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stdout)
-	cmd.SetArgs([]string{source})
+	cmd.SetArgs([]string{"--global", source})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("init failed: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".cli.json"))
+	data, err := os.ReadFile(filepath.Join(homeDir, ".config", "oas-cli", ".cli.json"))
 	if err != nil {
 		t.Fatalf("read created config: %v", err)
 	}
@@ -498,7 +489,7 @@ func TestInitCommandGlobalCreatesConfigDir(t *testing.T) {
 }
 
 func TestInitCommandDerivesNameFromGenericBasenameAndTitle(t *testing.T) {
-	specPath := filepath.Join(t.TempDir(), "openapi.json")
+	specPath := filepath.Join(t.TempDir(), "openapi-v2.json")
 	if err := os.WriteFile(specPath, []byte(`{
   "openapi": "3.0.3",
   "info": {"title": "Billing Service", "version": "1.0.0"},
@@ -521,14 +512,14 @@ func TestDeriveServiceNameFallsBackToMeaningfulHostLabel(t *testing.T) {
 		},
 	}
 
-	got := deriveServiceName("https://api.payments.example.com/openapi.json", doc)
+	got := deriveServiceName("https://api.staging.payments.example.com/openapi.json", doc)
 	if got != "payments" {
 		t.Fatalf("expected host fallback name payments, got %q", got)
 	}
 }
 
 func TestInitCommandFallsBackToServiceForLocalFiles(t *testing.T) {
-	specPath := filepath.Join(t.TempDir(), "api.json")
+	specPath := filepath.Join(t.TempDir(), "api-1.yaml")
 	if err := os.WriteFile(specPath, []byte(`{
   "openapi": "3.0.3",
   "info": {"title": "OpenAPI 3.0", "version": "1.0.0"},

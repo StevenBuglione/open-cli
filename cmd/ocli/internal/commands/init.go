@@ -306,6 +306,21 @@ func validateMCPFlags(transport, command, mcpURL string) error {
 }
 
 var versionTokenPattern = regexp.MustCompile(`^(?:v)?\d+(?:\.\d+)*$`)
+var ignoredHostLabels = map[string]struct{}{
+	"api":         {},
+	"dev":         {},
+	"development": {},
+	"int":         {},
+	"internal":    {},
+	"preview":     {},
+	"prod":        {},
+	"production":  {},
+	"qa":          {},
+	"sandbox":     {},
+	"staging":     {},
+	"test":        {},
+	"uat":         {},
+}
 
 func deriveServiceName(source string, doc *openapi3.T) string {
 	if name := deriveServiceNameFromBasename(source); name != "" {
@@ -449,7 +464,17 @@ func isBoilerplateToken(token string) bool {
 }
 
 func isGenericServiceName(name string) bool {
-	switch name {
+	tokens := strings.Split(name, "-")
+	for len(tokens) > 0 && versionTokenPattern.MatchString(tokens[0]) {
+		tokens = tokens[1:]
+	}
+	for len(tokens) > 0 && versionTokenPattern.MatchString(tokens[len(tokens)-1]) {
+		tokens = tokens[:len(tokens)-1]
+	}
+	if len(tokens) != 1 {
+		return false
+	}
+	switch tokens[0] {
 	case "openapi", "swagger", "api", "spec", "index":
 		return true
 	default:
@@ -458,5 +483,9 @@ func isGenericServiceName(name string) bool {
 }
 
 func isIgnoredHostLabel(name string) bool {
-	return isGenericServiceName(name) || versionTokenPattern.MatchString(name)
+	if isGenericServiceName(name) || versionTokenPattern.MatchString(name) {
+		return true
+	}
+	_, ignored := ignoredHostLabels[name]
+	return ignored
 }
