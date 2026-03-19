@@ -38,7 +38,11 @@ Priority order:
 4. Otherwise, derive from OpenAPI `info.title`:
    - Normalize to lowercase kebab-case with the same sanitization rules
    - Reject it if it is empty or still generic
-5. Otherwise, fall back to the existing sanitized basename logic.
+5. Otherwise, if the source is a URL, derive from the host:
+   - Use the registrable host label when practical (`petstore3.swagger.io` -> `petstore3`)
+   - Normalize to lowercase kebab-case
+   - Reject it if it is empty or still generic
+6. Otherwise, fall back to `service`.
 
 The derived name must remain stable, lowercase, and shell-friendly. Generic filenames like `openapi.json` should no longer produce `ocli openapi ...` unless the spec title is also generic.
 
@@ -87,6 +91,45 @@ Structured-mode contract:
   - `scopePaths`
 - Missing context must be represented explicitly with null/empty/`unknown` values rather than omitted ad hoc
 
+Structured `status` shape:
+
+```json
+{
+  "runtime": {
+    "available": true,
+    "mode": "embedded|local|remote|unknown",
+    "version": "string|null"
+  },
+  "config": {
+    "activePath": "string|null"
+  },
+  "sources": {
+    "totalActive": 0,
+    "byType": {
+      "openapi": 0,
+      "mcp": 0
+    }
+  },
+  "auth": {
+    "mode": "string|unknown",
+    "required": true,
+    "audience": "string|null",
+    "scopes": ["..."],
+    "browserLoginConfigured": true
+  },
+  "approval": {
+    "hasApprovalGatedTools": true,
+    "status": "required|not_required|unknown"
+  },
+  "scopePaths": {
+    "managed": "string|null",
+    "user": "string|null",
+    "project": "string|null",
+    "local": "string|null"
+  }
+}
+```
+
 ### 3. Tool Preflight / Security Introspection
 
 Users need a way to answer “what will happen if I run this?” without actually running the tool.
@@ -116,6 +159,20 @@ Structured-mode contract:
   - `runtime`
   - `runtimeAvailable`
 
+Structured `explain` additions:
+
+```json
+{
+  "auth": [],
+  "approvalRequired": true,
+  "approvalStatus": "required|not_required|unknown",
+  "runtime": {
+    "mode": "embedded|local|remote|unknown"
+  },
+  "runtimeAvailable": true
+}
+```
+
 This keeps the UX discoverable: `catalog` finds tools, `search` narrows them, `explain` tells you operational and security details.
 
 Degraded behavior:
@@ -130,7 +187,10 @@ The remote OAuth model already exists in the implementation and tests. The CLI s
 Changes:
 
 - `status` should summarize runtime auth mode and key metadata when the runtime reports it.
-- `auth status` should distinguish config-only auth posture from runtime-backed session posture.
+- `auth status` should distinguish config-only auth posture from runtime-backed session posture:
+  - `configOnly`
+  - `runtimeSession`
+  - `unknown`
 - `explain` should show auth alternatives and approval posture clearly in terminal and structured output.
 
 This makes the security model legible without reading config files or source code.
@@ -175,8 +235,18 @@ Verification must include:
 Deterministic verification requirements:
 
 - Add fixture-backed tests for `init` naming, including a generic URL basename with a meaningful `info.title`
+- Add fixture-backed tests for `init` naming when the basename is generic and `info.title` is missing/generic, proving the host/final fallback path
 - Live CLI checks must include explicit assertions on output, not just command success
 - Do not rely on a public external URL for primary verification; external URLs may be used only as optional smoke checks after local verification passes
+- Add `status` coverage for:
+  - runtime available with auth metadata
+  - runtime unavailable
+  - partial runtime auth metadata
+- Add `explain` coverage for:
+  - approval required
+  - approval unknown
+  - auth requirements present
+- Add `auth status` coverage proving the posture split between config-only and runtime-backed session states
 
 ## Risks
 
