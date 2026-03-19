@@ -386,11 +386,14 @@ func deriveServiceNameFromHost(source string) string {
 		return ""
 	}
 
-	name := sanitizeServiceName(parts[0])
-	if name == "" || isGenericServiceName(name) {
-		return ""
+	for _, part := range parts {
+		name := sanitizeServiceName(part)
+		if name == "" || isIgnoredHostLabel(name) {
+			continue
+		}
+		return name
 	}
-	return name
+	return ""
 }
 
 func trimSpecSuffix(base string) string {
@@ -452,4 +455,8 @@ func isGenericServiceName(name string) bool {
 	default:
 		return false
 	}
+}
+
+func isIgnoredHostLabel(name string) bool {
+	return isGenericServiceName(name) || versionTokenPattern.MatchString(name)
 }

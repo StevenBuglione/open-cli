@@ -3,10 +3,8 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +14,7 @@ import (
 	cfgpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/config"
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
 	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/cobra"
 )
 
@@ -129,7 +128,8 @@ func assertInitConfigName(t *testing.T, cfg map[string]any, want string) {
 	if !ok {
 		t.Fatalf("expected services map, got %#v", cfg["services"])
 	}
-	if _, ok := services[want]; !ok {
+	serviceEntry, ok := services[want].(map[string]any)
+	if !ok {
 		t.Fatalf("expected service %q in config, got %#v", want, services)
 	}
 
@@ -137,26 +137,16 @@ func assertInitConfigName(t *testing.T, cfg map[string]any, want string) {
 	if !ok {
 		t.Fatalf("expected sources map, got %#v", cfg["sources"])
 	}
-	if _, ok := sources[want+"Source"]; !ok {
+	sourceKey := want + "Source"
+	if _, ok := sources[sourceKey]; !ok {
 		t.Fatalf("expected source %q in config, got %#v", want+"Source", sources)
 	}
-}
-
-func newLocalhostSpecURL(t *testing.T, specBody []byte) string {
-	t.Helper()
-
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(specBody)
-	}))
-	t.Cleanup(backend.Close)
-
-	targetURL, err := url.Parse(backend.URL)
-	if err != nil {
-		t.Fatalf("parse backend URL: %v", err)
+	if got := serviceEntry["source"]; got != sourceKey {
+		t.Fatalf("expected service %q to point at source %q, got %#v", want, sourceKey, got)
 	}
-	targetURL.Host = net.JoinHostPort("localhost", targetURL.Port())
-	return targetURL.String() + "/openapi.json"
+	if got := serviceEntry["alias"]; got != want {
+		t.Fatalf("expected service %q alias %q, got %#v", want, want, got)
+	}
 }
 
 func testCatalogResponse() runtimepkg.CatalogResponse {
@@ -524,19 +514,17 @@ func TestInitCommandDerivesNameFromGenericBasenameAndTitle(t *testing.T) {
 	assertInitConfigName(t, cfg, "billing-service")
 }
 
-func TestInitCommandFallsBackToHostWhenTitleIsGeneric(t *testing.T) {
-	specBody := []byte(`{
-  "openapi": "3.0.3",
-  "info": {"title": "OpenAPI 3.0", "version": "1.0.0"},
-  "paths": {}
-}`)
-	sourceURL := newLocalhostSpecURL(t, specBody)
-
-	stdout, cfg := runInitCommand(t, sourceURL)
-	if !strings.Contains(stdout, "ocli localhost --help") {
-		t.Fatalf("expected localhost next step, got: %s", stdout)
+func TestDeriveServiceNameFallsBackToMeaningfulHostLabel(t *testing.T) {
+	doc := &openapi3.T{
+		Info: &openapi3.Info{
+			Title: "OpenAPI 3.0",
+		},
 	}
-	assertInitConfigName(t, cfg, "localhost")
+
+	got := deriveServiceName("https://api.payments.example.com/openapi.json", doc)
+	if got != "payments" {
+		t.Fatalf("expected host fallback name payments, got %q", got)
+	}
 }
 
 func TestInitCommandFallsBackToServiceForLocalFiles(t *testing.T) {
