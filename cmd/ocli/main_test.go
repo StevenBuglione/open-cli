@@ -146,6 +146,80 @@ func TestRootCommandUsesServiceAlias(t *testing.T) {
 	}
 }
 
+func TestRootCommandDemoStatusShowsSecuritySummary(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+	var stdout bytes.Buffer
+	options, err := setupDemoConfig(CommandOptions{
+		Stdout: &stdout,
+		Stderr: &stdout,
+	})
+	if err != nil {
+		t.Fatalf("setupDemoConfig: %v", err)
+	}
+	options.Format = "table"
+
+	cmd, err := NewRootCommand(options, []string{"status"})
+	if err != nil {
+		t.Fatalf("NewRootCommand returned error: %v", err)
+	}
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("status command failed: %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"Runtime:  ok embedded",
+		"Config:",
+		"Sources:",
+		"Auth:",
+		"Approval:",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in demo status output, got: %s", want, output)
+		}
+	}
+	if strings.Contains(output, "Suggestion:") {
+		t.Fatalf("did not expect local-runtime suggestion in embedded demo output: %s", output)
+	}
+}
+
+func TestRootCommandDemoExplainShowsSecuritySummary(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+	var stdout bytes.Buffer
+	options, err := setupDemoConfig(CommandOptions{
+		Stdout: &stdout,
+		Stderr: &stdout,
+	})
+	if err != nil {
+		t.Fatalf("setupDemoConfig: %v", err)
+	}
+	options.Format = "table"
+
+	cmd, err := NewRootCommand(options, []string{"explain", "demo:createItem"})
+	if err != nil {
+		t.Fatalf("NewRootCommand returned error: %v", err)
+	}
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("explain command failed: %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"Auth:",
+		"Approval:",
+		"Approval status:",
+		"Runtime:",
+		"Runtime available:",
+		"embedded",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in demo explain output, got: %s", want, output)
+		}
+	}
+}
+
 func TestRootCommandReadsBodyFromFileAndStdin(t *testing.T) {
 	tool := catalog.Tool{
 		ID:        "tickets:createTicket",

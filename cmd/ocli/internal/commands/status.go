@@ -215,9 +215,6 @@ func populateStatusAuth(auth *statusAuthSummary, rawConfig map[string]any, runti
 	}
 	auth.Scopes = stringSliceFromMap(runtimeAuth, "scopes")
 	if len(auth.Scopes) == 0 {
-		auth.Scopes = stringSliceFromMap(runtimeAuth, "scopePrefixes")
-	}
-	if len(auth.Scopes) == 0 {
 		auth.Scopes = stringSliceFromRawConfig(rawConfig, "runtime", "remote", "oauth", "scopes")
 	}
 	if len(auth.Scopes) == 0 {
@@ -237,7 +234,7 @@ func deriveStatusAuthMode(rawConfig map[string]any, runtimeAuth map[string]any) 
 		if !*required {
 			return "none"
 		}
-		if len(stringSliceFromMap(runtimeAuth, "scopes")) > 0 || len(stringSliceFromMap(runtimeAuth, "scopePrefixes")) > 0 {
+		if len(stringSliceFromMap(runtimeAuth, "scopes")) > 0 {
 			return "oauthClient"
 		}
 	}

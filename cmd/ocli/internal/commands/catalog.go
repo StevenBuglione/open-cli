@@ -6,6 +6,7 @@ import (
 	cfgpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/config"
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
 	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	configpkg "github.com/StevenBuglione/open-cli/pkg/config"
 	policypkg "github.com/StevenBuglione/open-cli/pkg/policy"
 	"github.com/spf13/cobra"
 )
@@ -101,6 +102,7 @@ type explainReport struct {
 	Servers          []string                  `json:"servers,omitempty"`
 	Safety           catalog.Safety            `json:"safety"`
 	Auth             []catalog.AuthRequirement `json:"auth"`
+	AuthAlternatives []catalog.AuthAlternative `json:"authAlternatives,omitempty"`
 	ApprovalRequired bool                      `json:"approvalRequired"`
 	ApprovalStatus   string                    `json:"approvalStatus"`
 	Runtime          explainRuntimeSummary     `json:"runtime"`
@@ -117,10 +119,10 @@ func buildExplainReport(options cfgpkg.Options, response runtimepkg.CatalogRespo
 		Group:            tool.Group,
 		Command:          tool.Command,
 		Safety:           tool.Safety,
-		Auth:             explainAuthRequirements(tool),
 		Runtime:          explainRuntimeSummary{Mode: runtimeMode(options)},
 		RuntimeAvailable: explainRuntimeAvailable(options),
 	}
+	report.Auth, report.AuthAlternatives = explainAuthRequirements(tool)
 	if tool.Description != "" {
 		report.Description = tool.Description
 	}
@@ -143,18 +145,17 @@ func buildExplainReport(options cfgpkg.Options, response runtimepkg.CatalogRespo
 	return report
 }
 
-func explainAuthRequirements(tool *catalog.Tool) []catalog.AuthRequirement {
+func explainAuthRequirements(tool *catalog.Tool) ([]catalog.AuthRequirement, []catalog.AuthAlternative) {
 	if len(tool.Auth) > 0 {
-		return append([]catalog.AuthRequirement(nil), tool.Auth...)
+		return append([]catalog.AuthRequirement(nil), tool.Auth...), nil
 	}
 	if len(tool.AuthAlternatives) == 0 {
-		return []catalog.AuthRequirement{}
+		return []catalog.AuthRequirement{}, nil
 	}
-	var requirements []catalog.AuthRequirement
-	for _, alternative := range tool.AuthAlternatives {
-		requirements = append(requirements, alternative.Requirements...)
+	if len(tool.AuthAlternatives) == 1 {
+		return append([]catalog.AuthRequirement(nil), tool.AuthAlternatives[0].Requirements...), nil
 	}
-	return requirements
+	return []catalog.AuthRequirement{}, append([]catalog.AuthAlternative(nil), tool.AuthAlternatives...)
 }
 
 func explainRuntimeAvailable(options cfgpkg.Options) bool {
@@ -165,12 +166,10 @@ func explainApprovalStatus(options cfgpkg.Options, tool *catalog.Tool) (string, 
 	if tool.Safety.RequiresApproval {
 		return "required", true
 	}
-	raw, err := readConfigFile(options.ConfigPath)
-	if err != nil || raw == nil {
+	patterns := explainApprovalPatterns(options)
+	if patterns == nil {
 		return "unknown", false
 	}
-	policyMap, _ := raw["policy"].(map[string]any)
-	patterns := stringSliceFromAny(policyMap["approvalRequired"])
 	if len(patterns) == 0 {
 		return "not_required", false
 	}
@@ -178,6 +177,63 @@ func explainApprovalStatus(options cfgpkg.Options, tool *catalog.Tool) (string, 
 		return "required", true
 	}
 	return "not_required", false
+}
+
+func explainApprovalPatterns(options cfgpkg.Options) []string {
+	if options.ConfigPath == "" {
+		return nil
+	}
+	scopePaths := configpkg.DiscoverScopePaths(configpkg.LoadOptions{})
+	if explainMatchesDiscoveredPath(options.ConfigPath, scopePaths) {
+		patterns := []string{}
+		for _, scope := range []configpkg.Scope{configpkg.ScopeManaged, configpkg.ScopeUser, configpkg.ScopeProject, configpkg.ScopeLocal} {
+			path := scopePaths[scope]
+			if path == "" {
+				continue
+			}
+			raw, err := readConfigFile(path)
+			if err != nil || raw == nil {
+				continue
+			}
+			patterns = uniqueStrings(patterns, extractApprovalPatterns(raw))
+		}
+		return patterns
+	}
+	raw, err := readConfigFile(options.ConfigPath)
+	if err != nil || raw == nil {
+		return nil
+	}
+	return extractApprovalPatterns(raw)
+}
+
+func explainMatchesDiscoveredPath(configPath string, scopePaths map[configpkg.Scope]string) bool {
+	for _, path := range scopePaths {
+		if path == configPath {
+			return true
+		}
+	}
+	return false
+}
+
+func extractApprovalPatterns(raw map[string]any) []string {
+	policyMap, _ := raw["policy"].(map[string]any)
+	return stringSliceFromAny(policyMap["approvalRequired"])
+}
+
+func uniqueStrings(existing, additions []string) []string {
+	seen := make(map[string]struct{}, len(existing)+len(additions))
+	result := append([]string(nil), existing...)
+	for _, value := range existing {
+		seen[value] = struct{}{}
+	}
+	for _, value := range additions {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 // NewWorkflowCommand returns the "workflow" sub-command.

@@ -255,16 +255,24 @@ func authServicesFromRawConfig(raw map[string]any) []authStatusService {
 				configured = "ok configured in source"
 			}
 		}
-		for secretName, secretValue := range secrets {
+		for _, secretName := range []string{
+			serviceName + ".oauth",
+			sourceName + ".oauth",
+			serviceName,
+			sourceName,
+		} {
+			secretValue, ok := secrets[secretName]
+			if !ok {
+				continue
+			}
 			secret, ok := secretValue.(map[string]any)
 			if !ok {
 				continue
 			}
 			secretType, _ := secret["type"].(string)
-			if secretName == serviceName || secretName == sourceName || secretName == serviceName+".oauth" || secretName == sourceName+".oauth" {
-				authType = secretType
-				configured = fmt.Sprintf("ok secret: %s", secretName)
-			}
+			authType = secretType
+			configured = fmt.Sprintf("ok secret: %s", secretName)
+			break
 		}
 		result = append(result, authStatusService{
 			Name:       serviceName,
@@ -286,10 +294,15 @@ func configHasAuthEvidence(raw map[string]any) bool {
 		return true
 	}
 	if sources, _ := raw["sources"].(map[string]any); len(sources) > 0 {
-		return true
-	}
-	if services, _ := raw["services"].(map[string]any); len(services) > 0 {
-		return true
+		for _, value := range sources {
+			source, _ := value.(map[string]any)
+			if source == nil {
+				continue
+			}
+			if _, ok := source["oauth"]; ok {
+				return true
+			}
+		}
 	}
 	if secrets, _ := raw["secrets"].(map[string]any); len(secrets) > 0 {
 		return true

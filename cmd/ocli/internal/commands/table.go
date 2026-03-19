@@ -124,7 +124,24 @@ func writeExplainTable(w *tabwriter.Writer, report explainReport) error {
 		fmt.Fprintf(w, "Description\t%s\n", report.Description)
 	}
 	if len(report.Auth) == 0 {
-		fmt.Fprintln(w, "Auth:\tnone")
+		if len(report.AuthAlternatives) == 0 {
+			fmt.Fprintln(w, "Auth:\tnone")
+		} else {
+			for idx, alternative := range report.AuthAlternatives {
+				label := fmt.Sprintf("Auth option %d:", idx+1)
+				if len(alternative.Requirements) == 0 {
+					fmt.Fprintf(w, "%s\tnone\n", label)
+					continue
+				}
+				for reqIdx, requirement := range alternative.Requirements {
+					reqLabel := label
+					if reqIdx > 0 {
+						reqLabel = ""
+					}
+					fmt.Fprintf(w, "%s\t%s\n", reqLabel, formatAuthRequirement(requirement))
+				}
+			}
+		}
 	} else {
 		for idx, requirement := range report.Auth {
 			label := "Auth:"
@@ -134,7 +151,7 @@ func writeExplainTable(w *tabwriter.Writer, report explainReport) error {
 			fmt.Fprintf(w, "%s\t%s\n", label, formatAuthRequirement(requirement))
 		}
 	}
-	fmt.Fprintf(w, "Approval:\t%s\n", report.ApprovalStatus)
+	fmt.Fprintf(w, "Approval:\t%s\n", yesNo(report.ApprovalRequired))
 	fmt.Fprintf(w, "Approval status:\t%s\n", report.ApprovalStatus)
 	fmt.Fprintf(w, "Runtime:\t%s\n", report.Runtime.Mode)
 	fmt.Fprintf(w, "Runtime available:\t%s\n", yesNo(report.RuntimeAvailable))
