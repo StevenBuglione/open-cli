@@ -36,7 +36,12 @@ Priority order:
    - `index`
 3. If the basename is non-generic, use it.
 4. Otherwise, derive from OpenAPI `info.title`:
-   - Normalize to lowercase kebab-case with the same sanitization rules
+   - First strip generic boilerplate terms from both ends of the title:
+     - `swagger`
+     - `openapi`
+     - `api`
+     - version suffixes like `2`, `3`, `3.0`, `3.0.0`
+   - Normalize the remaining title to lowercase kebab-case with the same sanitization rules
    - Reject it if it is empty or still generic
 5. Otherwise, if the source is a URL, derive from the host:
    - Parse the hostname
@@ -113,14 +118,14 @@ Structured `status` shape:
     }
   },
   "auth": {
-    "mode": "string|unknown",
-    "required": "true|false|unknown",
+    "mode": "providedToken|oauthClient|browserLogin|none|unknown",
+    "required": "boolean|null",
     "audience": "string|null",
     "scopes": ["..."],
-    "browserLoginConfigured": "true|false|unknown"
+    "browserLoginConfigured": "boolean|null"
   },
   "approval": {
-    "hasApprovalGatedTools": "true|false|unknown",
+    "hasApprovalGatedTools": "boolean|null",
     "status": "required|not_required|unknown"
   },
   "scopePaths": {
@@ -260,10 +265,14 @@ Deterministic verification requirements:
   - runtime available with auth metadata
   - runtime unavailable
   - partial runtime auth metadata
+  - approval-gated-tool detection
+  - known scope-path reporting
+  - browser-login configuration reporting
 - Add `explain` coverage for:
   - approval required
   - approval unknown
   - auth requirements present
+  - terminal/structured security-field parity
 - Add `auth status` coverage proving the posture split between config-only and runtime-backed session states
 
 ## Risks
