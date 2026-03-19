@@ -117,6 +117,7 @@ func runInitCommand(t *testing.T, source string) (string, map[string]any) {
 func TestBuildInitSubprocessEnvStripsInheritedProxyVars(t *testing.T) {
 	baseEnv := []string{
 		"PATH=/usr/bin",
+		"HOME=/parent/home",
 		"HTTP_PROXY=http://127.0.0.1:1",
 		"http_proxy=http://127.0.0.1:1",
 		"HTTPS_PROXY=http://127.0.0.1:2",
@@ -144,6 +145,9 @@ func TestBuildInitSubprocessEnvStripsInheritedProxyVars(t *testing.T) {
 	}
 	if !containsEnvExact(got, "HOME=/tmp/home") {
 		t.Fatalf("expected HOME override, got %v", got)
+	}
+	if countEnvKey(got, "HOME") != 1 {
+		t.Fatalf("expected HOME to appear once, got %v", got)
 	}
 }
 
@@ -175,6 +179,12 @@ func buildInitSubprocessEnv(baseEnv []string, overrides map[string]string) []str
 	for _, entry := range baseEnv {
 		if isProxyEnvEntry(entry) {
 			continue
+		}
+		key, _, found := strings.Cut(entry, "=")
+		if found {
+			if _, overridden := overrides[key]; overridden {
+				continue
+			}
 		}
 		filtered = append(filtered, entry)
 	}
@@ -220,6 +230,17 @@ func containsEnvExact(env []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func countEnvKey(env []string, key string) int {
+	count := 0
+	for _, entry := range env {
+		entryKey, _, found := strings.Cut(entry, "=")
+		if found && entryKey == key {
+			count++
+		}
+	}
+	return count
 }
 
 func TestInitCommandHelperProcess(t *testing.T) {

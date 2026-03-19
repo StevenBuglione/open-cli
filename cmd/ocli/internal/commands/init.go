@@ -113,19 +113,6 @@ func isRemoteURL(s string) bool {
 	return u.Scheme == "http" || u.Scheme == "https"
 }
 
-func validateRemoteSpec(specURL string) error {
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Head(specURL)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("server returned HTTP %d", resp.StatusCode)
-	}
-	return nil
-}
-
 func buildOpenAPIConfig(source string, w io.Writer) (map[string]any, []string, string, error) {
 	isURL := isRemoteURL(source)
 
