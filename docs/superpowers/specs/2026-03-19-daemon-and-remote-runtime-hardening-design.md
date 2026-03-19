@@ -61,9 +61,27 @@ Behavioral contract:
 
 Flag semantics:
 
-- `--runtime` may override the runtime URL endpoint within the selected deployment class.
-- `--runtime` must not change a `remote` config into `local`, or a `local` config into embedded.
+- `--runtime` may override only the runtime URL endpoint within the deployment class declared by config.
+- `--runtime` must not change a `remote` config into `local`, or a `local` config into anything other than another local daemon URL.
 - `--embedded` must be removed or rejected for normal configs.
+
+Override precedence must be explicit and deterministic:
+
+1. CLI flag `--runtime`
+2. environment variable `OCLI_RUNTIME_URL`
+3. config-declared runtime URL
+
+Validation rules:
+
+- `runtime.mode: local`
+  - valid runtime URL hosts are loopback or Unix-domain-equivalent local targets only
+  - non-local URLs must be rejected
+- `runtime.mode: remote`
+  - any valid absolute HTTP(S) runtime URL is allowed
+- if both CLI flag and environment variable are present, the CLI flag wins
+- if no runtime URL can be resolved for the selected mode, config loading fails
+
+This prevents ambiguous endpoint selection and makes runtime targeting auditable.
 
 This ensures the operator can trust that tool execution actually crossed the enforcement boundary they configured.
 
@@ -72,6 +90,22 @@ This ensures the operator can trust that tool execution actually crossed the enf
 In `remote` mode, the runtime must not honor arbitrary caller-supplied `configPath`.
 
 The runtime process must execute against a fixed runtime-owned config identity established at startup. Requests may optionally carry a config identifier for diagnostics, but not for runtime selection.
+
+Remote API contract:
+
+- `GET /v1/catalog`
+  - request must not require `config`
+  - if `config` is absent, serve the runtime-owned config
+  - if `config` is present and matches the runtime-owned config identity, serve normally
+  - if `config` is present and does not match, reject with a clear client error
+- `POST /v1/tools/execute`
+  - request body must not require `configPath`
+  - if `configPath` is absent, execute against the runtime-owned config
+  - if `configPath` is present and matches the runtime-owned config identity, execute normally
+  - if `configPath` is present and does not match, reject with a clear client error
+- the same matching/rejection behavior applies to workflow, refresh, audit, and runtime-info endpoints that currently accept config selection
+
+Config identity for this purpose should be a runtime-known canonical absolute config path or equivalent fingerprint derived at startup. The important contract is that the client cannot use request-scoped config selection to escape the runtime-owned boundary.
 
 Server-side contract:
 
@@ -112,6 +146,24 @@ The system may continue to surface a note that the server was relative and norma
 
 This change applies to both init-time generated configs and direct runtime loading paths so the behavior is consistent.
 
+Server selection rules must be deterministic:
+
+1. If an operation defines `servers`, use the first operation-level server entry.
+2. Otherwise, if the path item defines `servers`, use the first path-level server entry.
+3. Otherwise, if the document defines `servers`, use the first document-level server entry.
+4. Otherwise, fall back to the spec origin for URL-loaded specs.
+5. For file-loaded specs without any server entry, preserve existing behavior unless an explicit base is configured elsewhere.
+
+Normalization rules:
+
+- absolute server URLs remain unchanged
+- relative server URLs are resolved against the spec origin URL
+- server variable substitution must use declared defaults
+- if a required server variable has no default, loading fails clearly
+- if multiple server entries exist, only the selected one above is normalized for execution
+
+The implementation must apply the same selection and normalization logic in both init-generated configs and runtime-loaded execution.
+
 ### 6. `dry-run` Must Be Pure Preview
 
 `dry-run` must render the would-be request shape without requiring:
@@ -136,6 +188,21 @@ For MCP tools, `dry-run` should show:
 
 If a tool requires auth or approval, `dry-run` should report that as metadata, not fail before showing the preview.
 
+Data-source contract:
+
+- `dry-run` must use catalog/config-derived metadata already available to the CLI/runtime request-shaping path
+- `dry-run` must not perform token acquisition, secret dereferencing, upstream HTTP calls, MCP calls, or daemon-side execution
+- in `local` mode, if the daemon is reachable, `dry-run` may use daemon-provided catalog metadata but must still avoid execution/auth side effects
+- in `remote` mode, if the remote runtime is unreachable, `dry-run` may degrade to config/catalog-only preview when enough local metadata exists; otherwise it must fail clearly with “preview metadata unavailable” rather than pretending execution succeeded
+
+Output requirements when metadata is incomplete:
+
+- render the request shape that can be determined locally
+- mark auth posture as `required`, `not_required`, or `unknown`
+- mark approval posture as `required`, `not_required`, or `unknown`
+- for REST URLs, print the absolute URL when it can be derived; otherwise print the known path plus an explicit “base unresolved” note
+- for MCP tools, print service/tool/payload preview even when transport-side details are unavailable
+
 ### 7. Audit Semantics Must Separate Denial From Failure
 
 Audit events must distinguish:
@@ -148,9 +215,26 @@ An upstream transport failure or runtime-side execution error must not be record
 
 Behavioral contract:
 
-- policy/authz rejection => denial event with denial reason
-- execution/network failure => execution error event with failure reason
-- empty audit log => `[]`, not `null`
+- policy/authz rejection => `eventType: "authz_denial"` with denial reason
+- execution/network failure => `eventType: "execution_error"` with failure reason
+- successful execution => `eventType: "tool_execution"` with success decision
+- empty audit log => JSON `[]`, not `null`
+
+Required event fields:
+
+- `timestamp`
+- `eventType`
+- `toolId` when tool-scoped
+- `serviceId` when tool-scoped
+- `decision`
+- `reasonCode`
+- `statusCode` when applicable
+
+Required reason behavior:
+
+- `authz_denial` uses policy/authz reason codes such as `authz_denied`, `approval_required`, `managed_deny`, `curated_deny`
+- `execution_error` uses execution failure reasons such as `network_error`, `upstream_error`, or existing execution-failure classifications
+- `tool_execution` uses `allowed`
 
 This makes the runtime a more credible enforcement and observability point.
 
@@ -168,6 +252,24 @@ Examples:
 
 The CLI should resolve operator-facing command references back to the canonical tool. Users should not need JSON output to discover the valid explain identifier.
 
+Resolution algorithm:
+
+1. If the input contains `:` and matches a canonical tool ID exactly, use it.
+2. Otherwise, tokenize the input as command-form:
+   - service token
+   - optional group token
+   - command token
+3. Normalize command-form tokens using the same lowercase kebab-case rules used in help/catalog output.
+4. Match against catalog entries by:
+   - service alias or service ID
+   - group command segment when present
+   - rendered command name
+5. If exactly one tool matches, resolve to that canonical tool ID.
+6. If no tools match, return the existing not-found error.
+7. If multiple tools match, return a clear ambiguity error listing candidate canonical IDs.
+
+Canonical tool IDs remain the source of truth, but command-form resolution becomes a deterministic convenience layer.
+
 ### 9. MCP Tool Inputs Should Expose Simple Flags
 
 MCP-derived commands should expose first-class flags for simple scalar parameters where the input schema permits it.
@@ -182,6 +284,33 @@ Examples:
 `--body` remains as a fallback for complex payloads, but common tools should not force raw JSON for one-argument operations such as `--path /tmp`.
 
 This is required if the CLI is meant to be more usable than MCP-native raw tool calling.
+
+Schema-to-flag mapping rules:
+
+- generate flags only for top-level input object properties
+- eligible property types:
+  - `string`
+  - `boolean`
+  - `integer`
+  - `number`
+- do not auto-generate flags for:
+  - nested objects
+  - arrays
+  - union types beyond nullable scalar
+  - schemas that cannot be flattened without ambiguity
+- nullable scalars still get flags
+- enum-valued scalars get flags with enum help text
+- required properties remain required at command validation time
+- optional properties remain optional
+- defaults, when present, populate flag defaults
+- name collisions with reserved command flags (`--help`, `--format`, `--body`, `--dry-run`, etc.) must fall back to `--body` for that property set rather than inventing unsafe renames
+- if any non-eligible top-level properties exist, keep `--body` available as a full-payload fallback
+
+For mixed schemas:
+
+- expose first-class flags for the eligible top-level scalar fields
+- still accept `--body` for the full payload
+- when both flags and `--body` are supplied, fail clearly rather than merging implicitly
 
 ## Files
 
