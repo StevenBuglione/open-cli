@@ -5,6 +5,8 @@ import (
 
 	cfgpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/config"
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
+	"github.com/StevenBuglione/open-cli/pkg/catalog"
+	policypkg "github.com/StevenBuglione/open-cli/pkg/policy"
 	"github.com/spf13/cobra"
 )
 
@@ -73,37 +75,109 @@ func NewExplainCommand(options cfgpkg.Options, response runtimepkg.CatalogRespon
 					"The tool ID may be misspelled or filtered by curation rules",
 					"Run 'ocli catalog list' to see available tools")
 			}
-			result := map[string]any{
-				"toolId":  tool.ID,
-				"summary": tool.Summary,
-				"method":  tool.Method,
-				"path":    tool.Path,
-				"service": tool.ServiceID,
-				"group":   tool.Group,
-				"command": tool.Command,
-				"safety":  tool.Safety,
-			}
-			if tool.Description != "" {
-				result["description"] = tool.Description
-			}
-			if len(tool.PathParams) > 0 {
-				result["pathParams"] = tool.PathParams
-			}
-			if len(tool.Flags) > 0 {
-				result["parameters"] = tool.Flags
-			}
-			if tool.RequestBody != nil {
-				result["requestBody"] = tool.RequestBody
-			}
-			if tool.Guidance != nil {
-				result["guidance"] = tool.Guidance
-			}
-			if len(tool.Servers) > 0 {
-				result["servers"] = tool.Servers
-			}
+			result := buildExplainReport(options, response, tool)
 			return WriteOutput(options.Stdout, options.Format, result)
 		},
 	}
+}
+
+type explainRuntimeSummary struct {
+	Mode string `json:"mode"`
+}
+
+type explainReport struct {
+	ToolID           string                    `json:"toolId"`
+	Summary          string                    `json:"summary"`
+	Method           string                    `json:"method"`
+	Path             string                    `json:"path"`
+	Service          string                    `json:"service"`
+	Group            string                    `json:"group"`
+	Command          string                    `json:"command"`
+	Description      string                    `json:"description,omitempty"`
+	PathParams       []catalog.Parameter       `json:"pathParams,omitempty"`
+	Parameters       []catalog.Parameter       `json:"parameters,omitempty"`
+	RequestBody      *catalog.RequestBody      `json:"requestBody,omitempty"`
+	Guidance         *catalog.Guidance         `json:"guidance,omitempty"`
+	Servers          []string                  `json:"servers,omitempty"`
+	Safety           catalog.Safety            `json:"safety"`
+	Auth             []catalog.AuthRequirement `json:"auth"`
+	ApprovalRequired bool                      `json:"approvalRequired"`
+	ApprovalStatus   string                    `json:"approvalStatus"`
+	Runtime          explainRuntimeSummary     `json:"runtime"`
+	RuntimeAvailable bool                      `json:"runtimeAvailable"`
+}
+
+func buildExplainReport(options cfgpkg.Options, response runtimepkg.CatalogResponse, tool *catalog.Tool) explainReport {
+	report := explainReport{
+		ToolID:           tool.ID,
+		Summary:          tool.Summary,
+		Method:           tool.Method,
+		Path:             tool.Path,
+		Service:          tool.ServiceID,
+		Group:            tool.Group,
+		Command:          tool.Command,
+		Safety:           tool.Safety,
+		Auth:             explainAuthRequirements(tool),
+		Runtime:          explainRuntimeSummary{Mode: runtimeMode(options)},
+		RuntimeAvailable: explainRuntimeAvailable(options),
+	}
+	if tool.Description != "" {
+		report.Description = tool.Description
+	}
+	if len(tool.PathParams) > 0 {
+		report.PathParams = append([]catalog.Parameter(nil), tool.PathParams...)
+	}
+	if len(tool.Flags) > 0 {
+		report.Parameters = append([]catalog.Parameter(nil), tool.Flags...)
+	}
+	if tool.RequestBody != nil {
+		report.RequestBody = tool.RequestBody
+	}
+	if tool.Guidance != nil {
+		report.Guidance = tool.Guidance
+	}
+	if len(tool.Servers) > 0 {
+		report.Servers = append([]string(nil), tool.Servers...)
+	}
+	report.ApprovalStatus, report.ApprovalRequired = explainApprovalStatus(options, tool)
+	return report
+}
+
+func explainAuthRequirements(tool *catalog.Tool) []catalog.AuthRequirement {
+	if len(tool.Auth) > 0 {
+		return append([]catalog.AuthRequirement(nil), tool.Auth...)
+	}
+	if len(tool.AuthAlternatives) == 0 {
+		return []catalog.AuthRequirement{}
+	}
+	var requirements []catalog.AuthRequirement
+	for _, alternative := range tool.AuthAlternatives {
+		requirements = append(requirements, alternative.Requirements...)
+	}
+	return requirements
+}
+
+func explainRuntimeAvailable(options cfgpkg.Options) bool {
+	return options.Embedded || options.Demo || options.RuntimeDeployment != "" || options.RuntimeURL != ""
+}
+
+func explainApprovalStatus(options cfgpkg.Options, tool *catalog.Tool) (string, bool) {
+	if tool.Safety.RequiresApproval {
+		return "required", true
+	}
+	raw, err := readConfigFile(options.ConfigPath)
+	if err != nil || raw == nil {
+		return "unknown", false
+	}
+	policyMap, _ := raw["policy"].(map[string]any)
+	patterns := stringSliceFromAny(policyMap["approvalRequired"])
+	if len(patterns) == 0 {
+		return "not_required", false
+	}
+	if policypkg.MatchesAny(patterns, tool.ID) {
+		return "required", true
+	}
+	return "not_required", false
 }
 
 // NewWorkflowCommand returns the "workflow" sub-command.

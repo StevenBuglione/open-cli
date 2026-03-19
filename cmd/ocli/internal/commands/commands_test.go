@@ -379,6 +379,35 @@ func testCatalogResponse() runtimepkg.CatalogResponse {
 	}
 }
 
+func testExplainResponse() runtimepkg.CatalogResponse {
+	tool := catalog.Tool{
+		ID:          "demo:deleteItem",
+		ServiceID:   "demo",
+		Group:       "admin",
+		Command:     "delete-item",
+		Method:      http.MethodDelete,
+		Path:        "/items/{id}",
+		Summary:     "Delete item",
+		Description: "Delete an item",
+		Auth: []catalog.AuthRequirement{
+			{
+				Name:   "oauth2",
+				Type:   "oauth2",
+				Scheme: "bearer",
+				Scopes: []string{"openid", "profile"},
+			},
+		},
+		Safety: catalog.Safety{RequiresApproval: false},
+	}
+	return runtimepkg.CatalogResponse{
+		Catalog: catalog.NormalizedCatalog{
+			Services: []catalog.Service{{ID: "demo", Alias: "demo", SourceID: "demoSource", Title: "Demo"}},
+			Tools:    []catalog.Tool{tool},
+		},
+		View: catalog.EffectiveView{Name: "discover", Mode: "discover", Tools: []catalog.Tool{tool}},
+	}
+}
+
 func TestCatalogListFilters(t *testing.T) {
 	response := testCatalogResponse()
 	var stdout bytes.Buffer
@@ -424,6 +453,157 @@ func TestSearchCommandRuntimeUnavailable(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected runtime unavailable error")
+	}
+}
+
+func TestExplainCommandStructuredIncludesSecuritySummary(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(configPath, []byte(`{
+  "cli": "1.0.0",
+  "mode": {"default": "discover"},
+  "policy": {
+    "approvalRequired": ["demo:deleteItem"]
+  },
+  "sources": {
+    "demoSource": {"type": "openapi", "enabled": true}
+  },
+  "services": {
+    "demo": {"source": "demoSource", "alias": "demo"}
+  }
+}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	options := testOptions(&stdout, &stdout)
+	options.ConfigPath = configPath
+	options.RuntimeDeployment = "remote"
+	options.RuntimeURL = "https://runtime.example.invalid"
+	cmd := NewExplainCommand(options, testExplainResponse())
+	cmd.SetArgs([]string{"demo:deleteItem"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	var payload struct {
+		ToolID           string                    `json:"toolId"`
+		Summary          string                    `json:"summary"`
+		Method           string                    `json:"method"`
+		Path             string                    `json:"path"`
+		Service          string                    `json:"service"`
+		Group            string                    `json:"group"`
+		Command          string                    `json:"command"`
+		Safety           catalog.Safety            `json:"safety"`
+		Auth             []catalog.AuthRequirement `json:"auth"`
+		ApprovalRequired bool                      `json:"approvalRequired"`
+		ApprovalStatus   string                    `json:"approvalStatus"`
+		Runtime          struct {
+			Mode string `json:"mode"`
+		} `json:"runtime"`
+		RuntimeAvailable bool `json:"runtimeAvailable"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if payload.ToolID != "demo:deleteItem" || payload.Service != "demo" || payload.Command != "delete-item" {
+		t.Fatalf("unexpected explain payload: %#v", payload)
+	}
+	if len(payload.Auth) != 1 || payload.Auth[0].Name != "oauth2" || payload.Auth[0].Scheme != "bearer" {
+		t.Fatalf("expected oauth2 auth requirement, got %#v", payload.Auth)
+	}
+	if !payload.ApprovalRequired {
+		t.Fatal("expected approvalRequired=true")
+	}
+	if payload.ApprovalStatus != "required" {
+		t.Fatalf("expected approvalStatus required, got %q", payload.ApprovalStatus)
+	}
+	if payload.Runtime.Mode != "remote" {
+		t.Fatalf("expected runtime mode remote, got %q", payload.Runtime.Mode)
+	}
+	if !payload.RuntimeAvailable {
+		t.Fatal("expected runtimeAvailable=true")
+	}
+}
+
+func TestExplainCommandTerminalShowsSecuritySummary(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(configPath, []byte(`{
+  "cli": "1.0.0",
+  "mode": {"default": "discover"},
+  "policy": {
+    "approvalRequired": ["demo:deleteItem"]
+  },
+  "sources": {
+    "demoSource": {"type": "openapi", "enabled": true}
+  },
+  "services": {
+    "demo": {"source": "demoSource", "alias": "demo"}
+  }
+}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	options := testOptions(&stdout, &stdout)
+	options.Format = "table"
+	options.ConfigPath = configPath
+	options.RuntimeDeployment = "remote"
+	options.RuntimeURL = "https://runtime.example.invalid"
+	cmd := NewExplainCommand(options, testExplainResponse())
+	cmd.SetArgs([]string{"demo:deleteItem"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"Auth:",
+		"Approval:",
+		"Runtime:",
+		"Runtime available:",
+		"required",
+		"remote",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in explain output, got: %s", want, output)
+		}
+	}
+}
+
+func TestExplainCommandDegradesWhenContextMissing(t *testing.T) {
+	var stdout bytes.Buffer
+	options := testOptions(&stdout, &stdout)
+	options.Format = "json"
+	cmd := NewExplainCommand(options, testExplainResponse())
+	cmd.SetArgs([]string{"demo:deleteItem"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+
+	var payload struct {
+		ApprovalRequired bool   `json:"approvalRequired"`
+		ApprovalStatus   string `json:"approvalStatus"`
+		Runtime          struct {
+			Mode string `json:"mode"`
+		} `json:"runtime"`
+		RuntimeAvailable bool `json:"runtimeAvailable"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if payload.ApprovalStatus != "unknown" {
+		t.Fatalf("expected approvalStatus unknown, got %q", payload.ApprovalStatus)
+	}
+	if payload.ApprovalRequired {
+		t.Fatal("expected approvalRequired=false when context is missing")
+	}
+	if payload.Runtime.Mode != "unknown" {
+		t.Fatalf("expected runtime mode unknown, got %q", payload.Runtime.Mode)
+	}
+	if payload.RuntimeAvailable {
+		t.Fatal("expected runtimeAvailable=false when runtime context is missing")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
@@ -43,6 +44,10 @@ func WriteTable(out io.Writer, value any) error {
 	switch v := value.(type) {
 	case runtimepkg.CatalogResponse:
 		return writeCatalogTable(w, v)
+	case explainReport:
+		return writeExplainTable(w, v)
+	case *explainReport:
+		return writeExplainTable(w, *v)
 	case *catalog.Tool:
 		return writeToolTable(w, v)
 	case catalog.Tool:
@@ -102,4 +107,57 @@ func writeMapTable(w *tabwriter.Writer, m map[string]any) error {
 		fmt.Fprintf(w, "%s\t%v\n", k, v)
 	}
 	return w.Flush()
+}
+
+func writeExplainTable(w *tabwriter.Writer, report explainReport) error {
+	fmt.Fprintf(w, "FIELD\tVALUE\n")
+	fmt.Fprintf(w, "ID\t%s\n", report.ToolID)
+	fmt.Fprintf(w, "Service\t%s\n", report.Service)
+	fmt.Fprintf(w, "Method\t%s\n", report.Method)
+	fmt.Fprintf(w, "Path\t%s\n", report.Path)
+	fmt.Fprintf(w, "Group\t%s\n", report.Group)
+	fmt.Fprintf(w, "Command\t%s\n", report.Command)
+	if report.Summary != "" {
+		fmt.Fprintf(w, "Summary\t%s\n", report.Summary)
+	}
+	if report.Description != "" {
+		fmt.Fprintf(w, "Description\t%s\n", report.Description)
+	}
+	if len(report.Auth) == 0 {
+		fmt.Fprintln(w, "Auth:\tnone")
+	} else {
+		for idx, requirement := range report.Auth {
+			label := "Auth:"
+			if idx > 0 {
+				label = "Auth:"
+			}
+			fmt.Fprintf(w, "%s\t%s\n", label, formatAuthRequirement(requirement))
+		}
+	}
+	fmt.Fprintf(w, "Approval:\t%s\n", report.ApprovalStatus)
+	fmt.Fprintf(w, "Approval status:\t%s\n", report.ApprovalStatus)
+	fmt.Fprintf(w, "Runtime:\t%s\n", report.Runtime.Mode)
+	fmt.Fprintf(w, "Runtime available:\t%s\n", yesNo(report.RuntimeAvailable))
+	return w.Flush()
+}
+
+func formatAuthRequirement(requirement catalog.AuthRequirement) string {
+	parts := []string{requirement.Name}
+	if requirement.Type != "" {
+		parts = append(parts, requirement.Type)
+	}
+	if requirement.Scheme != "" {
+		parts = append(parts, requirement.Scheme)
+	}
+	if len(requirement.Scopes) > 0 {
+		parts = append(parts, "scopes="+strings.Join(requirement.Scopes, " "))
+	}
+	return strings.Join(parts, " ")
+}
+
+func yesNo(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
 }
