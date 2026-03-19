@@ -156,6 +156,14 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 		AddDynamicToolCommands(root, options, client, response.Catalog.Services, response.View.Tools)
 	}
 	root.AddCommand(NewInitCommand())
+	root.AddCommand(NewConfigCommand(options))
+	root.AddCommand(NewAuthCommand(options, client, runtimeUnavailable))
+	root.AddCommand(NewStatusCommand(options, client, runtimeUnavailable))
+	if runtimeUnavailable {
+		root.AddCommand(NewSearchCommand(options, nil))
+	} else {
+		root.AddCommand(NewSearchCommand(options, &response))
+	}
 	root.SetArgs(args)
 	return root, nil
 }

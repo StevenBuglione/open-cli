@@ -51,14 +51,34 @@ func AddDynamicToolCommands(root *cobra.Command, options cfgpkg.Options, client 
 		}
 
 		toolCopy := tool
+		expectedArgs := len(tool.PathParams)
 		command := &cobra.Command{
 			Use:     tool.Command,
-			Args:    cobra.ExactArgs(len(tool.PathParams)),
 			Short:   CommandSummary(toolCopy),
 			Long:    toolCopy.Description,
 			Hidden:  toolCopy.Hidden,
 			Aliases: append([]string(nil), toolCopy.Aliases...),
+			Args: func(cmd *cobra.Command, args []string) error {
+				if len(args) >= expectedArgs {
+					return nil
+				}
+				if IsTerminalReader(cmd.InOrStdin()) {
+					return nil
+				}
+				return fmt.Errorf("accepts %d arg(s), received %d", expectedArgs, len(args))
+			},
 			RunE: func(cmd *cobra.Command, args []string) error {
+				if len(args) < len(toolCopy.PathParams) {
+					if !IsTerminalReader(cmd.InOrStdin()) {
+						return fmt.Errorf("accepts %d arg(s), received %d", len(toolCopy.PathParams), len(args))
+					}
+					prompted, err := PromptForMissingArgs(cmd.InOrStdin(), cmd.ErrOrStderr(), toolCopy.PathParams, args)
+					if err != nil {
+						return err
+					}
+					args = prompted
+				}
+
 				flags := map[string]string{}
 				for _, flag := range toolCopy.Flags {
 					value, err := cmd.Flags().GetString(flag.Name)
@@ -73,6 +93,11 @@ func AddDynamicToolCommands(root *cobra.Command, options cfgpkg.Options, client 
 				body, err := LoadBody(bodyRef, cmd.InOrStdin())
 				if err != nil {
 					return err
+				}
+				dryRun, _ := cmd.Flags().GetBool("dry-run")
+				if dryRun {
+					WriteDryRun(options.Stdout, toolCopy, args, flags, body)
+					return nil
 				}
 				result, err := client.Execute(runtimepkg.ExecuteRequest{
 					ConfigPath:   options.ConfigPath,
@@ -104,6 +129,7 @@ func AddDynamicToolCommands(root *cobra.Command, options cfgpkg.Options, client 
 			command.Flags().String(flag.Name, "", "parameter "+flag.OriginalName)
 		}
 		command.Flags().String("body", "", "inline request body")
+		command.Flags().Bool("dry-run", false, "Show the request without executing")
 		groupCommand.AddCommand(command)
 	}
 }

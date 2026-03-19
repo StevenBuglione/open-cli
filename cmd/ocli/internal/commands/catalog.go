@@ -14,13 +14,27 @@ func NewCatalogCommand(options cfgpkg.Options, response runtimepkg.CatalogRespon
 		Use:   "catalog",
 		Short: "Inspect the tool catalog",
 	}
-	command.AddCommand(&cobra.Command{
+	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List the effective catalog",
+		Short: "List all available tools",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return WriteOutput(options.Stdout, options.Format, response)
+			service, _ := cmd.Flags().GetString("service")
+			group, _ := cmd.Flags().GetString("group")
+			safety, _ := cmd.Flags().GetString("safety")
+
+			tools := response.View.Tools
+			if service != "" || group != "" || safety != "" {
+				tools = FilterTools(tools, service, group, safety)
+			}
+			filtered := response
+			filtered.View.Tools = tools
+			return WriteOutput(options.Stdout, options.Format, filtered)
 		},
-	})
+	}
+	listCmd.Flags().String("service", "", "Filter by service ID")
+	listCmd.Flags().String("group", "", "Filter by group name")
+	listCmd.Flags().String("safety", "", "Filter by safety: read-only, destructive, requires-approval, idempotent")
+	command.AddCommand(listCmd)
 	return command
 }
 
