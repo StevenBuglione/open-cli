@@ -56,6 +56,18 @@ func EnvBool(name string) bool {
 	return value == "1" || value == "true" || value == "yes" || value == "on"
 }
 
+// DiscoverConfigPath searches standard locations for a .cli.json config file.
+// Priority: project (.cli.json in CWD) > user (~/.config/oas-cli/.cli.json) > managed (/etc/oas-cli/.cli.json).
+func DiscoverConfigPath() string {
+	paths := configpkg.DiscoverScopePaths(configpkg.LoadOptions{})
+	for _, scope := range []configpkg.Scope{configpkg.ScopeProject, configpkg.ScopeLocal, configpkg.ScopeUser, configpkg.ScopeManaged} {
+		if p, ok := paths[scope]; ok {
+			return p
+		}
+	}
+	return ""
+}
+
 // BootstrapFromArgs performs a quick pre-parse of the raw CLI arguments to
 // populate the initial Options before Cobra takes over.
 func BootstrapFromArgs(args []string) Options {
@@ -107,6 +119,10 @@ func BootstrapFromArgs(args []string) Options {
 		case "--demo":
 			options.Demo = true
 		}
+	}
+	// Auto-discover config when --config was not explicitly provided.
+	if options.ConfigPath == "" && !options.Demo {
+		options.ConfigPath = DiscoverConfigPath()
 	}
 	return options
 }
