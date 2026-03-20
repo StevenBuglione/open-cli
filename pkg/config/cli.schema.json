@@ -3,7 +3,8 @@
   "type": "object",
   "required": [
     "cli",
-    "mode"
+    "mode",
+    "runtime"
   ],
   "$defs": {
     "refreshPolicy": {
@@ -387,11 +388,12 @@
     },
     "runtime": {
       "type": "object",
+      "required": [
+        "mode"
+      ],
       "properties": {
         "mode": {
           "enum": [
-            "auto",
-            "embedded",
             "local",
             "remote"
           ]

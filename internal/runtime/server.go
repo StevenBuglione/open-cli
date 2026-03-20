@@ -94,6 +94,8 @@ type runtimeAuthError struct {
 	Message    string
 }
 
+var errRuntimeAttachMismatch = errors.New("runtime_attach_mismatch")
+
 func (e *runtimeAuthError) Error() string {
 	if e.Message != "" {
 		return e.Message
@@ -248,7 +250,7 @@ func (server *Server) handleEffectiveCatalog(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		finishErr = err
 		server.observer.Emit(ctx, obs.Event{Name: "runtime.catalog.effective", Operation: "catalog.effective", Duration: time.Since(start), ErrorCategory: "catalog_load_error", RequestID: requestID})
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		server.writeConfigSelectionError(w, err)
 		return
 	}
 	authz, err := server.authorizeRequest(ctx, r, cfg.Config, ntc)
@@ -297,7 +299,7 @@ func (server *Server) handleExecuteTool(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		finishErr = err
 		server.observer.Emit(ctx, obs.Event{Name: "runtime.tools.execute", Operation: "tools.execute", Duration: time.Since(start), ErrorCategory: "catalog_load_error", RequestID: requestID})
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		server.writeConfigSelectionError(w, err)
 		return
 	}
 	authz, err := server.authorizeRequest(ctx, r, cfg.Config, ntc)
@@ -429,7 +431,7 @@ func (server *Server) handleWorkflowRun(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		finishErr = err
 		server.observer.Emit(ctx, obs.Event{Name: "runtime.workflows.run", Operation: request.WorkflowID, Duration: time.Since(start), ErrorCategory: "catalog_load_error", RequestID: requestID})
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		server.writeConfigSelectionError(w, err)
 		return
 	}
 	authz, err := server.authorizeRequest(ctx, r, cfg.Config, ntc)
@@ -513,7 +515,7 @@ func (server *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		finishErr = err
 		server.observer.Emit(ctx, obs.Event{Name: "runtime.refresh", Operation: "refresh", Duration: time.Since(start), ErrorCategory: "refresh_error", RequestID: requestID})
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		server.writeConfigSelectionError(w, err)
 		return
 	}
 	authz, err := server.authenticateRequest(ctx, r, cfg.Config)
@@ -551,9 +553,10 @@ func (server *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (server *Server) handleAuditEvents(w http.ResponseWriter, r *http.Request) {
-	configPath := r.URL.Query().Get("config")
-	if configPath == "" {
-		configPath = server.defaultConfigPath
+	configPath, err := server.boundConfigPath(r.URL.Query().Get("config"))
+	if err != nil {
+		server.writeConfigSelectionError(w, err)
+		return
 	}
 	if configPath != "" {
 		cfg, err := config.LoadEffective(config.LoadOptions{ProjectPath: configPath})
@@ -579,9 +582,10 @@ func (server *Server) handleAuditEvents(w http.ResponseWriter, r *http.Request) 
 }
 
 func (server *Server) handleBrowserConfig(w http.ResponseWriter, r *http.Request) {
-	configPath := r.URL.Query().Get("config")
-	if configPath == "" {
-		configPath = server.defaultConfigPath
+	configPath, err := server.boundConfigPath(r.URL.Query().Get("config"))
+	if err != nil {
+		server.writeConfigSelectionError(w, err)
+		return
 	}
 	if configPath == "" {
 		http.Error(w, "config query parameter is required", http.StatusBadRequest)
@@ -618,9 +622,10 @@ func (server *Server) handleRuntimeInfo(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	configPath := r.URL.Query().Get("config")
-	if configPath == "" {
-		configPath = server.defaultConfigPath
+	configPath, err := server.boundConfigPath(r.URL.Query().Get("config"))
+	if err != nil {
+		server.writeConfigSelectionError(w, err)
+		return
 	}
 
 	var authCfg *config.RuntimeServerAuthConfig
@@ -1097,8 +1102,10 @@ func urlEncode(value string) string {
 }
 
 func (server *Server) loadCatalog(ctx context.Context, configPath string, forceRefresh bool) (*config.EffectiveConfig, *catalog.NormalizedCatalog, error) {
-	if configPath == "" {
-		configPath = server.defaultConfigPath
+	var err error
+	configPath, err = server.boundConfigPath(configPath)
+	if err != nil {
+		return nil, nil, err
 	}
 	if configPath == "" {
 		return nil, nil, fmt.Errorf("config query parameter is required")
@@ -1124,6 +1131,45 @@ func (server *Server) loadCatalog(ctx context.Context, configPath string, forceR
 		return nil, nil, err
 	}
 	return cfg, ntc, nil
+}
+
+func (server *Server) boundConfigPath(requestConfigPath string) (string, error) {
+	if server.effectiveRuntimeMode() != "remote" || strings.TrimSpace(server.defaultConfigPath) == "" {
+		return firstNonEmpty(strings.TrimSpace(requestConfigPath), server.defaultConfigPath), nil
+	}
+
+	runtimeConfigPath, err := canonicalConfigPath(server.defaultConfigPath)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(requestConfigPath) == "" {
+		return runtimeConfigPath, nil
+	}
+
+	requestedConfigPath, err := canonicalConfigPath(requestConfigPath)
+	if err != nil {
+		return "", err
+	}
+	if requestedConfigPath != runtimeConfigPath {
+		return "", errRuntimeAttachMismatch
+	}
+	return runtimeConfigPath, nil
+}
+
+func canonicalConfigPath(path string) (string, error) {
+	absolutePath, err := filepath.Abs(strings.TrimSpace(path))
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(absolutePath), nil
+}
+
+func (server *Server) writeConfigSelectionError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errRuntimeAttachMismatch) {
+		http.Error(w, errRuntimeAttachMismatch.Error(), http.StatusConflict)
+		return
+	}
+	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
 func selectView(cfg config.Config, ntc *catalog.NormalizedCatalog, mode, agentProfile string) *catalog.EffectiveView {
@@ -1352,9 +1398,10 @@ func (server *Server) drainInflightAndShutdown(reason string) {
 }
 
 func (server *Server) requireConfiguredAuth(w http.ResponseWriter, r *http.Request, requireDefaultConfig bool) bool {
-	configPath := r.URL.Query().Get("config")
-	if configPath == "" {
-		configPath = server.defaultConfigPath
+	configPath, err := server.boundConfigPath(r.URL.Query().Get("config"))
+	if err != nil {
+		server.writeConfigSelectionError(w, err)
+		return false
 	}
 	if configPath == "" {
 		if requireDefaultConfig {

@@ -36,6 +36,9 @@ func TestLoadEffectiveSupportsCanonicalMCPSources(t *testing.T) {
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "sources": {
 	    "remoteDocs": {
 	      "type": "mcp",
@@ -124,6 +127,9 @@ func TestLoadEffectiveAutoCreatesServiceForCanonicalMCPSource(t *testing.T) {
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "sources": {
 	    "filesystem": {
 	      "type": "mcp",
@@ -154,6 +160,9 @@ func TestLoadEffectiveInjectsSourceForCanonicalMCPService(t *testing.T) {
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "sources": {
 	    "filesystem": {
 	      "type": "mcp",
@@ -185,6 +194,9 @@ func TestLoadEffectiveNormalizesMCPServersAndInjectsServiceSource(t *testing.T) 
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "mcpServers": {
 	    "filesystem": {
 	      "type": "stdio",
@@ -240,6 +252,9 @@ func TestLoadEffectiveAutoCreatesServiceForMCPServer(t *testing.T) {
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "mcpServers": {
 	    "filesystem": {
 	      "type": "stdio",
@@ -296,6 +311,9 @@ func TestLoadEffectiveRejectsMCPServiceSourceConflicts(t *testing.T) {
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "services": {
 	    "filesystem": {
 	      "source": "other",
@@ -319,6 +337,9 @@ func TestLoadEffectiveRejectsCanonicalMCPServiceSourceConflicts(t *testing.T) {
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "sources": {
 	    "filesystem": {
 	      "type": "mcp",
@@ -391,6 +412,9 @@ func TestLoadEffectiveRejectsInvalidMCPTransportConfig(t *testing.T) {
 			document: `{
 			  "cli": "1.0.0",
 			  "mode": { "default": "discover" },
+			  "runtime": {
+			    "mode": "local"
+			  },
 			  "sources": {
 			    "remoteDocs": {
 			      "type": "mcp",
@@ -569,6 +593,9 @@ func TestLoadEffectiveRejectsInvalidMCPSourceRelationships(t *testing.T) {
 			document: `{
 			  "cli": "1.0.0",
 			  "mode": { "default": "discover" },
+			  "runtime": {
+			    "mode": "local"
+			  },
 			  "sources": {
 			    "remoteDocs": {
 			      "type": "mcp",
@@ -636,6 +663,9 @@ func TestLoadEffectiveClearsExclusiveFieldsWhenSourceTypeChanges(t *testing.T) {
 	  }
 	}`)
 	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "sources": {
 	    "filesystem": {
 	      "type": "mcp",
@@ -704,6 +734,9 @@ func TestLoadEffectiveAllowsHigherScopeToRepairMCPServiceSource(t *testing.T) {
 	  }
 	}`)
 	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "services": {
 	    "demo": {
 	      "source": "demo",
@@ -758,6 +791,9 @@ func TestLoadEffectiveClearsExclusiveFieldsWhenMCPTransportTypeChanges(t *testin
 	  }
 	}`)
 	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "sources": {
 	    "demo": {
 	      "transport": {
@@ -971,6 +1007,9 @@ func TestLoadEffectiveClearsExclusiveFieldsWhenMCPOAuthModeChanges(t *testing.T)
 	  }
 	}`)
 	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "sources": {
 	    "remoteDocs": {
 	      "oauth": {

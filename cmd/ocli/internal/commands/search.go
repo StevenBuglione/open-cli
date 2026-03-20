@@ -19,7 +19,7 @@ func NewSearchCommand(options cfgpkg.Options, response *runtimepkg.CatalogRespon
 				return NewUserError(
 					"Cannot search tools",
 					"Runtime is not available — catalog not loaded",
-					"Use --embedded or start the daemon with oclird")
+					"Start the daemon with oclird or use --demo to try the built-in demo API")
 			}
 
 			pattern := args[0]

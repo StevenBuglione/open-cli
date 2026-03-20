@@ -440,6 +440,16 @@ func setupDemoConfig(options CommandOptions) (CommandOptions, error) {
 	configContent := fmt.Sprintf(`{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "local",
+    "local": {
+      "sessionScope": "terminal",
+      "heartbeatSeconds": 15,
+      "missedHeartbeatLimit": 3,
+      "shutdown": "when-owner-exits",
+      "share": "exclusive"
+    }
+  },
   "sources": {
     "demoSource": {
       "type": "openapi",
@@ -460,6 +470,7 @@ func setupDemoConfig(options CommandOptions) (CommandOptions, error) {
 		return options, fmt.Errorf("demo: write config: %w", err)
 	}
 	options.ConfigPath = configFile
+	options.Demo = true
 	options.Embedded = true
 	return options, nil
 }

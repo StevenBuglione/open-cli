@@ -22,6 +22,7 @@ import (
 
 func writeRuntimeFile(t *testing.T, dir, name, content string) string {
 	t.Helper()
+	content = normalizeRuntimeFixture(name, content)
 	path := filepath.Join(dir, name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
@@ -30,6 +31,29 @@ func writeRuntimeFile(t *testing.T, dir, name, content string) string {
 		t.Fatalf("write %s: %v", name, err)
 	}
 	return path
+}
+
+func normalizeRuntimeFixture(name, content string) string {
+	if !strings.HasSuffix(name, ".cli.json") {
+		return content
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal([]byte(content), &cfg); err != nil {
+		return content
+	}
+	runtimeCfg, _ := cfg["runtime"].(map[string]any)
+	if runtimeCfg == nil {
+		runtimeCfg = map[string]any{}
+		cfg["runtime"] = runtimeCfg
+	}
+	if _, ok := runtimeCfg["mode"]; !ok {
+		runtimeCfg["mode"] = "local"
+	}
+	normalized, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return content
+	}
+	return string(normalized) + "\n"
 }
 
 func postRuntimeJSON(t *testing.T, endpoint string, payload any) (*http.Response, map[string]any) {
@@ -81,6 +105,153 @@ func expectJSONStringSlice(t *testing.T, got any, want []string, field string) {
 		if values[i] != expected {
 			t.Fatalf("expected %s[%d]=%q, got %#v", field, i, expected, values[i])
 		}
+	}
+}
+
+type remoteConfigBindingFixture struct {
+	configPath      string
+	otherConfigPath string
+	serverURL       string
+	toolID          string
+	workflowID      string
+}
+
+type remoteAuthBindingFixture struct {
+	configPath      string
+	otherConfigPath string
+	serverURL       string
+}
+
+func newRemoteConfigBindingFixture(t *testing.T) remoteConfigBindingFixture {
+	t.Helper()
+
+	dir := t.TempDir()
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tickets" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []map[string]any{{"id": "T-1"}}})
+	}))
+	t.Cleanup(api.Close)
+
+	writeRuntimeFile(t, dir, "tickets.openapi.yaml", `
+openapi: 3.1.0
+info:
+  title: Tickets API
+  version: "1.0.0"
+servers:
+  - url: `+api.URL+`
+paths:
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      responses:
+        "200":
+          description: OK
+`)
+	writeRuntimeFile(t, dir, "workflows/tickets.arazzo.yaml", `
+arazzo: 1.0.0
+info:
+  title: Ticket workflows
+  version: 1.0.0
+workflows:
+  - workflowId: triageTicket
+    steps:
+      - stepId: list
+        operationId: listTickets
+`)
+
+	configBody := `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "sources": {
+	    "ticketsSource": {
+	      "type": "openapi",
+	      "uri": "./tickets.openapi.yaml",
+	      "enabled": true
+	    }
+	  },
+	  "services": {
+	    "tickets": {
+	      "source": "ticketsSource",
+	      "alias": "tickets",
+	      "workflows": ["./workflows/tickets.arazzo.yaml"]
+	    }
+	  }
+	}`
+	configPath := writeRuntimeFile(t, dir, ".cli.json", configBody)
+	otherConfigPath := writeRuntimeFile(t, dir, "other.cli.json", configBody)
+
+	server := runtime.NewServer(runtime.Options{
+		AuditPath:         filepath.Join(dir, "audit.log"),
+		DefaultConfigPath: configPath,
+		RuntimeMode:       "remote",
+	})
+	httpServer := httptest.NewServer(server.Handler())
+	t.Cleanup(httpServer.Close)
+
+	return remoteConfigBindingFixture{
+		configPath:      configPath,
+		otherConfigPath: otherConfigPath,
+		serverURL:       httpServer.URL,
+		toolID:          "tickets:listTickets",
+		workflowID:      "triageTicket",
+	}
+}
+
+func newRemoteAuthBindingFixture(t *testing.T) remoteAuthBindingFixture {
+	t.Helper()
+
+	dir := t.TempDir()
+	configPath := writeRuntimeFile(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "server": {
+	      "auth": {
+	        "validationProfile": "oauth2_introspection",
+	        "audience": "oclird",
+	        "introspectionURL": "https://auth.example.com/introspect",
+	        "authorizationURL": "https://auth.example.com/authorize",
+	        "tokenURL": "https://auth.example.com/token",
+	        "browserClientId": "browser-client"
+	      }
+	    }
+	  },
+	  "sources": {
+	    "placeholder": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.json",
+	      "enabled": false
+	    }
+	  }
+	}`)
+	otherConfigPath := writeRuntimeFile(t, dir, "other.cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "sources": {
+	    "placeholder": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.json",
+	      "enabled": false
+	    }
+	  }
+	}`)
+
+	server := runtime.NewServer(runtime.Options{
+		AuditPath:         filepath.Join(dir, "audit.log"),
+		DefaultConfigPath: configPath,
+		RuntimeMode:       "remote",
+	})
+	httpServer := httptest.NewServer(server.Handler())
+	t.Cleanup(httpServer.Close)
+
+	return remoteAuthBindingFixture{
+		configPath:      configPath,
+		otherConfigPath: otherConfigPath,
+		serverURL:       httpServer.URL,
 	}
 }
 
@@ -148,6 +319,462 @@ func TestServerRuntimeInfoIncludesLeaseMetadata(t *testing.T) {
 	}
 	if got := lifecycle["shareKeyPresent"]; got != false {
 		t.Fatalf("expected shareKeyPresent false, got %#v", got)
+	}
+}
+
+func TestServerRemoteCatalogBindsRequestsToRuntimeOwnedConfig(t *testing.T) {
+	fixture := newRemoteConfigBindingFixture(t)
+
+	testCases := []struct {
+		name       string
+		configPath string
+		wantStatus int
+	}{
+		{name: "allows absent selector", wantStatus: http.StatusOK},
+		{name: "allows matching selector", configPath: fixture.configPath, wantStatus: http.StatusOK},
+		{name: "rejects mismatched selector", configPath: fixture.otherConfigPath, wantStatus: http.StatusConflict},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			url := fixture.serverURL + "/v1/catalog/effective"
+			if tc.configPath != "" {
+				url += "?config=" + tc.configPath
+			}
+			resp, err := http.Get(url)
+			if err != nil {
+				t.Fatalf("catalog request: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("expected %d catalog response, got %d with body %q", tc.wantStatus, resp.StatusCode, readTrimmedBody(t, resp))
+			}
+			if tc.wantStatus != http.StatusOK {
+				if got := readTrimmedBody(t, resp); got != "runtime_attach_mismatch" {
+					t.Fatalf("expected runtime_attach_mismatch body, got %q", got)
+				}
+				return
+			}
+
+			var payload map[string]any
+			if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode catalog response: %v", err)
+			}
+			catalogData, ok := payload["catalog"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected catalog object, got %#v", payload["catalog"])
+			}
+			tools, ok := catalogData["tools"].([]any)
+			if !ok || len(tools) != 1 {
+				t.Fatalf("expected one catalog tool, got %#v", catalogData["tools"])
+			}
+			tool, ok := tools[0].(map[string]any)
+			if !ok {
+				t.Fatalf("expected tool object, got %#v", tools[0])
+			}
+			if got := tool["id"]; got != fixture.toolID {
+				t.Fatalf("expected tool %q, got %#v", fixture.toolID, got)
+			}
+		})
+	}
+}
+
+func TestServerRemoteExecuteBindsRequestsToRuntimeOwnedConfig(t *testing.T) {
+	fixture := newRemoteConfigBindingFixture(t)
+
+	testCases := []struct {
+		name       string
+		configPath string
+		wantStatus int
+	}{
+		{name: "allows absent selector", wantStatus: http.StatusOK},
+		{name: "allows matching selector", configPath: fixture.configPath, wantStatus: http.StatusOK},
+		{name: "rejects mismatched selector", configPath: fixture.otherConfigPath, wantStatus: http.StatusConflict},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := map[string]any{"toolId": fixture.toolID}
+			if tc.configPath != "" {
+				payload["configPath"] = tc.configPath
+			}
+			body, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatalf("marshal execute payload: %v", err)
+			}
+			resp, err := http.Post(fixture.serverURL+"/v1/tools/execute", "application/json", bytes.NewReader(body))
+			if err != nil {
+				t.Fatalf("execute request: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("expected %d execute response, got %d with body %q", tc.wantStatus, resp.StatusCode, readTrimmedBody(t, resp))
+			}
+			if tc.wantStatus != http.StatusOK {
+				if got := readTrimmedBody(t, resp); got != "runtime_attach_mismatch" {
+					t.Fatalf("expected runtime_attach_mismatch body, got %q", got)
+				}
+				return
+			}
+
+			var payloadResp map[string]any
+			if err := json.NewDecoder(resp.Body).Decode(&payloadResp); err != nil {
+				t.Fatalf("decode execute response: %v", err)
+			}
+			if got := payloadResp["statusCode"]; got != float64(http.StatusOK) {
+				t.Fatalf("expected statusCode 200, got %#v", got)
+			}
+		})
+	}
+}
+
+func TestServerRemoteWorkflowBindsRequestsToRuntimeOwnedConfig(t *testing.T) {
+	fixture := newRemoteConfigBindingFixture(t)
+
+	testCases := []struct {
+		name       string
+		configPath string
+		wantStatus int
+	}{
+		{name: "allows absent selector", wantStatus: http.StatusOK},
+		{name: "allows matching selector", configPath: fixture.configPath, wantStatus: http.StatusOK},
+		{name: "rejects mismatched selector", configPath: fixture.otherConfigPath, wantStatus: http.StatusConflict},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := map[string]any{"workflowId": fixture.workflowID}
+			if tc.configPath != "" {
+				payload["configPath"] = tc.configPath
+			}
+			body, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatalf("marshal workflow payload: %v", err)
+			}
+			resp, err := http.Post(fixture.serverURL+"/v1/workflows/run", "application/json", bytes.NewReader(body))
+			if err != nil {
+				t.Fatalf("workflow request: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("expected %d workflow response, got %d with body %q", tc.wantStatus, resp.StatusCode, readTrimmedBody(t, resp))
+			}
+			if tc.wantStatus != http.StatusOK {
+				if got := readTrimmedBody(t, resp); got != "runtime_attach_mismatch" {
+					t.Fatalf("expected runtime_attach_mismatch body, got %q", got)
+				}
+				return
+			}
+
+			var payloadResp map[string]any
+			if err := json.NewDecoder(resp.Body).Decode(&payloadResp); err != nil {
+				t.Fatalf("decode workflow response: %v", err)
+			}
+			if got := payloadResp["workflowId"]; got != fixture.workflowID {
+				t.Fatalf("expected workflow %q, got %#v", fixture.workflowID, got)
+			}
+		})
+	}
+}
+
+func TestServerRemoteAncillaryEndpointsBindRequestsToRuntimeOwnedConfig(t *testing.T) {
+	fixture := newRemoteConfigBindingFixture(t)
+
+	testCases := []struct {
+		name       string
+		method     string
+		path       string
+		configKey  string
+		configPath string
+		wantStatus int
+		assertOK   func(*testing.T, *http.Response)
+	}{
+		{
+			name:       "refresh allows absent selector",
+			method:     http.MethodPost,
+			path:       "/v1/refresh",
+			wantStatus: http.StatusOK,
+			assertOK: func(t *testing.T, resp *http.Response) {
+				t.Helper()
+				var payload map[string]any
+				if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode refresh response: %v", err)
+				}
+				if _, ok := payload["refreshedAt"]; !ok {
+					t.Fatalf("expected refreshedAt, got %#v", payload)
+				}
+			},
+		},
+		{
+			name:       "refresh allows matching selector",
+			method:     http.MethodPost,
+			path:       "/v1/refresh",
+			configKey:  "configPath",
+			configPath: fixture.configPath,
+			wantStatus: http.StatusOK,
+			assertOK: func(t *testing.T, resp *http.Response) {
+				t.Helper()
+				var payload map[string]any
+				if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode refresh response: %v", err)
+				}
+				if _, ok := payload["refreshedAt"]; !ok {
+					t.Fatalf("expected refreshedAt, got %#v", payload)
+				}
+			},
+		},
+		{
+			name:       "refresh rejects mismatched selector",
+			method:     http.MethodPost,
+			path:       "/v1/refresh",
+			configKey:  "configPath",
+			configPath: fixture.otherConfigPath,
+			wantStatus: http.StatusConflict,
+		},
+		{
+			name:       "audit allows absent selector",
+			method:     http.MethodGet,
+			path:       "/v1/audit/events",
+			wantStatus: http.StatusOK,
+			assertOK: func(t *testing.T, resp *http.Response) {
+				t.Helper()
+				var payload []map[string]any
+				if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode audit response: %v", err)
+				}
+			},
+		},
+		{
+			name:       "audit allows matching selector",
+			method:     http.MethodGet,
+			path:       "/v1/audit/events?config=" + fixture.configPath,
+			wantStatus: http.StatusOK,
+			assertOK: func(t *testing.T, resp *http.Response) {
+				t.Helper()
+				var payload []map[string]any
+				if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode audit response: %v", err)
+				}
+			},
+		},
+		{
+			name:       "audit rejects mismatched selector",
+			method:     http.MethodGet,
+			path:       "/v1/audit/events?config=" + fixture.otherConfigPath,
+			wantStatus: http.StatusConflict,
+		},
+		{
+			name:       "runtime info allows absent selector",
+			method:     http.MethodGet,
+			path:       "/v1/runtime/info",
+			wantStatus: http.StatusOK,
+			assertOK: func(t *testing.T, resp *http.Response) {
+				t.Helper()
+				var payload map[string]any
+				if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode runtime info response: %v", err)
+				}
+				if got := payload["runtimeMode"]; got != "remote" {
+					t.Fatalf("expected runtimeMode remote, got %#v", got)
+				}
+			},
+		},
+		{
+			name:       "runtime info allows matching selector",
+			method:     http.MethodGet,
+			path:       "/v1/runtime/info?config=" + fixture.configPath,
+			wantStatus: http.StatusOK,
+			assertOK: func(t *testing.T, resp *http.Response) {
+				t.Helper()
+				var payload map[string]any
+				if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+					t.Fatalf("decode runtime info response: %v", err)
+				}
+				if got := payload["runtimeMode"]; got != "remote" {
+					t.Fatalf("expected runtimeMode remote, got %#v", got)
+				}
+			},
+		},
+		{
+			name:       "runtime info rejects mismatched selector",
+			method:     http.MethodGet,
+			path:       "/v1/runtime/info?config=" + fixture.otherConfigPath,
+			wantStatus: http.StatusConflict,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var body io.Reader
+			if tc.method == http.MethodPost {
+				payload := map[string]any{}
+				if tc.configKey != "" {
+					payload[tc.configKey] = tc.configPath
+				}
+				data, err := json.Marshal(payload)
+				if err != nil {
+					t.Fatalf("marshal request payload: %v", err)
+				}
+				body = bytes.NewReader(data)
+			}
+			req, err := http.NewRequest(tc.method, fixture.serverURL+tc.path, body)
+			if err != nil {
+				t.Fatalf("new request: %v", err)
+			}
+			if tc.method == http.MethodPost {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("do request: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("expected %d response, got %d with body %q", tc.wantStatus, resp.StatusCode, readTrimmedBody(t, resp))
+			}
+			if tc.wantStatus != http.StatusOK {
+				if got := readTrimmedBody(t, resp); got != "runtime_attach_mismatch" {
+					t.Fatalf("expected runtime_attach_mismatch body, got %q", got)
+				}
+				return
+			}
+			tc.assertOK(t, resp)
+		})
+	}
+}
+
+func TestServerRemoteBrowserConfigBindsRequestsToRuntimeOwnedConfig(t *testing.T) {
+	fixture := newRemoteAuthBindingFixture(t)
+
+	testCases := []struct {
+		name       string
+		configPath string
+		wantStatus int
+	}{
+		{name: "allows absent selector", wantStatus: http.StatusOK},
+		{name: "allows matching selector", configPath: fixture.configPath, wantStatus: http.StatusOK},
+		{name: "rejects mismatched selector", configPath: fixture.otherConfigPath, wantStatus: http.StatusConflict},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			url := fixture.serverURL + "/v1/auth/browser-config"
+			if tc.configPath != "" {
+				url += "?config=" + tc.configPath
+			}
+			resp, err := http.Get(url)
+			if err != nil {
+				t.Fatalf("browser config request: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("expected %d browser config response, got %d with body %q", tc.wantStatus, resp.StatusCode, readTrimmedBody(t, resp))
+			}
+			if tc.wantStatus != http.StatusOK {
+				if got := readTrimmedBody(t, resp); got != "runtime_attach_mismatch" {
+					t.Fatalf("expected runtime_attach_mismatch body, got %q", got)
+				}
+				return
+			}
+			var metadata map[string]any
+			if err := json.NewDecoder(resp.Body).Decode(&metadata); err != nil {
+				t.Fatalf("decode browser config response: %v", err)
+			}
+			if got := metadata["clientId"]; got != "browser-client" {
+				t.Fatalf("expected default runtime browser config, got %#v", got)
+			}
+		})
+	}
+}
+
+func TestServerRemoteLifecycleEndpointsBindRequestsToRuntimeOwnedConfig(t *testing.T) {
+	fixture := newRemoteAuthBindingFixture(t)
+
+	testCases := []struct {
+		name       string
+		method     string
+		path       string
+		body       string
+		configPath string
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name:       "heartbeat requires auth on bound config",
+			method:     http.MethodPost,
+			path:       "/v1/runtime/heartbeat",
+			body:       `{"sessionId":"sess-1"}`,
+			wantStatus: http.StatusUnauthorized,
+			wantBody:   "authn_failed",
+		},
+		{
+			name:       "heartbeat rejects mismatched selector",
+			method:     http.MethodPost,
+			path:       "/v1/runtime/heartbeat",
+			body:       `{"sessionId":"sess-1"}`,
+			configPath: fixture.otherConfigPath,
+			wantStatus: http.StatusConflict,
+			wantBody:   "runtime_attach_mismatch",
+		},
+		{
+			name:       "stop requires auth on bound config",
+			method:     http.MethodPost,
+			path:       "/v1/runtime/stop",
+			wantStatus: http.StatusUnauthorized,
+			wantBody:   "authn_failed",
+		},
+		{
+			name:       "stop rejects mismatched selector",
+			method:     http.MethodPost,
+			path:       "/v1/runtime/stop",
+			configPath: fixture.otherConfigPath,
+			wantStatus: http.StatusConflict,
+			wantBody:   "runtime_attach_mismatch",
+		},
+		{
+			name:       "session-close requires auth on bound config",
+			method:     http.MethodPost,
+			path:       "/v1/runtime/session-close",
+			body:       `{"sessionId":"sess-1"}`,
+			wantStatus: http.StatusUnauthorized,
+			wantBody:   "authn_failed",
+		},
+		{
+			name:       "session-close rejects mismatched selector",
+			method:     http.MethodPost,
+			path:       "/v1/runtime/session-close",
+			body:       `{"sessionId":"sess-1"}`,
+			configPath: fixture.otherConfigPath,
+			wantStatus: http.StatusConflict,
+			wantBody:   "runtime_attach_mismatch",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			url := fixture.serverURL + tc.path
+			if tc.configPath != "" {
+				url += "?config=" + tc.configPath
+			}
+			req, err := http.NewRequest(tc.method, url, strings.NewReader(tc.body))
+			if err != nil {
+				t.Fatalf("new request: %v", err)
+			}
+			if tc.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("lifecycle request: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.wantStatus {
+				t.Fatalf("expected %d response, got %d with body %q", tc.wantStatus, resp.StatusCode, readTrimmedBody(t, resp))
+			}
+			if got := readTrimmedBody(t, resp); got != tc.wantBody {
+				t.Fatalf("expected body %q, got %q", tc.wantBody, got)
+			}
+		})
 	}
 }
 

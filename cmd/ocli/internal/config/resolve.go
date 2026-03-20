@@ -1,8 +1,12 @@
 package config
 
 import (
+	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	authpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/auth"
@@ -139,25 +143,38 @@ func ResolveCommandOptions(options Options, hooks ResolveHooks) (Options, error)
 		cachedRuntimeCfg, cachedRuntimeCfgLoaded = hooks.LoadRuntimeConfig(options)
 		return cachedRuntimeCfg, cachedRuntimeCfg != nil
 	}
+	if !options.Demo && strings.TrimSpace(options.ConfigPath) != "" {
+		if _, err := configpkg.LoadEffective(configpkg.LoadOptions{
+			ProjectPath: options.ConfigPath,
+			WorkingDir:  filepath.Dir(options.ConfigPath),
+		}); err != nil {
+			return options, err
+		}
+	}
 	if options.InstanceID == "" {
 		options.InstanceID = os.Getenv("OCLI_INSTANCE_ID")
 	}
 	if options.StateDir == "" {
 		options.StateDir = os.Getenv("OCLI_STATE_DIR")
 	}
+	if !options.Demo && options.Embedded {
+		return options, fmt.Errorf("embedded mode is not supported for normal configs")
+	}
 	if !options.Embedded {
 		options.Embedded = EnvBool("OCLI_EMBEDDED")
 	}
 	if options.Embedded {
-		options.RuntimeDeployment = "embedded"
-		return options, nil
+		if options.Demo {
+			options.RuntimeDeployment = "embedded"
+			return options, nil
+		}
+		return options, fmt.Errorf("embedded mode is not supported for normal configs")
 	}
 	if options.RuntimeDeployment == "" {
 		options.RuntimeDeployment = hooks.ResolveRuntimeDeployment(options)
 	}
 	if options.RuntimeDeployment == "embedded" {
-		options.Embedded = true
-		return options, nil
+		return options, fmt.Errorf("embedded deployment is not supported for normal configs")
 	}
 	if options.RuntimeDeployment == "local" && options.InstanceID == "" {
 		if runtimeCfg, ok := loadCachedRuntimeConfig(); ok && runtimeCfg.Local != nil {
@@ -217,6 +234,9 @@ func ResolveCommandOptions(options Options, hooks ResolveHooks) (Options, error)
 	if options.RuntimeURL == "" {
 		options.RuntimeURL = defaultRuntimeURL
 	}
+	if err := validateRuntimeTarget(options); err != nil {
+		return options, err
+	}
 	if options.RuntimeDeployment == "local" && options.RuntimeURL != "" {
 		handshaken, err := hooks.LocalSessionHandshake(options)
 		if err != nil {
@@ -225,4 +245,23 @@ func ResolveCommandOptions(options Options, hooks ResolveHooks) (Options, error)
 		options = handshaken
 	}
 	return options, nil
+}
+
+func validateRuntimeTarget(options Options) error {
+	if options.RuntimeDeployment != "local" || options.RuntimeURL == "" {
+		return nil
+	}
+	u, err := url.Parse(options.RuntimeURL)
+	if err != nil {
+		return fmt.Errorf("invalid local runtime URL: %w", err)
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && ip.IsLoopback() {
+		return nil
+	}
+	return fmt.Errorf("local runtime URL must target a local daemon")
 }

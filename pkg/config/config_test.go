@@ -70,6 +70,9 @@ func TestLoadEffectiveMergesScopesAndPreservesManagedDenies(t *testing.T) {
 	projectPath := writeJSON(t, dir, "project.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "curated" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "services": {
 	    "tickets": {
 	      "source": "ticketsService",
@@ -135,6 +138,9 @@ func TestLoadEffectiveReturnsFieldDiagnostics(t *testing.T) {
 	projectPath := writeJSON(t, dir, "project.json", `{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local"
+	  },
 	  "sources": {
 	    "broken": {
 	      "type": "openapi"
@@ -265,7 +271,7 @@ func TestLoadEffectiveLoadsRuntimeLocalConfiguration(t *testing.T) {
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "auto",
+	    "mode": "local",
 	    "local": {
 	      "sessionScope": "shared-group",
 	      "heartbeatSeconds": 15,
@@ -291,8 +297,8 @@ func TestLoadEffectiveLoadsRuntimeLocalConfiguration(t *testing.T) {
 	if effective.Config.Runtime == nil {
 		t.Fatalf("expected runtime configuration to be loaded")
 	}
-	if effective.Config.Runtime.Mode != "auto" {
-		t.Fatalf("expected runtime mode auto, got %q", effective.Config.Runtime.Mode)
+	if effective.Config.Runtime.Mode != "local" {
+		t.Fatalf("expected runtime mode local, got %q", effective.Config.Runtime.Mode)
 	}
 	if effective.Config.Runtime.Local == nil {
 		t.Fatalf("expected local runtime configuration")
@@ -306,6 +312,66 @@ func TestLoadEffectiveLoadsRuntimeLocalConfiguration(t *testing.T) {
 	if effective.Config.Runtime.Local.ShareKey != "team-a" {
 		t.Fatalf("expected shareKey team-a, got %q", effective.Config.Runtime.Local.ShareKey)
 	}
+}
+
+func TestLoadEffectiveRejectsMissingRuntimeConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "sources": {
+	    "demo": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.json",
+	      "enabled": true
+	    }
+	  }
+	}`)
+
+	_, err := config.LoadEffective(config.LoadOptions{ProjectPath: projectPath, WorkingDir: dir})
+	requireValidationDiagnostic(t, err, "runtime", "required")
+}
+
+func TestLoadEffectiveRejectsEmbeddedRuntimeMode(t *testing.T) {
+	dir := t.TempDir()
+	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "embedded"
+	  },
+	  "sources": {
+	    "demo": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.json",
+	      "enabled": true
+	    }
+	  }
+	}`)
+
+	_, err := config.LoadEffective(config.LoadOptions{ProjectPath: projectPath, WorkingDir: dir})
+	requireValidationDiagnostic(t, err, "runtime.mode", "local or remote")
+}
+
+func TestLoadEffectiveRejectsAutoRuntimeMode(t *testing.T) {
+	dir := t.TempDir()
+	projectPath := writeJSON(t, dir, ".cli.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "auto"
+	  },
+	  "sources": {
+	    "demo": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.json",
+	      "enabled": true
+	    }
+	  }
+	}`)
+
+	_, err := config.LoadEffective(config.LoadOptions{ProjectPath: projectPath, WorkingDir: dir})
+	requireValidationDiagnostic(t, err, "runtime.mode", "local or remote")
 }
 
 func TestLoadEffectiveRejectsLocalRuntimeWithZeroHeartbeatSeconds(t *testing.T) {
@@ -617,6 +683,7 @@ func TestLoadEffectiveLoadsRemoteRuntimeOIDCJWKSConfiguration(t *testing.T) {
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
+	    "mode": "local",
 	    "server": {
 	      "auth": {
 	        "validationProfile": "oidc_jwks",
@@ -701,6 +768,7 @@ func TestLoadEffectiveHigherPrecedenceLegacyRuntimeAuthModeOverridesLowerValidat
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
+	    "mode": "local",
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",
@@ -765,6 +833,7 @@ func TestLoadEffectiveHigherPrecedenceValidationProfileDoesNotOverrideLegacyRunt
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
+	    "mode": "local",
 	    "server": {
 	      "auth": {
 	        "validationProfile": "oidc_jwks"
@@ -816,6 +885,7 @@ func TestLoadEffectivePreservesRemoteRuntimeOAuth2IntrospectionConfiguration(t *
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
+	    "mode": "local",
 	    "server": {
 	      "auth": {
 	        "mode": "oauth2Introspection",

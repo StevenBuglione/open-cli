@@ -202,7 +202,7 @@ func writeStatusTerminal(w io.Writer, report statusReport, runtimeAuthPresent bo
 
 	if runtimeUnavailable {
 		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Suggestion: Run with --embedded or start the daemon with oclird")
+		fmt.Fprintln(w, "Suggestion: Start the daemon with oclird")
 	}
 }
 

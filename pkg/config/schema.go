@@ -55,6 +55,9 @@ func validateDocument(data []byte, partial bool) error {
 }
 
 func normalizeSchemaMessage(path, message string) string {
+	if path == "runtime.mode" && strings.Contains(message, `must be one of the following`) {
+		return "must be local or remote"
+	}
 	if message != "False always fails validation" {
 		return message
 	}
@@ -116,6 +119,9 @@ func rootPathForDescription(message string) string {
 	}
 	if strings.Contains(message, `"mode"`) {
 		return "mode"
+	}
+	if strings.Contains(message, `"runtime"`) {
+		return "runtime"
 	}
 	if strings.Contains(message, `"sources"`) {
 		return "sources"

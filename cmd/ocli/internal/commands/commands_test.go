@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -453,6 +454,37 @@ func TestSearchCommandRuntimeUnavailable(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected runtime unavailable error")
+	}
+	if strings.Contains(err.Error(), "--embedded") {
+		t.Fatalf("unexpected embedded guidance: %v", err)
+	}
+	if !strings.Contains(err.Error(), "Start the daemon with oclird") {
+		t.Fatalf("expected daemon guidance, got: %v", err)
+	}
+}
+
+func TestRootCommandRuntimeClientErrorDoesNotSuggestEmbedded(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	options := testOptions(&stdout, &stderr)
+
+	_, err := NewRootCommand(options, nil, RootHooks{
+		ResolveCommandOptions: func(cfgpkg.Options) (cfgpkg.Options, error) {
+			return options, nil
+		},
+		NewRuntimeClient: func(cfgpkg.Options) (runtimepkg.Client, error) {
+			return nil, errors.New("dial failure")
+		},
+		ShouldSendHeartbeat: func(*cobra.Command) bool { return false },
+	})
+	if err == nil {
+		t.Fatal("expected runtime client construction to fail")
+	}
+	if strings.Contains(err.Error(), "--embedded") {
+		t.Fatalf("unexpected embedded guidance: %v", err)
+	}
+	if !strings.Contains(err.Error(), "start the daemon with oclird") {
+		t.Fatalf("expected daemon guidance, got: %v", err)
 	}
 }
 
@@ -1066,6 +1098,35 @@ func TestStatusCommandRuntimeUnavailableStillReportsConfig(t *testing.T) {
 	}
 }
 
+func TestStatusCommandTerminalRuntimeUnavailableDoesNotSuggestEmbedded(t *testing.T) {
+	dir := t.TempDir()
+	projectPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(projectPath, []byte(`{
+  "cli": "1.0.0",
+  "sources": {
+    "openapi": {"type": "openapi", "uri": "https://example.com/openapi.json", "enabled": true}
+  }
+}`), 0o644); err != nil {
+		t.Fatalf("write project config: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	options := testOptions(&stdout, &stdout)
+	options.Format = "table"
+	options.ConfigPath = projectPath
+	cmd := NewStatusCommand(options, fakeRuntimeClient{}, true)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	output := stdout.String()
+	if strings.Contains(output, "--embedded") {
+		t.Fatalf("unexpected embedded guidance: %s", output)
+	}
+	if !strings.Contains(output, "Start the daemon with oclird") {
+		t.Fatalf("expected daemon guidance, got: %s", output)
+	}
+}
+
 func TestStatusCommandTerminalIncludesCompactSummaries(t *testing.T) {
 	projectDir := t.TempDir()
 	projectPath := filepath.Join(projectDir, ".cli.json")
@@ -1489,6 +1550,44 @@ func TestAuthLoginUsesBrowserMetadata(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Login successful") {
 		t.Fatalf("unexpected auth login output: %s", stdout.String())
+	}
+}
+
+func TestAuthLoginRuntimeUnavailableDoesNotSuggestEmbedded(t *testing.T) {
+	var stdout bytes.Buffer
+	options := testOptions(&stdout, &stdout)
+	cmd := NewAuthCommand(options, fakeRuntimeClient{}, true)
+	cmd.SetArgs([]string{"login"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected runtime unavailable error")
+	}
+	if strings.Contains(err.Error(), "--embedded") {
+		t.Fatalf("unexpected embedded guidance: %v", err)
+	}
+	if !strings.Contains(err.Error(), "Start the daemon with oclird") {
+		t.Fatalf("expected daemon guidance, got: %v", err)
+	}
+}
+
+func TestAuthLoginRuntimeInfoErrorDoesNotSuggestEmbedded(t *testing.T) {
+	var stdout bytes.Buffer
+	options := testOptions(&stdout, &stdout)
+	cmd := NewAuthCommand(options, fakeRuntimeClient{
+		runtimeInfoFn: func() (map[string]any, error) {
+			return nil, errors.New("dial failure")
+		},
+	}, false)
+	cmd.SetArgs([]string{"login"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected runtime info error")
+	}
+	if strings.Contains(err.Error(), "--embedded") {
+		t.Fatalf("unexpected embedded guidance: %v", err)
+	}
+	if !strings.Contains(err.Error(), "start the daemon with oclird") {
+		t.Fatalf("expected daemon guidance, got: %v", err)
 	}
 }
 

@@ -64,7 +64,7 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 	if err != nil {
 		return nil, FormatError(err,
 			"Could not create runtime client",
-			"Check --runtime URL or use 'ocli --embedded' for in-process mode")
+			"Check --runtime URL or start the daemon with oclird")
 	}
 
 	var response runtimepkg.CatalogResponse
@@ -136,7 +136,7 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 	root.PersistentFlags().BoolVar(&options.Approval, "approval", options.Approval, "Grant approval for protected tools")
 	root.PersistentFlags().StringVar(&options.InstanceID, "instance-id", options.InstanceID, "Instance id for isolated runtime resolution")
 	root.PersistentFlags().StringVar(&options.StateDir, "state-dir", options.StateDir, "State directory root for runtime metadata")
-	root.PersistentFlags().BoolVar(&options.Embedded, "embedded", options.Embedded, "Use the embedded runtime instead of an external daemon")
+	root.PersistentFlags().BoolVar(&options.Embedded, "embedded", options.Embedded, "Run with the in-process runtime")
 	root.PersistentFlags().BoolVar(&options.Demo, "demo", options.Demo, "Use the built-in demo API")
 
 	// Hide advanced flags to keep default help clean.

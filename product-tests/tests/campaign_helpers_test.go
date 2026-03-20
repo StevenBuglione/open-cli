@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -179,6 +180,7 @@ func newRestFixtureHandler(store *fixtureStore) http.Handler {
 // writeFile creates a file at dir/name with the given content and returns its path.
 func writeFile(t *testing.T, dir, name, content string) string {
 	t.Helper()
+	content = normalizeRuntimeFixture(name, content)
 	path := filepath.Join(dir, name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
@@ -187,6 +189,29 @@ func writeFile(t *testing.T, dir, name, content string) string {
 		t.Fatalf("write %s: %v", name, err)
 	}
 	return path
+}
+
+func normalizeRuntimeFixture(name, content string) string {
+	if !strings.HasSuffix(name, ".cli.json") {
+		return content
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal([]byte(content), &cfg); err != nil {
+		return content
+	}
+	runtimeCfg, _ := cfg["runtime"].(map[string]any)
+	if runtimeCfg == nil {
+		runtimeCfg = map[string]any{}
+		cfg["runtime"] = runtimeCfg
+	}
+	if _, ok := runtimeCfg["mode"]; !ok {
+		runtimeCfg["mode"] = "local"
+	}
+	normalized, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return content
+	}
+	return string(normalized) + "\n"
 }
 
 // executeTool posts a /v1/tools/execute request to runtimeURL and returns the

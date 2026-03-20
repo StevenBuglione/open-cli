@@ -57,11 +57,11 @@ func newAuthLoginCommand(options cfgpkg.Options, client runtimepkg.Client, runti
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if runtimeUnavailable {
-				return NewUserError("Cannot log in", "Runtime is not available", "Use --embedded or start the daemon with oclird")
+				return NewUserError("Cannot log in", "Runtime is not available", "Start the daemon with oclird")
 			}
 			info, err := client.RuntimeInfo()
 			if err != nil {
-				return FormatError(err, "Failed to reach runtime", "Check runtime URL or use --embedded")
+				return FormatError(err, "Failed to reach runtime", "Check runtime URL or start the daemon with oclird")
 			}
 			authInfo, _ := info["auth"].(map[string]any)
 			browserEndpoint, _ := authInfo["browserLoginEndpoint"].(string)

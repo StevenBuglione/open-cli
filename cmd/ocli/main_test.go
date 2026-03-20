@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +27,62 @@ import (
 	configpkg "github.com/StevenBuglione/open-cli/pkg/config"
 	"github.com/StevenBuglione/open-cli/pkg/instance"
 )
+
+func writeRuntimeConfigFile(t *testing.T, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	return configPath
+}
+
+func writeRemoteRuntimeConfig(t *testing.T) string {
+	t.Helper()
+	return writeRuntimeConfigFile(t, `{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote",
+    "remote": {
+      "url": "https://runtime.example.invalid"
+    }
+  },
+  "sources": {
+    "placeholder": {
+      "type": "openapi",
+      "uri": "https://example.com/openapi.json",
+      "enabled": true
+    }
+  }
+}`)
+}
+
+func writeLocalRuntimeConfig(t *testing.T) string {
+	t.Helper()
+	return writeRuntimeConfigFile(t, `{
+  "cli": "1.0.0",
+  "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "local",
+    "local": {
+      "sessionScope": "terminal",
+      "heartbeatSeconds": 15,
+      "missedHeartbeatLimit": 3,
+      "shutdown": "when-owner-exits",
+      "share": "exclusive"
+    }
+  },
+  "sources": {
+    "placeholder": {
+      "type": "openapi",
+      "uri": "https://example.com/openapi.json",
+      "enabled": true
+    }
+  }
+}`)
+}
 
 func TestRootCommandInvokesRuntimeToolsAndSchemas(t *testing.T) {
 	tool := catalog.Tool{
@@ -68,10 +125,11 @@ func TestRootCommandInvokesRuntimeToolsAndSchemas(t *testing.T) {
 	}))
 	defer runtimeServer.Close()
 
+	configPath := writeRemoteRuntimeConfig(t)
 	var stdout bytes.Buffer
 	cmd, err := NewRootCommand(CommandOptions{
 		RuntimeURL: runtimeServer.URL,
-		ConfigPath: "/tmp/project/.cli.json",
+		ConfigPath: configPath,
 		Stdout:     &stdout,
 		Stderr:     &stdout,
 	}, []string{"tickets", "list", "--state", "open", "--format", "json"})
@@ -88,7 +146,7 @@ func TestRootCommandInvokesRuntimeToolsAndSchemas(t *testing.T) {
 	stdout.Reset()
 	cmd, err = NewRootCommand(CommandOptions{
 		RuntimeURL: runtimeServer.URL,
-		ConfigPath: "/tmp/project/.cli.json",
+		ConfigPath: configPath,
 		Stdout:     &stdout,
 		Stderr:     &stdout,
 	}, []string{"tool", "schema", "tickets:listTickets"})
@@ -131,10 +189,11 @@ func TestRootCommandUsesServiceAlias(t *testing.T) {
 	}))
 	defer runtimeServer.Close()
 
+	configPath := writeRemoteRuntimeConfig(t)
 	var stdout bytes.Buffer
 	cmd, err := NewRootCommand(CommandOptions{
 		RuntimeURL: runtimeServer.URL,
-		ConfigPath: "/tmp/project/.cli.json",
+		ConfigPath: configPath,
 		Stdout:     &stdout,
 		Stderr:     &stdout,
 	}, []string{"helpdesk", "tickets", "list", "--format", "json"})
@@ -232,6 +291,7 @@ func TestRootCommandReadsBodyFromFileAndStdin(t *testing.T) {
 	view := catalog.EffectiveView{Name: "discover", Mode: "discover", Tools: []catalog.Tool{tool}}
 
 	t.Run("file", func(t *testing.T) {
+		configPath := writeRemoteRuntimeConfig(t)
 		bodyFile, err := os.CreateTemp(t.TempDir(), "body-*.json")
 		if err != nil {
 			t.Fatalf("create temp body file: %v", err)
@@ -268,7 +328,7 @@ func TestRootCommandReadsBodyFromFileAndStdin(t *testing.T) {
 		var stdout bytes.Buffer
 		cmd, err := NewRootCommand(CommandOptions{
 			RuntimeURL: runtimeServer.URL,
-			ConfigPath: "/tmp/project/.cli.json",
+			ConfigPath: configPath,
 			Stdout:     &stdout,
 			Stderr:     &stdout,
 		}, []string{"tickets", "create", "--body", "@" + bodyFile.Name()})
@@ -284,6 +344,7 @@ func TestRootCommandReadsBodyFromFileAndStdin(t *testing.T) {
 	})
 
 	t.Run("stdin", func(t *testing.T) {
+		configPath := writeRemoteRuntimeConfig(t)
 		var captured executeRequest
 		runtimeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
@@ -309,7 +370,7 @@ func TestRootCommandReadsBodyFromFileAndStdin(t *testing.T) {
 		var stdout bytes.Buffer
 		cmd, err := NewRootCommand(CommandOptions{
 			RuntimeURL: runtimeServer.URL,
-			ConfigPath: "/tmp/project/.cli.json",
+			ConfigPath: configPath,
 			Stdout:     &stdout,
 			Stderr:     &stdout,
 			Stdin:      bytes.NewBufferString(`{"title":"stdin"}`),
@@ -346,6 +407,10 @@ func TestRootCommandUsesRuntimeRegistryForInstance(t *testing.T) {
 				},
 				"view": view,
 			})
+		case "/v1/runtime/info":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"version": "1.2.3",
+			})
 		default:
 			http.NotFound(w, r)
 		}
@@ -370,26 +435,27 @@ func TestRootCommandUsesRuntimeRegistryForInstance(t *testing.T) {
 		t.Fatalf("WriteRuntimeInfo: %v", err)
 	}
 
+	configPath := writeLocalRuntimeConfig(t)
 	var stdout bytes.Buffer
 	cmd, err := NewRootCommand(CommandOptions{
-		ConfigPath: "/tmp/project/.cli.json",
+		ConfigPath: configPath,
 		InstanceID: "alpha",
 		StateDir:   stateDir,
 		Stdout:     &stdout,
 		Stderr:     &stdout,
-	}, []string{"catalog", "list", "--format", "json"})
+	}, []string{"status", "--format", "json"})
 	if err != nil {
 		t.Fatalf("NewRootCommand returned error: %v", err)
 	}
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("expected command to resolve runtime from instance registry, got %v", err)
 	}
-	if !bytes.Contains(stdout.Bytes(), []byte(`"catalog"`)) {
-		t.Fatalf("expected catalog output, got %s", stdout.String())
+	if !bytes.Contains(stdout.Bytes(), []byte(`"available":true`)) || !bytes.Contains(stdout.Bytes(), []byte(`"version":"1.2.3"`)) {
+		t.Fatalf("expected runtime output, got %s", stdout.String())
 	}
 }
 
-func TestRootCommandExecutesEmbeddedRuntimeWithoutDaemon(t *testing.T) {
+func TestRootCommandRejectsEmbeddedRuntimeForNormalConfig(t *testing.T) {
 	dir := t.TempDir()
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"items": []map[string]any{{"id": "T-1"}}})
@@ -419,6 +485,16 @@ paths:
 	if err := os.WriteFile(configPath, []byte(`{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local",
+	    "local": {
+	      "sessionScope": "terminal",
+	      "heartbeatSeconds": 15,
+	      "missedHeartbeatLimit": 3,
+	      "shutdown": "when-owner-exits",
+	      "share": "exclusive"
+	    }
+	  },
 	  "sources": {
 	    "ticketsSource": {
 	      "type": "openapi",
@@ -437,7 +513,7 @@ paths:
 	}
 
 	var stdout bytes.Buffer
-	cmd, err := NewRootCommand(CommandOptions{
+	_, err := NewRootCommand(CommandOptions{
 		ConfigPath: configPath,
 		Embedded:   true,
 		InstanceID: "embedded-alpha",
@@ -445,14 +521,60 @@ paths:
 		Stdout:     &stdout,
 		Stderr:     &stdout,
 	}, []string{"tickets", "list-tickets", "--format", "json"})
-	if err != nil {
-		t.Fatalf("NewRootCommand returned error: %v", err)
+	if err == nil {
+		t.Fatal("expected embedded runtime to be rejected for normal configs")
 	}
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("expected embedded runtime command to execute, got %v", err)
+	if !strings.Contains(err.Error(), "embedded") {
+		t.Fatalf("expected embedded rejection, got %v", err)
 	}
-	if !bytes.Contains(stdout.Bytes(), []byte(`"items"`)) {
-		t.Fatalf("expected embedded runtime output, got %s", stdout.String())
+}
+
+func TestRootCommandFailsFastOnMissingRuntimeConfig(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(configPath, []byte(`{
+  "cli": "1.0.0",
+  "sources": {}
+}`), 0o644); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
+
+	_, err := NewRootCommand(CommandOptions{
+		ConfigPath: configPath,
+		Stdout:     io.Discard,
+		Stderr:     io.Discard,
+	}, []string{"status"})
+	if err == nil {
+		t.Fatal("expected invalid config to be rejected")
+	}
+	if !strings.Contains(err.Error(), "runtime") {
+		t.Fatalf("expected runtime validation error, got %v", err)
+	}
+}
+
+func TestRootCommandFailsFastOnUnsupportedRuntimeMode(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(configPath, []byte(`{
+  "cli": "1.0.0",
+  "runtime": {
+    "mode": "auto"
+  },
+  "sources": {}
+}`), 0o644); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
+
+	_, err := NewRootCommand(CommandOptions{
+		ConfigPath: configPath,
+		Stdout:     io.Discard,
+		Stderr:     io.Discard,
+	}, []string{"status"})
+	if err == nil {
+		t.Fatal("expected invalid runtime mode to be rejected")
+	}
+	if !strings.Contains(err.Error(), "local or remote") {
+		t.Fatalf("expected local-or-remote validation error, got %v", err)
 	}
 }
 
@@ -522,16 +644,38 @@ func TestResolveCommandOptionsUsesOCLIEnvironmentVariables(t *testing.T) {
 
 func TestResolveCommandOptionsUsesOCLIEmbeddedEnvironmentVariable(t *testing.T) {
 	t.Setenv("OCLI_EMBEDDED", "1")
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(configPath, []byte(`{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "local",
+	    "local": {
+	      "sessionScope": "terminal",
+	      "heartbeatSeconds": 15,
+	      "missedHeartbeatLimit": 3,
+	      "shutdown": "when-owner-exits",
+	      "share": "exclusive"
+	    }
+	  },
+	  "sources": {
+	    "demoSource": {
+	      "type": "openapi",
+	      "uri": "https://example.com/openapi.json",
+	      "enabled": true
+	    }
+	  }
+	}`), 0o644); err != nil {
+		t.Fatalf("WriteFile config: %v", err)
+	}
 
-	resolved, err := resolveCommandOptions(CommandOptions{})
-	if err != nil {
-		t.Fatalf("resolveCommandOptions: %v", err)
+	_, err := resolveCommandOptions(CommandOptions{ConfigPath: configPath})
+	if err == nil {
+		t.Fatal("expected OCLI_EMBEDDED to be rejected for normal configs")
 	}
-	if !resolved.Embedded {
-		t.Fatalf("expected embedded mode when OCLI_EMBEDDED=1")
-	}
-	if resolved.RuntimeDeployment != "embedded" {
-		t.Fatalf("expected embedded runtime deployment, got %q", resolved.RuntimeDeployment)
+	if !strings.Contains(err.Error(), "embedded") {
+		t.Fatalf("expected embedded rejection, got %v", err)
 	}
 }
 
@@ -826,14 +970,14 @@ func TestResolveCommandOptionsTreatsDeadRuntimePIDAsStaleEvenWhenURLIsReachable(
 	}
 }
 
-func TestResolveCommandOptionsPromotesAutoRuntimeForLocalMCP(t *testing.T) {
+func TestResolveCommandOptionsUsesLocalRuntimeForLocalMCP(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, ".cli.json")
 	if err := os.WriteFile(configPath, []byte(`{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "auto",
+	    "mode": "local",
 	    "local": {
 	      "sessionScope": "terminal",
 	      "heartbeatSeconds": 15,
@@ -868,10 +1012,10 @@ func TestResolveCommandOptionsPromotesAutoRuntimeForLocalMCP(t *testing.T) {
 		t.Fatalf("resolveCommandOptions: %v", err)
 	}
 	if resolved.RuntimeDeployment != "local" {
-		t.Fatalf("expected auto runtime with local mcp to promote to local deployment, got %q", resolved.RuntimeDeployment)
+		t.Fatalf("expected local deployment for local MCP config, got %q", resolved.RuntimeDeployment)
 	}
 	if resolved.RuntimeURL != "http://127.0.0.1:18887" {
-		t.Fatalf("expected promoted local deployment to use managed runtime url, got %q", resolved.RuntimeURL)
+		t.Fatalf("expected local deployment to use managed runtime url, got %q", resolved.RuntimeURL)
 	}
 }
 
@@ -2193,10 +2337,11 @@ func TestRootCommandRuntimeCommandsUseRuntimeEndpoints(t *testing.T) {
 	defer runtimeServer.Close()
 
 	t.Run("info", func(t *testing.T) {
+		configPath := writeRemoteRuntimeConfig(t)
 		var stdout bytes.Buffer
 		cmd, err := NewRootCommand(CommandOptions{
 			RuntimeURL: runtimeServer.URL,
-			ConfigPath: "/tmp/project/.cli.json",
+			ConfigPath: configPath,
 			Stdout:     &stdout,
 			Stderr:     &stdout,
 		}, []string{"runtime", "info", "--format", "json"})
@@ -2212,10 +2357,11 @@ func TestRootCommandRuntimeCommandsUseRuntimeEndpoints(t *testing.T) {
 	})
 
 	t.Run("stop", func(t *testing.T) {
+		configPath := writeRemoteRuntimeConfig(t)
 		var stdout bytes.Buffer
 		cmd, err := NewRootCommand(CommandOptions{
 			RuntimeURL: runtimeServer.URL,
-			ConfigPath: "/tmp/project/.cli.json",
+			ConfigPath: configPath,
 			Stdout:     &stdout,
 			Stderr:     &stdout,
 		}, []string{"runtime", "stop", "--format", "json"})
@@ -2231,10 +2377,11 @@ func TestRootCommandRuntimeCommandsUseRuntimeEndpoints(t *testing.T) {
 	})
 
 	t.Run("session-close", func(t *testing.T) {
+		configPath := writeRemoteRuntimeConfig(t)
 		var stdout bytes.Buffer
 		cmd, err := NewRootCommand(CommandOptions{
 			RuntimeURL: runtimeServer.URL,
-			ConfigPath: "/tmp/project/.cli.json",
+			ConfigPath: configPath,
 			Stdout:     &stdout,
 			Stderr:     &stdout,
 		}, []string{"runtime", "session-close", "--format", "json"})
@@ -2287,11 +2434,12 @@ func TestRootCommandSendsHeartbeatForManagedLocalRuntime(t *testing.T) {
 	}))
 	defer runtimeServer.Close()
 
+	configPath := writeLocalRuntimeConfig(t)
 	var stdout bytes.Buffer
 	cmd, err := NewRootCommand(CommandOptions{
 		RuntimeURL:        runtimeServer.URL,
 		RuntimeDeployment: "local",
-		ConfigPath:        "/tmp/project/.cli.json",
+		ConfigPath:        configPath,
 		Stdout:            &stdout,
 		Stderr:            &stdout,
 	}, []string{"catalog", "list", "--format", "json"})
@@ -2345,11 +2493,12 @@ func TestRootCommandSendsSessionCloseOnLocalRuntimeTeardown(t *testing.T) {
 	}))
 	defer runtimeServer.Close()
 
+	configPath := writeLocalRuntimeConfig(t)
 	var stdout bytes.Buffer
 	cmd, err := NewRootCommand(CommandOptions{
 		RuntimeURL:        runtimeServer.URL,
 		RuntimeDeployment: "local",
-		ConfigPath:        "/tmp/project/.cli.json",
+		ConfigPath:        configPath,
 		Stdout:            &stdout,
 		Stderr:            &stdout,
 	}, []string{"runtime", "session-close", "--format", "json"})
