@@ -136,7 +136,6 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 	root.PersistentFlags().BoolVar(&options.Approval, "approval", options.Approval, "Grant approval for protected tools")
 	root.PersistentFlags().StringVar(&options.InstanceID, "instance-id", options.InstanceID, "Instance id for isolated runtime resolution")
 	root.PersistentFlags().StringVar(&options.StateDir, "state-dir", options.StateDir, "State directory root for runtime metadata")
-	root.PersistentFlags().BoolVar(&options.Embedded, "embedded", options.Embedded, "Run with the in-process runtime")
 	root.PersistentFlags().BoolVar(&options.Demo, "demo", options.Demo, "Use the built-in demo API")
 
 	// Hide advanced flags to keep default help clean.
