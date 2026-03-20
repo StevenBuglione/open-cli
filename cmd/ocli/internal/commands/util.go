@@ -67,6 +67,7 @@ func ResolveToolReference(services []catalog.Service, tools []catalog.Tool, ref 
 			return tool, nil
 		}
 	}
+	normalizedRef := normalizeCommandReference(ref)
 
 	serviceNames := map[string][]string{}
 	for _, service := range services {
@@ -86,7 +87,7 @@ func ResolveToolReference(services []catalog.Service, tools []catalog.Tool, ref 
 		}
 		for _, serviceName := range names {
 			for _, candidate := range toolCommandForms(serviceName, *tool) {
-				if stringSlicesEqual(candidate, ref) {
+				if stringSlicesEqual(normalizeCommandReference(candidate), normalizedRef) {
 					matches = append(matches, tool)
 					goto nextTool
 				}
@@ -132,6 +133,21 @@ func stringSlicesEqual(left, right []string) bool {
 		}
 	}
 	return true
+}
+
+func normalizeCommandReference(parts []string) []string {
+	normalized := make([]string, len(parts))
+	for idx, part := range parts {
+		normalized[idx] = normalizeCommandToken(part)
+	}
+	return normalized
+}
+
+func normalizeCommandToken(value string) string {
+	normalized := strings.TrimSpace(strings.ToLower(value))
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = strings.ReplaceAll(normalized, " ", "-")
+	return normalized
 }
 
 // CommandSummary returns a short description suitable for cobra.Command.Short.

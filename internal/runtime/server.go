@@ -1192,7 +1192,7 @@ func selectView(cfg config.Config, ntc *catalog.NormalizedCatalog, mode, agentPr
 func (server *Server) recordEvent(tool catalog.Tool, agentProfile string, decision policy.Decision, statusCode, retryCount int, latency time.Duration) {
 	eventType := "tool_execution"
 	decisionValue := "allowed"
-	if decision.ReasonCode == "execution_error" {
+	if isExecutionErrorReason(decision.ReasonCode) {
 		eventType = "execution_error"
 		decisionValue = "error"
 	} else if !decision.Allowed {
@@ -1215,6 +1215,18 @@ func (server *Server) recordEvent(tool catalog.Tool, agentProfile string, decisi
 		RetryCount:    retryCount,
 		LatencyMS:     latency.Milliseconds(),
 	})
+}
+
+func isExecutionErrorReason(reasonCode string) bool {
+	if reasonCode == "" {
+		return false
+	}
+	switch reasonCode {
+	case "authz_denied", "approval_required", "managed_deny", "curated_deny", "allowed":
+		return false
+	default:
+		return strings.HasSuffix(reasonCode, "_error")
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

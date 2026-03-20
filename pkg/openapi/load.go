@@ -232,13 +232,16 @@ func remoteBaseURL(sourceRef string) (*url.URL, bool) {
 }
 
 func normalizeServerList(servers openapi3.Servers, baseURL *url.URL) error {
-	for _, server := range servers {
+	for idx, server := range servers {
 		if server == nil {
 			continue
 		}
 		normalized, err := normalizeServerURL(server, baseURL)
 		if err != nil {
-			return err
+			if idx == 0 {
+				return err
+			}
+			continue
 		}
 		server.URL = normalized
 	}

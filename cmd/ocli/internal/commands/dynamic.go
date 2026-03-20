@@ -144,7 +144,7 @@ func AddDynamicToolCommands(root *cobra.Command, options cfgpkg.Options, client 
 			command.Flags().String(flag.Name, "", "parameter "+flag.OriginalName)
 		}
 		for _, field := range mcpBodyFields {
-			command.Flags().String(field.FlagName, "", "MCP input "+field.JSONName)
+			command.Flags().String(field.FlagName, mcpFieldDefaultValue(field), mcpFieldHelp(field))
 		}
 		command.Flags().String("body", "", "inline request body")
 		command.Flags().Bool("dry-run", false, "Show the request without executing")
@@ -156,6 +156,9 @@ type mcpBodyField struct {
 	FlagName string
 	JSONName string
 	Type     string
+	Required bool
+	Default  *string
+	Enum     []string
 }
 
 func mcpScalarBodyFields(tool catalog.Tool) []mcpBodyField {
@@ -174,7 +177,7 @@ func mcpScalarBodyFields(tool catalog.Tool) []mcpBodyField {
 		return nil
 	}
 
-	reserved := map[string]struct{}{"body": {}}
+	reserved := map[string]struct{}{"body": {}, "dry-run": {}, "help": {}, "h": {}}
 	for _, flag := range tool.Flags {
 		reserved[flag.Name] = struct{}{}
 	}
@@ -191,17 +194,24 @@ func mcpScalarBodyFields(tool catalog.Tool) []mcpBodyField {
 	fields := make([]mcpBodyField, 0, len(names))
 	for _, name := range names {
 		property, _ := properties[name].(map[string]any)
-		fieldType, _ := property["type"].(string)
+		fieldType := scalarSchemaType(property)
 		switch fieldType {
 		case "string", "boolean", "integer", "number":
 		default:
 			continue
 		}
-		flagName := normalizeMCPFlagName(name)
+		flagName := normalizeCommandToken(name)
 		if _, exists := reserved[flagName]; exists {
 			continue
 		}
-		fields = append(fields, mcpBodyField{FlagName: flagName, JSONName: name, Type: fieldType})
+		fields = append(fields, mcpBodyField{
+			FlagName: flagName,
+			JSONName: name,
+			Type:     fieldType,
+			Required: stringSetFromAny(schema["required"]).Contains(name),
+			Default:  scalarSchemaDefault(property, fieldType),
+			Enum:     scalarSchemaEnum(property),
+		})
 	}
 	return fields
 }
@@ -211,30 +221,48 @@ func mcpBodyFromFlags(cmd *cobra.Command, fields []mcpBodyField) ([]byte, int, e
 		return nil, 0, nil
 	}
 	body := map[string]any{}
-	used := 0
+	explicit := 0
+	var missing []string
 	for _, field := range fields {
 		raw, err := cmd.Flags().GetString(field.FlagName)
 		if err != nil {
 			return nil, 0, err
 		}
-		if raw == "" {
+		flag := cmd.Flags().Lookup(field.FlagName)
+		changed := flag != nil && flag.Changed
+		if !changed && field.Default == nil {
+			if field.Required {
+				missing = append(missing, "--"+field.FlagName)
+			}
 			continue
+		}
+		if !changed && field.Default != nil {
+			raw = *field.Default
+		}
+		if len(field.Enum) > 0 && !containsString(field.Enum, raw) {
+			return nil, explicit, fmt.Errorf("invalid value %q for --%s (expected one of: %s)", raw, field.FlagName, strings.Join(field.Enum, ", "))
 		}
 		value, err := parseMCPScalarValue(field.Type, raw)
 		if err != nil {
 			return nil, 0, err
 		}
 		body[field.JSONName] = value
-		used++
+		if changed {
+			explicit++
+		}
 	}
-	if used == 0 {
-		return nil, 0, nil
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return nil, explicit, fmt.Errorf("missing required MCP flags: %s", strings.Join(missing, ", "))
+	}
+	if len(body) == 0 {
+		return nil, explicit, nil
 	}
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, 0, err
+		return nil, explicit, err
 	}
-	return data, used, nil
+	return data, explicit, nil
 }
 
 func parseMCPScalarValue(fieldType, raw string) (any, error) {
@@ -264,9 +292,112 @@ func parseMCPScalarValue(fieldType, raw string) (any, error) {
 	}
 }
 
-func normalizeMCPFlagName(name string) string {
-	normalized := strings.TrimSpace(strings.ToLower(name))
-	normalized = strings.ReplaceAll(normalized, "_", "-")
-	normalized = strings.ReplaceAll(normalized, " ", "-")
-	return normalized
+func scalarSchemaType(property map[string]any) string {
+	switch typed := property["type"].(type) {
+	case string:
+		return typed
+	case []any:
+		for _, candidate := range typed {
+			if value, ok := candidate.(string); ok && value != "null" {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func scalarSchemaDefault(property map[string]any, fieldType string) *string {
+	value, ok := property["default"]
+	if !ok {
+		return nil
+	}
+	switch fieldType {
+	case "string":
+		if typed, ok := value.(string); ok {
+			return &typed
+		}
+	case "boolean":
+		if typed, ok := value.(bool); ok {
+			rendered := strconv.FormatBool(typed)
+			return &rendered
+		}
+	case "integer":
+		switch typed := value.(type) {
+		case int:
+			rendered := strconv.Itoa(typed)
+			return &rendered
+		case float64:
+			rendered := strconv.Itoa(int(typed))
+			return &rendered
+		}
+	case "number":
+		if typed, ok := value.(float64); ok {
+			rendered := strconv.FormatFloat(typed, 'f', -1, 64)
+			return &rendered
+		}
+	}
+	return nil
+}
+
+func scalarSchemaEnum(property map[string]any) []string {
+	values, _ := property["enum"].([]any)
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		result = append(result, fmt.Sprint(value))
+	}
+	return result
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func stringSetFromAny(value any) stringSet {
+	items, _ := value.([]any)
+	set := make(stringSet, len(items))
+	for _, item := range items {
+		if text, ok := item.(string); ok {
+			set[text] = struct{}{}
+		}
+	}
+	return set
+}
+
+type stringSet map[string]struct{}
+
+func (set stringSet) Contains(value string) bool {
+	_, ok := set[value]
+	return ok
+}
+
+func mcpFieldDefaultValue(field mcpBodyField) string {
+	if field.Default == nil {
+		return ""
+	}
+	return *field.Default
+}
+
+func mcpFieldHelp(field mcpBodyField) string {
+	suffixes := []string{}
+	if field.Required {
+		suffixes = append(suffixes, "required")
+	}
+	if field.Default != nil {
+		suffixes = append(suffixes, "default="+*field.Default)
+	}
+	if len(field.Enum) > 0 {
+		suffixes = append(suffixes, "one of: "+strings.Join(field.Enum, ", "))
+	}
+	if len(suffixes) == 0 {
+		return "MCP input " + field.JSONName
+	}
+	return "MCP input " + field.JSONName + " (" + strings.Join(suffixes, "; ") + ")"
 }
