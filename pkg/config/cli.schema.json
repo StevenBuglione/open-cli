@@ -353,6 +353,25 @@
       },
       "additionalProperties": false
     },
+    "remoteOAuthDelegation": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "tokenExchangeURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "remoteOAuth": {
       "type": "object",
       "properties": {
@@ -382,6 +401,9 @@
         },
         "browserLogin": {
           "$ref": "#/$defs/browserLogin"
+        },
+        "delegation": {
+          "$ref": "#/$defs/remoteOAuthDelegation"
         }
       },
       "additionalProperties": false
@@ -790,6 +812,11 @@
     {
       "required": [
         "mcpServers"
+      ]
+    },
+    {
+      "required": [
+        "runtime"
       ]
     }
   ],

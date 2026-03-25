@@ -92,6 +92,8 @@ Workload provider requirements:
 - runtime audience: `oclird`
 - runtime scopes: normalized values such as `bundle:tickets` and `tool:tickets:listTickets`
 
+If you later need sub-agent delegation, treat Authentik as the identity-facing broker and add the delegated token-exchange behavior in a broker or gateway layer that can validate the parent runtime token, subset-check requested runtime scopes, and mint a shorter-lived child token that still matches the same `oclird` runtime contract.
+
 Do **not** assume that you can keep one rendered config and only flip `runtime.remote.oauth.mode`. Authentik discovery and JWKS are provider-specific, so the browser and workload proofs need separate rendered configs when they use different provider types.
 
 ### 3. Render the browser runtime template

@@ -84,6 +84,7 @@ type sessionLease struct {
 type authResult struct {
 	Enabled      bool
 	Principal    string
+	Lineage      *audit.DelegationLineage
 	Scopes       []string
 	AllowedTools map[string]struct{}
 }
@@ -257,7 +258,7 @@ func (server *Server) handleEffectiveCatalog(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		finishErr = err
 		if authErr, ok := err.(*runtimeAuthError); ok {
-			server.recordRuntimeEvent("authn_failure", "", "", "denied", authErr.Code, authErr.StatusCode)
+			server.recordRuntimeEvent("authn_failure", "", nil, "", "denied", authErr.Code, authErr.StatusCode)
 			http.Error(w, authErr.Code, authErr.StatusCode)
 			return
 		}
@@ -269,9 +270,9 @@ func (server *Server) handleEffectiveCatalog(w http.ResponseWriter, r *http.Requ
 	agentProfile := r.URL.Query().Get("agentProfile")
 	filteredCatalog := ntc
 	if authz.Enabled {
-		server.recordRuntimeEvent("authenticated_connect", authz.Principal, "", "allowed", "authenticated_connect", http.StatusOK)
+		server.recordRuntimeEvent("authenticated_connect", authz.Principal, authz.Lineage, "", "allowed", "authenticated_connect", http.StatusOK)
 		filteredCatalog = filterCatalog(ntc, authz.AllowedTools)
-		server.recordCatalogEvent(authz.Principal, "catalog_filtered")
+		server.recordCatalogEvent(authz.Principal, authz.Lineage, "catalog_filtered")
 	}
 	view := selectView(cfg.Config, filteredCatalog, mode, agentProfile)
 	server.observer.Emit(ctx, obs.Event{Name: "runtime.catalog.effective", Operation: "catalog.effective", StatusCode: http.StatusOK, Duration: time.Since(start), RequestID: requestID})
@@ -322,7 +323,7 @@ func (server *Server) handleExecuteTool(w http.ResponseWriter, r *http.Request) 
 	}
 	if authz.Enabled {
 		if _, ok := authz.AllowedTools[tool.ID]; !ok {
-			server.recordEvent(*tool, request.AgentProfile, policy.Decision{Allowed: false, ReasonCode: "authz_denied"}, 0, 0, 0)
+			server.recordEvent(authz.Principal, authz.Lineage, *tool, request.AgentProfile, policy.Decision{Allowed: false, ReasonCode: "authz_denied"}, 0, 0, 0)
 			http.Error(w, "authz_denied", http.StatusForbidden)
 			return
 		}
@@ -334,7 +335,7 @@ func (server *Server) handleExecuteTool(w http.ResponseWriter, r *http.Request) 
 		ApprovalGranted: request.Approval,
 	})
 	if !decision.Allowed {
-		server.recordEvent(*tool, request.AgentProfile, decision, 0, 0, 0)
+		server.recordEvent(authz.Principal, authz.Lineage, *tool, request.AgentProfile, decision, 0, 0, 0)
 		server.observer.Emit(ctx, obs.Event{Name: "runtime.tools.execute", Service: tool.ServiceID, Operation: tool.ID, Duration: time.Since(start), ErrorCategory: decision.ReasonCode, RequestID: requestID})
 		http.Error(w, decision.ReasonCode, http.StatusForbidden)
 		return
@@ -344,14 +345,14 @@ func (server *Server) handleExecuteTool(w http.ResponseWriter, r *http.Request) 
 	result, err := server.executeTool(ctx, cfg.Config, *tool, request)
 	if err != nil {
 		finishErr = err
-		server.recordEvent(*tool, request.AgentProfile, policy.Decision{Allowed: false, ReasonCode: "execution_error"}, 0, 0, 0)
+		server.recordEvent(authz.Principal, authz.Lineage, *tool, request.AgentProfile, policy.Decision{Allowed: false, ReasonCode: "execution_error"}, 0, 0, 0)
 		server.observer.Emit(ctx, obs.Event{Name: "runtime.tools.execute", Service: tool.ServiceID, Operation: tool.ID, Duration: time.Since(execStart), ErrorCategory: "execution_error", RequestID: requestID})
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 
 	latency := time.Since(execStart)
-	server.recordEvent(*tool, request.AgentProfile, decision, result.StatusCode, result.RetryCount, latency)
+	server.recordEvent(authz.Principal, authz.Lineage, *tool, request.AgentProfile, decision, result.StatusCode, result.RetryCount, latency)
 	server.observer.Emit(ctx, obs.Event{Name: "runtime.tools.execute", Service: tool.ServiceID, Operation: tool.ID, StatusCode: result.StatusCode, Duration: latency, RequestID: requestID})
 
 	response := executeToolResponse{StatusCode: result.StatusCode}
@@ -522,7 +523,7 @@ func (server *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		finishErr = err
 		if authErr, ok := err.(*runtimeAuthError); ok {
-			server.recordRuntimeEvent("authn_failure", "", "", "denied", authErr.Code, authErr.StatusCode)
+			server.recordRuntimeEvent("authn_failure", "", nil, "", "denied", authErr.Code, authErr.StatusCode)
 			http.Error(w, authErr.Code, authErr.StatusCode)
 			return
 		}
@@ -546,7 +547,7 @@ func (server *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if authz.Enabled {
-		server.recordRuntimeEvent("token_refresh", authz.Principal, "", "allowed", "token_refresh", http.StatusOK)
+		server.recordRuntimeEvent("token_refresh", authz.Principal, authz.Lineage, "", "allowed", "token_refresh", http.StatusOK)
 	}
 	server.observer.Emit(ctx, obs.Event{Name: "runtime.refresh", Operation: "refresh", StatusCode: http.StatusOK, Duration: time.Since(start), RequestID: requestID})
 	writeJSON(w, http.StatusOK, response)
@@ -751,7 +752,7 @@ func (server *Server) handleRuntimeSessionClose(w http.ResponseWriter, r *http.R
 	}
 	if strings.TrimSpace(request.SessionID) != "" {
 		server.removeLease(strings.TrimSpace(request.SessionID))
-		server.recordRuntimeEvent("session_close", "", strings.TrimSpace(request.SessionID), "allowed", "session_close", http.StatusOK)
+		server.recordRuntimeEvent("session_close", "", nil, strings.TrimSpace(request.SessionID), "allowed", "session_close", http.StatusOK)
 	}
 	if err := os.RemoveAll(filepath.Join(server.stateDir, "oauth")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -784,6 +785,7 @@ func (server *Server) authenticateRequest(ctx context.Context, request *http.Req
 		return nil, &runtimeAuthError{StatusCode: http.StatusUnauthorized, Code: "authn_failed", Message: err.Error()}
 	}
 	principal := ""
+	var lineage *audit.DelegationLineage
 	var scopes []string
 	if runtimeServerAuthUsesOIDCJWKS(authCfg) {
 		claims, err := server.validateJWTWithJWKS(ctx, *authCfg, token)
@@ -795,6 +797,7 @@ func (server *Server) authenticateRequest(ctx context.Context, request *http.Req
 			return nil, &runtimeAuthError{StatusCode: http.StatusUnauthorized, Code: "authn_failed", Message: "oidc_jwks token must contain sub or client_id"}
 		}
 		scopes = strings.Fields(claims.Scope)
+		lineage = claims.delegationLineage()
 	} else {
 		introspection, err := server.introspectToken(ctx, *authCfg, token)
 		if err != nil {
@@ -806,6 +809,7 @@ func (server *Server) authenticateRequest(ctx context.Context, request *http.Req
 	return &authResult{
 		Enabled:   true,
 		Principal: principal,
+		Lineage:   lineage,
 		Scopes:    scopes,
 	}, nil
 }
@@ -1068,18 +1072,19 @@ func filterCatalog(ntc *catalog.NormalizedCatalog, allowed map[string]struct{}) 
 	return &filtered
 }
 
-func (server *Server) recordCatalogEvent(principal, reason string) {
+func (server *Server) recordCatalogEvent(principal string, lineage *audit.DelegationLineage, reason string) {
 	_ = server.auditStore.Append(audit.Event{
 		Timestamp:  time.Now().UTC(),
 		EventType:  "catalog_filtered",
 		Principal:  principal,
+		Lineage:    cloneDelegationLineage(lineage),
 		ToolID:     "catalog.effective",
 		Decision:   "allowed",
 		ReasonCode: reason,
 	})
 }
 
-func (server *Server) recordRuntimeEvent(eventType, principal, sessionID, decision, reason string, statusCode int) {
+func (server *Server) recordRuntimeEvent(eventType, principal string, lineage *audit.DelegationLineage, sessionID, decision, reason string, statusCode int) {
 	toolID := "runtime." + eventType
 	if eventType == "session_close" || eventType == "session_expiry" {
 		toolID = "runtime.session"
@@ -1088,12 +1093,44 @@ func (server *Server) recordRuntimeEvent(eventType, principal, sessionID, decisi
 		Timestamp:  time.Now().UTC(),
 		EventType:  eventType,
 		Principal:  principal,
+		Lineage:    cloneDelegationLineage(lineage),
 		SessionID:  sessionID,
 		ToolID:     toolID,
 		Decision:   decision,
 		ReasonCode: reason,
 		StatusCode: statusCode,
 	})
+}
+
+func cloneDelegationLineage(lineage *audit.DelegationLineage) *audit.DelegationLineage {
+	if lineage == nil {
+		return nil
+	}
+	clone := &audit.DelegationLineage{
+		DelegatedBy:  lineage.DelegatedBy,
+		DelegationID: lineage.DelegationID,
+	}
+	if len(lineage.Actor) > 0 {
+		clone.Actor = cloneNonEmptyStringMap(lineage.Actor)
+	}
+	return clone
+}
+
+func cloneNonEmptyStringMap(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(source))
+	for key, value := range source {
+		if strings.TrimSpace(key) == "" || value == "" {
+			continue
+		}
+		cloned[key] = value
+	}
+	if len(cloned) == 0 {
+		return nil
+	}
+	return cloned
 }
 
 func urlEncode(value string) string {
@@ -1189,7 +1226,7 @@ func selectView(cfg config.Config, ntc *catalog.NormalizedCatalog, mode, agentPr
 	return ntc.EffectiveView("discover")
 }
 
-func (server *Server) recordEvent(tool catalog.Tool, agentProfile string, decision policy.Decision, statusCode, retryCount int, latency time.Duration) {
+func (server *Server) recordEvent(principal string, lineage *audit.DelegationLineage, tool catalog.Tool, agentProfile string, decision policy.Decision, statusCode, retryCount int, latency time.Duration) {
 	eventType := "tool_execution"
 	decisionValue := "allowed"
 	if isExecutionErrorReason(decision.ReasonCode) {
@@ -1202,6 +1239,8 @@ func (server *Server) recordEvent(tool catalog.Tool, agentProfile string, decisi
 	_ = server.auditStore.Append(audit.Event{
 		Timestamp:     time.Now().UTC(),
 		EventType:     eventType,
+		Principal:     principal,
+		Lineage:       cloneDelegationLineage(lineage),
 		AgentProfile:  agentProfile,
 		ToolID:        tool.ID,
 		ServiceID:     tool.ServiceID,
@@ -1382,7 +1421,7 @@ func (server *Server) expireLease(sessionID string, expiresAt time.Time) {
 	delete(server.leases, sessionID)
 	remaining := len(server.leases)
 	server.leaseMu.Unlock()
-	server.recordRuntimeEvent("session_expiry", "", sessionID, "allowed", "session_expiry", 0)
+	server.recordRuntimeEvent("session_expiry", "", nil, sessionID, "allowed", "session_expiry", 0)
 	if remaining == 0 && server.shutdownMode == "when-owner-exits" && server.shutdown != nil {
 		server.drainInflightAndShutdown("expiry")
 	}
@@ -1410,7 +1449,7 @@ func (server *Server) drainInflightAndShutdown(reason string) {
 	for server.inflight.Load() > 0 && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 	}
-	server.recordRuntimeEvent("lease_expiry_shutdown", "", "", "allowed", "lease_expiry_shutdown:"+reason, 0)
+	server.recordRuntimeEvent("lease_expiry_shutdown", "", nil, "", "allowed", "lease_expiry_shutdown:"+reason, 0)
 	_ = server.shutdown()
 }
 

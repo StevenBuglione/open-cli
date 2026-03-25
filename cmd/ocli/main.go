@@ -123,6 +123,7 @@ func resolveCommandOptions(options CommandOptions) (CommandOptions, error) {
 		ResolveRuntimeDeployment:  resolveRuntimeDeployment,
 		ResolveLocalInstanceID:    resolveLocalRuntimeInstanceID,
 		ResolveLocalSessionID:     resolveLocalSessionID,
+		ResolveAgentSessionID:     agentSessionIdentityProvider,
 		ResolveInstancePaths:      resolveInstancePaths,
 		ResolveRuntimeURLFromInst: resolveRuntimeURLFromInstance,
 		StartManagedRuntime:       managedRuntimeStarter,

@@ -1,0 +1,99 @@
+services:
+  postgresql:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: authentik-test-password
+      POSTGRES_USER: authentik
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d authentik -U authentik"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    command: --save 60 1
+    volumes:
+      - authentik_redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12.0
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: authentik-test-secret-change-me
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_BOOTSTRAP_PASSWORD: authentik-bootstrap-password
+      AUTHENTIK_BOOTSTRAP_TOKEN: authentik-bootstrap-token
+      AUTHENTIK_BOOTSTRAP_EMAIL: akadmin@example.test
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik-test-password
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    ports:
+      - "9100:9000"
+      - "9444:9443"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.12.0
+    command: worker
+    user: root
+    environment:
+      AUTHENTIK_SECRET_KEY: authentik-test-secret-change-me
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_BOOTSTRAP_PASSWORD: authentik-bootstrap-password
+      AUTHENTIK_BOOTSTRAP_TOKEN: authentik-bootstrap-token
+      AUTHENTIK_BOOTSTRAP_EMAIL: akadmin@example.test
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik-test-password
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - authentik_media:/media
+      - authentik_certs:/certs
+      - authentik_templates:/templates
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  oclird:
+    build: .
+    command: ["--addr", "0.0.0.0:8765", "--config", "${OCLIRD_CONFIG_PATH:-/config/.cli.json}"]
+    ports:
+      - "${OCLIRD_PORT:-8765}:8765"
+    volumes:
+      - ./config:/config
+      - ./:/workspace:ro
+      - oclird_state:/state
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - OCLI_STATE_DIR=/state
+
+volumes:
+  authentik_database:
+  authentik_redis:
+  authentik_media:
+  authentik_certs:
+  authentik_templates:
+  oclird_state:

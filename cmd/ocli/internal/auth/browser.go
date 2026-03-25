@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
@@ -39,17 +40,18 @@ type BrowserLoginRequest struct {
 var BrowserLoginTokenAcquirer = AcquireBrowserLoginToken
 
 // FetchHandshake retrieves the runtime handshake info from the given base URL.
-func FetchHandshake(baseURL string) (embeddedruntime.HandshakeInfo, error) {
-	return runtimepkg.GetJSON[embeddedruntime.HandshakeInfo](strings.TrimRight(baseURL, "/")+"/v1/runtime/info", "")
+func FetchHandshake(baseURL, configPath string) (embeddedruntime.HandshakeInfo, error) {
+	return runtimepkg.GetJSON[embeddedruntime.HandshakeInfo](withConfigQuery(strings.TrimRight(baseURL, "/")+"/v1/runtime/info", configPath), "")
 }
 
 // FetchBrowserLoginMetadata fetches, validates, and returns the browser-login
 // OAuth metadata from the runtime.
-func FetchBrowserLoginMetadata(baseURL, endpoint string) (BrowserLoginMetadata, error) {
+func FetchBrowserLoginMetadata(baseURL, endpoint, configPath string) (BrowserLoginMetadata, error) {
 	endpointURL, err := ResolveEndpointURL(baseURL, endpoint)
 	if err != nil {
 		return BrowserLoginMetadata{}, err
 	}
+	endpointURL = withConfigQuery(endpointURL, configPath)
 	req, err := http.NewRequest(http.MethodGet, endpointURL, nil)
 	if err != nil {
 		return BrowserLoginMetadata{}, err
@@ -89,6 +91,20 @@ func ResolveEndpointURL(baseURL, endpoint string) (string, error) {
 		endpoint = "/" + endpoint
 	}
 	return strings.TrimRight(baseURL, "/") + endpoint, nil
+}
+
+func withConfigQuery(endpointURL, configPath string) string {
+	if strings.TrimSpace(configPath) == "" {
+		return endpointURL
+	}
+	parsed, err := url.Parse(endpointURL)
+	if err != nil {
+		return endpointURL
+	}
+	query := parsed.Query()
+	query.Set("config", configPath)
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 // ValidateBrowserLoginMetadata checks that required fields are present.

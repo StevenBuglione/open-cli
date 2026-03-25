@@ -209,7 +209,7 @@ make verify-conformance # run conformance fixtures against spec/schemas
 make verify-all         # all three
 ```
 
-Spec and conformance targets install their own Python dependencies via `pip install -q -r requirements.txt`.
+Spec and conformance targets create a `.venv` and install Python dependencies automatically — no system-level pip required.
 
 **Product tests** — end-to-end capability tests in `product-tests/`:
 

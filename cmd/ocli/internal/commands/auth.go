@@ -71,7 +71,7 @@ func newAuthLoginCommand(options cfgpkg.Options, client runtimepkg.Client, runti
 				return nil
 			}
 
-			metadata, err := authpkg.FetchBrowserLoginMetadata(options.RuntimeURL, browserEndpoint)
+			metadata, err := authpkg.FetchBrowserLoginMetadata(options.RuntimeURL, browserEndpoint, options.RuntimeRequestConfigPath)
 			if err != nil {
 				return FormatError(err, "Failed to fetch login metadata from runtime", "The runtime may not support browser-based login")
 			}

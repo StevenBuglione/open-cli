@@ -56,12 +56,19 @@ type rawRemoteOAuthConfig struct {
 	TokenRef     *string                     `json:"tokenRef,omitempty"`
 	Client       *rawRemoteOAuthClientConfig `json:"client,omitempty"`
 	BrowserLogin *rawBrowserLoginConfig      `json:"browserLogin,omitempty"`
+	Delegation   *rawRemoteOAuthDelegation   `json:"delegation,omitempty"`
 }
 
 type rawRemoteOAuthClientConfig struct {
 	TokenURL     *string    `json:"tokenURL,omitempty"`
 	ClientID     *SecretRef `json:"clientId,omitempty"`
 	ClientSecret *SecretRef `json:"clientSecret,omitempty"`
+}
+
+type rawRemoteOAuthDelegation struct {
+	Enabled          *bool    `json:"enabled,omitempty"`
+	TokenExchangeURL *string  `json:"tokenExchangeURL,omitempty"`
+	Scopes           []string `json:"scopes,omitempty"`
 }
 
 type rawBrowserLoginConfig struct {
@@ -286,6 +293,22 @@ func (cfg *Config) merge(scope Scope, raw rawConfig) {
 						browserLogin.CallbackPort = *raw.Runtime.Remote.OAuth.BrowserLogin.CallbackPort
 					}
 					oauth.BrowserLogin = browserLogin
+				}
+				if raw.Runtime.Remote.OAuth.Delegation != nil {
+					delegation := oauth.Delegation
+					if delegation == nil {
+						delegation = &RemoteOAuthDelegation{}
+					}
+					if raw.Runtime.Remote.OAuth.Delegation.Enabled != nil {
+						delegation.Enabled = *raw.Runtime.Remote.OAuth.Delegation.Enabled
+					}
+					if raw.Runtime.Remote.OAuth.Delegation.TokenExchangeURL != nil {
+						delegation.TokenExchangeURL = *raw.Runtime.Remote.OAuth.Delegation.TokenExchangeURL
+					}
+					if raw.Runtime.Remote.OAuth.Delegation.Scopes != nil {
+						delegation.Scopes = append([]string(nil), raw.Runtime.Remote.OAuth.Delegation.Scopes...)
+					}
+					oauth.Delegation = delegation
 				}
 				remote.OAuth = oauth
 			}

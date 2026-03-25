@@ -17,9 +17,11 @@ Language-neutral fixtures and expected outputs for validating Open CLI implement
 From this directory:
 
 ```bash
-python3 -m pip install -r requirements.txt
-python3 scripts/run_conformance.py --schema-root ../spec/schemas
-python3 scripts/run_conformance.py --schema-root ../spec/schemas --candidate /path/to/generated.ntc.json
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+python scripts/run_conformance.py --schema-root ../spec/schemas
+python scripts/run_conformance.py --schema-root ../spec/schemas --candidate /path/to/generated.ntc.json
 ```
 
 Or from the repository root using the convenience targets:

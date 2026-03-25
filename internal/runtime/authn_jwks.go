@@ -11,14 +11,18 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/StevenBuglione/open-cli/pkg/audit"
 	"github.com/StevenBuglione/open-cli/pkg/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type oidcJWKSClaims struct {
 	jwt.RegisteredClaims
-	ClientID string `json:"client_id,omitempty"`
-	Scope    string `json:"scope,omitempty"`
+	ClientID     string            `json:"client_id,omitempty"`
+	Scope        string            `json:"scope,omitempty"`
+	DelegatedBy  string            `json:"delegated_by,omitempty"`
+	DelegationID string            `json:"delegation_id,omitempty"`
+	Act          map[string]string `json:"act,omitempty"`
 }
 
 type jwksDocument struct {
@@ -37,6 +41,23 @@ func runtimeServerAuthUsesOIDCJWKS(auth *config.RuntimeServerAuthConfig) bool {
 		return false
 	}
 	return auth.ValidationProfile == "oidc_jwks"
+}
+
+func (claims *oidcJWKSClaims) delegationLineage() *audit.DelegationLineage {
+	if claims == nil {
+		return nil
+	}
+	if claims.DelegatedBy == "" && claims.DelegationID == "" && len(claims.Act) == 0 {
+		return nil
+	}
+	lineage := &audit.DelegationLineage{
+		DelegatedBy:  claims.DelegatedBy,
+		DelegationID: claims.DelegationID,
+	}
+	if len(claims.Act) > 0 {
+		lineage.Actor = cloneNonEmptyStringMap(claims.Act)
+	}
+	return lineage
 }
 
 func (server *Server) validateJWTWithJWKS(ctx context.Context, authCfg config.RuntimeServerAuthConfig, rawToken string) (*oidcJWKSClaims, error) {

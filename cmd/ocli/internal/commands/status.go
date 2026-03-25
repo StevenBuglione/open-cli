@@ -111,7 +111,7 @@ func buildStatusReport(options cfgpkg.Options, client runtimepkg.Client, runtime
 			}
 			populateStatusAuth(&report.Auth, rawConfig, runtimeAuth)
 			if response, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{
-				ConfigPath:   options.ConfigPath,
+				ConfigPath:   options.RuntimeRequestConfigPath,
 				Mode:         options.Mode,
 				AgentProfile: options.AgentProfile,
 				RuntimeToken: options.RuntimeToken,

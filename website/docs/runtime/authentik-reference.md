@@ -91,6 +91,38 @@ return {
 }
 ```
 
+## Delegated sub-agent access
+
+Delegated sub-agent access stays on the **broker side** of the runtime boundary.
+
+The current runtime contract does not require a special sub-agent API in `oclird`. Instead, the deployment pattern is:
+
+1. a parent actor already holds a valid runtime token for audience `oclird`
+2. a broker or broker-adjacent gateway performs a token-exchange step
+3. that broker mints a separate child token for the sub-agent
+4. `oclird` validates the child token like any other runtime token and enforces only the child scope set
+
+Important constraints for operators:
+
+- the broker is the delegation boundary; do not treat local config or agent selection as a scope-minting mechanism
+- child tokens should be short-lived — minutes, not hours, and materially shorter than the parent token lifetime
+- delegation must be subset-only; the child token may keep or reduce scopes, but it must never add `bundle:*`, `profile:*`, or `tool:*` access outside the parent envelope
+- lineage claims such as `act`, `delegated_by`, or a delegation ID are recommended for auditability, but authorization still comes only from the child token `scope` claim
+- local config, curated mode, managed deny rules, and agent profiles may narrow what the child can see or execute, but they must never expand access beyond the child token scopes
+
+This repository does **not** currently document a first-class CLI UX for requesting delegated child tokens. The implemented reality today is the runtime-facing contract plus the reference broker/token-exchange pattern, not a finished end-user delegation workflow in `ocli`.
+
+## Authentik deployment guidance for delegation
+
+For Authentik-backed deployments, the safest assumption is:
+
+- **Authentik remains the identity-facing broker**
+- **delegated token exchange happens in an external broker or gateway layer in front of the runtime-facing contract**
+
+That extra layer can validate the parent runtime token, subset-check the requested runtime scopes, add lineage claims, and mint the short-lived child token that `oclird` already knows how to validate.
+
+Do not assume that Authentik alone should become the full delegation engine for sub-agent execution just because it is the reference broker for the base runtime auth proof. The official proof in this repository covers runtime-compatible token issuance and validation; delegated exchange should be added as a broker/gateway layer without changing the runtime-facing contract.
+
 ## Commands
 
 Automated workload proof:

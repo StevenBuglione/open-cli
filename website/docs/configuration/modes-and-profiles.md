@@ -95,3 +95,17 @@ Remember the separation:
 - execution-time policy still runs inside the runtime
 
 So a tool can be hidden from the CLI tree, inspected by ID, or rejected at execution time depending on the combination of view and policy.
+
+## Profiles can restrict access, not mint it
+
+In remote-runtime deployments with bearer auth enabled, the validated runtime token remains the outer authorization envelope.
+
+That means:
+
+- local config can hide tools or add deny rules
+- curated mode can narrow the visible catalog
+- an explicit or default agent profile can narrow the selected tool set
+
+But none of those layers can grant access outside the scopes already present on the runtime token being enforced by `oclird`.
+
+This matters for delegated child tokens too: a broker may mint a narrower child token for a sub-agent, and local config or profiles may narrow that child further, but the config/profile layer is never a scope-expansion mechanism.

@@ -71,7 +71,7 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 	var runtimeUnavailable bool
 	var catalogErr error
 	response, catalogErr = client.FetchCatalog(runtimepkg.CatalogFetchOptions{
-		ConfigPath:   options.ConfigPath,
+		ConfigPath:   options.RuntimeRequestConfigPath,
 		Mode:         options.Mode,
 		AgentProfile: options.AgentProfile,
 		RuntimeToken: options.RuntimeToken,

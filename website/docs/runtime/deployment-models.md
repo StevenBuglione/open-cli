@@ -94,6 +94,15 @@ Current remote auth support:
 
 Brokered deployments typically pair those client modes with `runtime.server.auth.validationProfile: "oidc_jwks"` so the daemon can validate broker-issued runtime tokens locally.
 
+If you need delegated sub-agent access in a remote deployment, keep that flow outside `oclird` itself:
+
+- the parent runtime token goes to a broker or gateway token-exchange layer
+- that layer returns a separate child token for audience `oclird`
+- the child token should be short-lived and scope-subset-only relative to the parent token
+- local config, curated mode, and agent profiles may restrict the child further, but they never expand access beyond the child token scopes
+
+This is a deployment concern, not a finished CLI feature. The current docs intentionally describe the operator-owned broker pattern, not a dedicated `ocli` delegation UX.
+
 This repo now ships one official worked example:
 
 - [Authentik reference proof](./authentik-reference)

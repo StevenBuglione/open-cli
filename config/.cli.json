@@ -1,0 +1,37 @@
+{
+  "cli": "1.0.0",
+  "mode": {
+    "default": "discover"
+  },
+  "runtime": {
+    "mode": "local",
+    "local": {
+      "sessionScope": "terminal",
+      "heartbeatSeconds": 15,
+      "missedHeartbeatLimit": 3,
+      "shutdown": "when-owner-exits",
+      "share": "exclusive"
+    },
+    "server": {
+      "auth": {
+        "validationProfile": "oidc_jwks",
+        "issuer": "http://localhost:9100/application/o/open-cli/",
+        "jwksURL": "http://localhost:9100/application/o/open-cli/jwks/",
+        "audience": "open-cli-runtime"
+      }
+    }
+  },
+  "sources": {
+    "petstore": {
+      "type": "openapi",
+      "uri": "https://petstore3.swagger.io/api/v3/openapi.json",
+      "enabled": true
+    }
+  },
+  "services": {
+    "petstore": {
+      "source": "petstore",
+      "alias": "petstore"
+    }
+  }
+}

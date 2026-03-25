@@ -42,15 +42,19 @@ func DiscoverScopePaths(options LoadOptions) map[Scope]string {
 			workingDir = cwd
 		}
 	}
+	projectDir := workingDir
+	if options.ProjectPath != "" {
+		projectDir = filepath.Dir(options.ProjectPath)
+	}
 	if options.ProjectPath != "" {
 		paths[ScopeProject] = options.ProjectPath
-	} else if workingDir != "" {
-		addIfExists(paths, ScopeProject, filepath.Join(workingDir, ".cli.json"))
+	} else if projectDir != "" {
+		addIfExists(paths, ScopeProject, filepath.Join(projectDir, ".cli.json"))
 	}
 	if options.LocalPath != "" {
 		paths[ScopeLocal] = options.LocalPath
-	} else if workingDir != "" {
-		addIfExists(paths, ScopeLocal, filepath.Join(workingDir, ".cli.local.json"))
+	} else if projectDir != "" {
+		addIfExists(paths, ScopeLocal, filepath.Join(projectDir, ".cli.local.json"))
 	}
 
 	return paths

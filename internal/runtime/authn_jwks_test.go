@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -232,6 +234,57 @@ func TestServerAcceptsValidOIDCJWKSToken(t *testing.T) {
 	tool := tools[0].(map[string]any)
 	if got := tool["id"]; got != "tickets:listTickets" {
 		t.Fatalf("expected tickets:listTickets in oidc_jwks scoped catalog, got %#v", got)
+	}
+}
+
+func TestServerAcceptsMultipleOIDCJWKSBundleScopes(t *testing.T) {
+	dir := t.TempDir()
+	issuer := newOIDCJWKSTestIssuer(t)
+	configPath := writeOIDCJWKSRuntimeConfig(t, dir, issuer, "https://tickets.example.com", "https://users.example.com")
+
+	token := issuer.signToken(t, map[string]any{
+		"sub":   "agent-123",
+		"aud":   "oclird",
+		"scope": "bundle:tickets bundle:users",
+		"exp":   time.Now().Add(time.Hour).Unix(),
+	})
+
+	server := runtime.NewServer(runtime.Options{AuditPath: filepath.Join(dir, "audit.log")})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, httpServer.URL+"/v1/catalog/effective?config="+configPath, nil)
+	if err != nil {
+		t.Fatalf("new catalog request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("get effective catalog: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 effective catalog, got %d with body %q", resp.StatusCode, readTrimmedBody(t, resp))
+	}
+
+	var effective map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&effective); err != nil {
+		t.Fatalf("decode effective catalog: %v", err)
+	}
+	catalogData := effective["catalog"].(map[string]any)
+	tools := catalogData["tools"].([]any)
+	if len(tools) != 2 {
+		t.Fatalf("expected two oidc_jwks scoped tools for multiple bundle scopes, got %#v", tools)
+	}
+
+	var toolIDs []string
+	for _, item := range tools {
+		toolIDs = append(toolIDs, item.(map[string]any)["id"].(string))
+	}
+	sort.Strings(toolIDs)
+	if !reflect.DeepEqual(toolIDs, []string{"tickets:listTickets", "users:listUsers"}) {
+		t.Fatalf("expected tickets and users tools for multiple bundle scopes, got %#v", toolIDs)
 	}
 }
 

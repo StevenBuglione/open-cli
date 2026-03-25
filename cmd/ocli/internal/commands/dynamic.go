@@ -115,7 +115,7 @@ func AddDynamicToolCommands(root *cobra.Command, options cfgpkg.Options, client 
 					return nil
 				}
 				result, err := client.Execute(runtimepkg.ExecuteRequest{
-					ConfigPath:   options.ConfigPath,
+					ConfigPath:   options.RuntimeRequestConfigPath,
 					Mode:         options.Mode,
 					AgentProfile: options.AgentProfile,
 					ToolID:       toolCopy.ID,

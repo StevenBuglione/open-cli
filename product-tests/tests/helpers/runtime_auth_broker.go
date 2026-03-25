@@ -21,6 +21,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const (
+	tokenExchangeGrantType = "urn:ietf:params:oauth:grant-type:token-exchange"
+	accessTokenType        = "urn:ietf:params:oauth:token-type:access_token"
+	delegatedTokenTTL      = 5 * time.Minute
+)
+
 type RuntimeAuthBroker struct {
 	URL              string
 	Issuer           string
@@ -164,6 +170,84 @@ func (broker *RuntimeAuthBroker) handleToken(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		writeRuntimeTokenResponse(w, token)
+	case tokenExchangeGrantType:
+		subjectToken := strings.TrimSpace(r.Form.Get("subject_token"))
+		if subjectToken == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_request"})
+			return
+		}
+		if tokenType := strings.TrimSpace(r.Form.Get("subject_token_type")); tokenType != "" && tokenType != accessTokenType {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_request"})
+			return
+		}
+		if tokenType := strings.TrimSpace(r.Form.Get("requested_token_type")); tokenType != "" && tokenType != accessTokenType {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_request"})
+			return
+		}
+		audience := strings.TrimSpace(r.Form.Get("audience"))
+		if audience == "" {
+			audience = "oclird"
+		}
+		if audience != "oclird" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_target"})
+			return
+		}
+		requestedScopes := strings.Fields(r.Form.Get("scope"))
+		if len(requestedScopes) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_request"})
+			return
+		}
+		parentClaims, err := broker.validateRuntimeToken(subjectToken, audience)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
+			return
+		}
+		if !scopesAreSubset(requestedScopes, strings.Fields(parentClaims.Scope)) {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_scope"})
+			return
+		}
+		expiry, err := selectDelegatedTokenExpiry(time.Now(), parentClaims.ExpiresAt)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
+			return
+		}
+		delegatedBy := parentClaims.Subject
+		if delegatedBy == "" {
+			delegatedBy = parentClaims.ClientID
+		}
+		actor := map[string]string{}
+		if parentClaims.Subject != "" {
+			actor["sub"] = parentClaims.Subject
+		}
+		if parentClaims.ClientID != "" {
+			actor["client_id"] = parentClaims.ClientID
+		}
+		if actorID := strings.TrimSpace(r.Form.Get("actor_id")); actorID != "" {
+			actor["actor_id"] = actorID
+		}
+		token, err := broker.signRuntimeTokenWithExpiry(parentClaims.UpstreamProvider, runtimeTokenClaims{
+			Audience:         audience,
+			Scopes:           requestedScopes,
+			Subject:          parentClaims.Subject,
+			ClientID:         parentClaims.ClientID,
+			DelegatedBy:      delegatedBy,
+			DelegationID:     fmt.Sprintf("delegation-%d", time.Now().UnixNano()),
+			Actor:            actor,
+			UpstreamProvider: parentClaims.UpstreamProvider,
+		}, expiry)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeRuntimeTokenResponseWithExpiry(w, token, int(time.Until(expiry).Round(time.Second)/time.Second))
 	case "authorization_code":
 		code := r.Form.Get("code")
 		broker.mu.Lock()
@@ -208,10 +292,24 @@ func (broker *RuntimeAuthBroker) handleToken(w http.ResponseWriter, r *http.Requ
 }
 
 type runtimeTokenClaims struct {
-	Audience string
-	Scopes   []string
-	Subject  string
-	ClientID string
+	Audience         string
+	Scopes           []string
+	Subject          string
+	ClientID         string
+	DelegatedBy      string
+	DelegationID     string
+	Actor            map[string]string
+	UpstreamProvider string
+}
+
+type brokerRuntimeTokenClaims struct {
+	jwt.RegisteredClaims
+	ClientID         string            `json:"client_id,omitempty"`
+	Scope            string            `json:"scope,omitempty"`
+	UpstreamProvider string            `json:"upstream_provider,omitempty"`
+	DelegatedBy      string            `json:"delegated_by,omitempty"`
+	DelegationID     string            `json:"delegation_id,omitempty"`
+	Act              map[string]string `json:"act,omitempty"`
 }
 
 func (broker *RuntimeAuthBroker) signRuntimeToken(upstream string, claims runtimeTokenClaims) (string, error) {
@@ -223,8 +321,11 @@ func (broker *RuntimeAuthBroker) signRuntimeTokenWithExpiry(upstream string, cla
 	if audience == "" {
 		audience = "oclird"
 	}
+	if claims.UpstreamProvider != "" {
+		upstream = claims.UpstreamProvider
+	}
 	scope := strings.Join(claims.Scopes, " ")
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+	mapClaims := jwt.MapClaims{
 		"iss":               broker.Issuer,
 		"aud":               audience,
 		"sub":               claims.Subject,
@@ -232,18 +333,82 @@ func (broker *RuntimeAuthBroker) signRuntimeTokenWithExpiry(upstream string, cla
 		"scope":             scope,
 		"exp":               expiry.Unix(),
 		"upstream_provider": normalizeBrokerUpstream(upstream),
-	})
+	}
+	if claims.DelegatedBy != "" {
+		mapClaims["delegated_by"] = claims.DelegatedBy
+	}
+	if claims.DelegationID != "" {
+		mapClaims["delegation_id"] = claims.DelegationID
+		mapClaims["jti"] = claims.DelegationID
+	}
+	if len(claims.Actor) > 0 {
+		mapClaims["act"] = claims.Actor
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, mapClaims)
 	token.Header["kid"] = broker.keyID
 	return token.SignedString(broker.privateKey)
 }
 
 func writeRuntimeTokenResponse(w http.ResponseWriter, token string) {
+	writeRuntimeTokenResponseWithExpiry(w, token, 3600)
+}
+
+func writeRuntimeTokenResponseWithExpiry(w http.ResponseWriter, token string, expiresIn int) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"access_token": token,
 		"token_type":   "Bearer",
-		"expires_in":   3600,
+		"expires_in":   expiresIn,
 	})
+}
+
+func (broker *RuntimeAuthBroker) validateRuntimeToken(rawToken, audience string) (*brokerRuntimeTokenClaims, error) {
+	claims := &brokerRuntimeTokenClaims{}
+	token, err := jwt.ParseWithClaims(rawToken, claims, func(token *jwt.Token) (any, error) {
+		return &broker.privateKey.PublicKey, nil
+	},
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
+		jwt.WithIssuer(broker.Issuer),
+		jwt.WithAudience(audience),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !token.Valid {
+		return nil, fmt.Errorf("token is invalid")
+	}
+	if claims.Subject == "" && claims.ClientID == "" {
+		return nil, fmt.Errorf("token missing principal")
+	}
+	return claims, nil
+}
+
+func scopesAreSubset(requestedScopes, parentScopes []string) bool {
+	if len(requestedScopes) == 0 {
+		return false
+	}
+	parentSet := make(map[string]struct{}, len(parentScopes))
+	for _, scope := range parentScopes {
+		parentSet[scope] = struct{}{}
+	}
+	for _, scope := range requestedScopes {
+		if _, ok := parentSet[scope]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func selectDelegatedTokenExpiry(now time.Time, parentExpiry *jwt.NumericDate) (time.Time, error) {
+	expiry := now.Add(delegatedTokenTTL)
+	if parentExpiry != nil && !parentExpiry.Time.IsZero() && !expiry.Before(parentExpiry.Time) {
+		expiry = parentExpiry.Time.Add(-time.Second)
+	}
+	if !expiry.After(now) {
+		return time.Time{}, fmt.Errorf("parent token expires too soon")
+	}
+	return expiry, nil
 }
 
 func normalizeBrokerUpstream(upstream string) string {
@@ -314,6 +479,40 @@ func (broker *RuntimeAuthBroker) ExchangeAuthorizationCode(t *testing.T, code, c
 	}
 	if payload.AccessToken == "" {
 		t.Fatalf("expected access token from broker auth code exchange")
+	}
+	return payload.AccessToken
+}
+
+func (broker *RuntimeAuthBroker) ExchangeDelegatedToken(t *testing.T, parentToken, audience string, scopes []string, actorID string) string {
+	t.Helper()
+
+	form := url.Values{}
+	form.Set("grant_type", tokenExchangeGrantType)
+	form.Set("subject_token", parentToken)
+	form.Set("subject_token_type", accessTokenType)
+	form.Set("requested_token_type", accessTokenType)
+	form.Set("audience", audience)
+	form.Set("scope", strings.Join(scopes, " "))
+	if actorID != "" {
+		form.Set("actor_id", actorID)
+	}
+
+	resp, err := http.PostForm(broker.TokenURL, form)
+	if err != nil {
+		t.Fatalf("exchange delegated broker token: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 delegated token response, got %d", resp.StatusCode)
+	}
+	var payload struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode delegated token response: %v", err)
+	}
+	if payload.AccessToken == "" {
+		t.Fatalf("expected access token from broker delegation exchange")
 	}
 	return payload.AccessToken
 }

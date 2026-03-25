@@ -1333,6 +1333,106 @@ paths:
 	}
 }
 
+func TestServerAuditsDelegationLineageForCatalogAndToolExecution(t *testing.T) {
+	dir := t.TempDir()
+	issuer := newOIDCJWKSTestIssuer(t)
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []map[string]any{{"id": "T-1"}}})
+	}))
+	defer api.Close()
+
+	configPath := writeOIDCJWKSRuntimeConfig(t, dir, issuer, api.URL, "https://users.example.com")
+	auditPath := filepath.Join(dir, "audit.log")
+	token := issuer.signToken(t, map[string]any{
+		"sub":           "subagent:triage-01",
+		"aud":           "oclird",
+		"scope":         "bundle:tickets",
+		"delegated_by":  "github:user-123",
+		"delegation_id": "delegation-123",
+		"act": map[string]string{
+			"sub":       "github:user-123",
+			"client_id": "ocli-browser",
+			"actor_id":  "lead-agent",
+		},
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+
+	server := runtime.NewServer(runtime.Options{AuditPath: auditPath})
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+
+	catalogReq, err := http.NewRequest(http.MethodGet, httpServer.URL+"/v1/catalog/effective?config="+configPath, nil)
+	if err != nil {
+		t.Fatalf("new catalog request: %v", err)
+	}
+	catalogReq.Header.Set("Authorization", "Bearer "+token)
+	catalogResp, err := http.DefaultClient.Do(catalogReq)
+	if err != nil {
+		t.Fatalf("catalog request: %v", err)
+	}
+	catalogResp.Body.Close()
+	if catalogResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 effective catalog, got %d", catalogResp.StatusCode)
+	}
+
+	execBody := bytes.NewBufferString(`{"configPath":"` + configPath + `","toolId":"tickets:listTickets"}`)
+	execReq, err := http.NewRequest(http.MethodPost, httpServer.URL+"/v1/tools/execute", execBody)
+	if err != nil {
+		t.Fatalf("new execute request: %v", err)
+	}
+	execReq.Header.Set("Content-Type", "application/json")
+	execReq.Header.Set("Authorization", "Bearer "+token)
+	execResp, err := http.DefaultClient.Do(execReq)
+	if err != nil {
+		t.Fatalf("execute request: %v", err)
+	}
+	execResp.Body.Close()
+	if execResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 execute response, got %d", execResp.StatusCode)
+	}
+
+	events, err := audit.NewFileStore(auditPath).List()
+	if err != nil {
+		t.Fatalf("list audit events: %v", err)
+	}
+
+	assertLineage := func(event audit.Event, wantType string) {
+		t.Helper()
+		if event.Principal != "subagent:triage-01" {
+			t.Fatalf("expected principal on %s audit event, got %#v", wantType, event)
+		}
+		if event.Lineage == nil {
+			t.Fatalf("expected lineage on %s audit event, got %#v", wantType, event)
+		}
+		if event.Lineage.DelegatedBy != "github:user-123" || event.Lineage.DelegationID != "delegation-123" {
+			t.Fatalf("expected delegation metadata on %s audit event, got %#v", wantType, event.Lineage)
+		}
+		if event.Lineage.Actor["sub"] != "github:user-123" || event.Lineage.Actor["client_id"] != "ocli-browser" || event.Lineage.Actor["actor_id"] != "lead-agent" {
+			t.Fatalf("expected actor lineage on %s audit event, got %#v", wantType, event.Lineage.Actor)
+		}
+	}
+
+	var connectEvent, toolEvent *audit.Event
+	for i := range events {
+		switch events[i].EventType {
+		case "authenticated_connect":
+			connectEvent = &events[i]
+		case "tool_execution":
+			if events[i].ToolID == "tickets:listTickets" {
+				toolEvent = &events[i]
+			}
+		}
+	}
+	if connectEvent == nil {
+		t.Fatalf("expected authenticated_connect audit event, got %#v", events)
+	}
+	if toolEvent == nil {
+		t.Fatalf("expected tool_execution audit event, got %#v", events)
+	}
+	assertLineage(*connectEvent, "authenticated_connect")
+	assertLineage(*toolEvent, "tool_execution")
+}
+
 func TestServerResolvesBearerAuthFromSecretReferences(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.Setenv("TICKETS_TOKEN", "token-abc"); err != nil {

@@ -37,12 +37,19 @@ type RemoteOAuthConfig struct {
 	TokenRef     string                   `json:"tokenRef,omitempty"`
 	Client       *RemoteOAuthClientConfig `json:"client,omitempty"`
 	BrowserLogin *BrowserLoginConfig      `json:"browserLogin,omitempty"`
+	Delegation   *RemoteOAuthDelegation   `json:"delegation,omitempty"`
 }
 
 type RemoteOAuthClientConfig struct {
 	TokenURL     string     `json:"tokenURL,omitempty"`
 	ClientID     *SecretRef `json:"clientId,omitempty"`
 	ClientSecret *SecretRef `json:"clientSecret,omitempty"`
+}
+
+type RemoteOAuthDelegation struct {
+	Enabled          bool     `json:"enabled,omitempty"`
+	TokenExchangeURL string   `json:"tokenExchangeURL,omitempty"`
+	Scopes           []string `json:"scopes,omitempty"`
 }
 
 type BrowserLoginConfig struct {
@@ -158,7 +165,7 @@ type Config struct {
 	CLI      string             `json:"cli"`
 	Mode     ModeConfig         `json:"mode"`
 	Runtime  *RuntimeConfig     `json:"runtime,omitempty"`
-	Sources  map[string]Source  `json:"sources"`
+	Sources  map[string]Source  `json:"sources,omitempty"`
 	Services map[string]Service `json:"services,omitempty"`
 	Curation CurationConfig     `json:"curation,omitempty"`
 	Agents   AgentsConfig       `json:"agents,omitempty"`

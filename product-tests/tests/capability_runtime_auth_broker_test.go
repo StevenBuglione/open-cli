@@ -12,9 +12,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/StevenBuglione/open-cli/internal/runtime"
 	brokerhelpers "github.com/StevenBuglione/open-cli/product-tests/tests/helpers"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestCapabilityRuntimeAuthBroker(t *testing.T) {
@@ -188,6 +190,131 @@ func TestCapabilityRuntimeAuthBroker(t *testing.T) {
 		defer catalogResp.Body.Close()
 		if catalogResp.StatusCode != http.StatusOK {
 			t.Fatalf("expected 200 browser-login catalog response, got %d", catalogResp.StatusCode)
+		}
+	})
+
+	t.Run("delegated_token_exchange", func(t *testing.T) {
+		parentToken := broker.AcquireClientCredentialsToken(t, "github", "oclird", []string{
+			"bundle:tickets",
+			"tool:tickets:listTickets",
+		})
+		childToken := broker.ExchangeDelegatedToken(t, parentToken, "oclird", []string{
+			"tool:tickets:listTickets",
+		}, "subagent:triage-01")
+
+		catalogReq, err := http.NewRequest(http.MethodGet, runtimeServer.URL+"/v1/catalog/effective?config="+url.QueryEscape(configPath), nil)
+		if err != nil {
+			t.Fatalf("new delegated catalog request: %v", err)
+		}
+		catalogReq.Header.Set("Authorization", "Bearer "+childToken)
+
+		catalogResp, err := http.DefaultClient.Do(catalogReq)
+		if err != nil {
+			t.Fatalf("delegated catalog request: %v", err)
+		}
+		defer catalogResp.Body.Close()
+		if catalogResp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 delegated catalog response, got %d", catalogResp.StatusCode)
+		}
+		var catalogBody map[string]any
+		if err := json.NewDecoder(catalogResp.Body).Decode(&catalogBody); err != nil {
+			t.Fatalf("decode delegated catalog: %v", err)
+		}
+		catalogPayload, _ := catalogBody["catalog"].(map[string]any)
+		tools, _ := catalogPayload["tools"].([]any)
+		if len(tools) != 1 {
+			t.Fatalf("expected one delegated tool, got %#v", tools)
+		}
+		tool, _ := tools[0].(map[string]any)
+		if got := tool["id"]; got != "tickets:listTickets" {
+			t.Fatalf("expected delegated access to tickets:listTickets, got %#v", got)
+		}
+
+		executeBody, _ := json.Marshal(map[string]any{"configPath": configPath, "toolId": "tickets:listTickets"})
+		executeReq, err := http.NewRequest(http.MethodPost, runtimeServer.URL+"/v1/tools/execute", strings.NewReader(string(executeBody)))
+		if err != nil {
+			t.Fatalf("new delegated execute request: %v", err)
+		}
+		executeReq.Header.Set("Content-Type", "application/json")
+		executeReq.Header.Set("Authorization", "Bearer "+childToken)
+		executeResp, err := http.DefaultClient.Do(executeReq)
+		if err != nil {
+			t.Fatalf("execute delegated tickets:listTickets: %v", err)
+		}
+		defer executeResp.Body.Close()
+		if executeResp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 delegated execute response, got %d", executeResp.StatusCode)
+		}
+
+		deniedBody, _ := json.Marshal(map[string]any{"configPath": configPath, "toolId": "users:listUsers"})
+		deniedReq, err := http.NewRequest(http.MethodPost, runtimeServer.URL+"/v1/tools/execute", strings.NewReader(string(deniedBody)))
+		if err != nil {
+			t.Fatalf("new delegated denied execute request: %v", err)
+		}
+		deniedReq.Header.Set("Content-Type", "application/json")
+		deniedReq.Header.Set("Authorization", "Bearer "+childToken)
+		deniedResp, err := http.DefaultClient.Do(deniedReq)
+		if err != nil {
+			t.Fatalf("execute delegated users:listUsers: %v", err)
+		}
+		defer deniedResp.Body.Close()
+		if deniedResp.StatusCode != http.StatusForbidden {
+			t.Fatalf("expected 403 for delegated denied tool, got %d", deniedResp.StatusCode)
+		}
+
+		parser := jwt.NewParser()
+		unverifiedClaims := jwt.MapClaims{}
+		if _, _, err := parser.ParseUnverified(childToken, unverifiedClaims); err != nil {
+			t.Fatalf("parse delegated token claims: %v", err)
+		}
+		if got := unverifiedClaims["delegated_by"]; got != "github:service-account" {
+			t.Fatalf("expected delegated_by github:service-account, got %#v", got)
+		}
+		if got := unverifiedClaims["delegation_id"]; got == "" {
+			t.Fatalf("expected delegation_id claim, got %#v", got)
+		}
+		act, _ := unverifiedClaims["act"].(map[string]any)
+		if got := act["actor_id"]; got != "subagent:triage-01" {
+			t.Fatalf("expected act.actor_id subagent:triage-01, got %#v", act)
+		}
+		exp, ok := unverifiedClaims["exp"].(float64)
+		if !ok {
+			t.Fatalf("expected numeric exp claim, got %#v", unverifiedClaims["exp"])
+		}
+		expiresAt := time.Unix(int64(exp), 0)
+		if ttl := time.Until(expiresAt); ttl <= 0 || ttl > 5*time.Minute+15*time.Second {
+			t.Fatalf("expected delegated token ttl <= %s and >0, got %s", 5*time.Minute+15*time.Second, ttl)
+		}
+	})
+
+	t.Run("delegated_token_exchange_rejects_scope_escalation", func(t *testing.T) {
+		parentToken := broker.AcquireClientCredentialsToken(t, "github", "oclird", []string{
+			"bundle:tickets",
+			"tool:tickets:listTickets",
+		})
+
+		form := url.Values{}
+		form.Set("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
+		form.Set("subject_token", parentToken)
+		form.Set("subject_token_type", "urn:ietf:params:oauth:token-type:access_token")
+		form.Set("requested_token_type", "urn:ietf:params:oauth:token-type:access_token")
+		form.Set("audience", "oclird")
+		form.Set("scope", "tool:users:listUsers")
+
+		resp, err := http.PostForm(broker.TokenURL, form)
+		if err != nil {
+			t.Fatalf("post delegated exchange: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected 400 delegated scope escalation response, got %d", resp.StatusCode)
+		}
+		var payload map[string]string
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode delegated scope escalation response: %v", err)
+		}
+		if payload["error"] != "invalid_scope" {
+			t.Fatalf("expected invalid_scope for delegated escalation, got %#v", payload)
 		}
 	})
 }

@@ -51,7 +51,8 @@ test-website-review:
 
 fleet-matrix-ci:
 	rm -rf $(FLEET_OUTPUT_DIR)
-	python3 scripts/run-agent-campaign.py --matrix $(FLEET_MATRIX) \
+	python3 ../devtools/bootstrap_python_env.py --venv ../.venv --requirements requirements.txt -- \
+	  ../.venv/bin/python3 scripts/run-agent-campaign.py --matrix $(FLEET_MATRIX) \
 	  --lane local-daemon-core \
 	  --lane local-daemon-process \
 	  --lane remote-runtime-oauth-client \
@@ -68,7 +69,8 @@ fleet-matrix-ci:
 fleet-matrix-mcp-remote: mcp-remote-up
 	@bash scripts/wait-for-mcp-remote.sh
 	rm -rf $(FLEET_OUTPUT_DIR)/mcp-remote-core
-	python3 scripts/run-agent-campaign.py --matrix $(FLEET_MATRIX) \
+	python3 ../devtools/bootstrap_python_env.py --venv ../.venv --requirements requirements.txt -- \
+	  ../.venv/bin/python3 scripts/run-agent-campaign.py --matrix $(FLEET_MATRIX) \
 	  --lane mcp-remote-core \
 	  --output-dir $(FLEET_OUTPUT_DIR); \
 	  status=$$?; \

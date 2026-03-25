@@ -1369,6 +1369,9 @@ func TestRootCommandUsesOAuthClientRemoteRuntimeBearerToken(t *testing.T) {
 			if got := r.Header.Get("Authorization"); got != "" {
 				t.Fatalf("expected unauthenticated runtime info discovery, got %q", got)
 			}
+			if got := r.URL.Query().Get("config"); got != "" {
+				t.Fatalf("expected no config query for remote runtime info, got %q", got)
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"contractVersion": "1.1",
 				"capabilities":    []string{"catalog", "brokered-auth"},
@@ -1382,6 +1385,9 @@ func TestRootCommandUsesOAuthClientRemoteRuntimeBearerToken(t *testing.T) {
 		case "/v1/catalog/effective":
 			if got := r.Header.Get("Authorization"); got != "Bearer oauth-client-token" {
 				t.Fatalf("expected runtime bearer token from oauth client flow, got %q", got)
+			}
+			if got := r.URL.Query().Get("config"); got != "" {
+				t.Fatalf("expected no config query for remote catalog fetch, got %q", got)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"catalog": map[string]any{
@@ -1419,17 +1425,6 @@ func TestRootCommandUsesOAuthClientRemoteRuntimeBearerToken(t *testing.T) {
 	        }
 	      }
 	    }
-	  },
-	  "sources": {
-	    "tickets": {
-	      "type": "openapi",
-	      "uri": "https://example.com/openapi.json"
-	    }
-	  },
-	  "services": {
-	    "tickets": {
-	      "source": "tickets"
-	    }
 	  }
 	}`, runtimeServer.URL, authServer.URL+"/token")), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -1447,6 +1442,151 @@ func TestRootCommandUsesOAuthClientRemoteRuntimeBearerToken(t *testing.T) {
 	}
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute returned error: %v", err)
+	}
+}
+
+func TestRootCommandUsesDelegatedOAuthClientRemoteRuntimeBearerToken(t *testing.T) {
+	t.Setenv("OAS_REMOTE_CLIENT_ID", "runtime-client")
+	t.Setenv("OAS_REMOTE_CLIENT_SECRET", "runtime-secret")
+	t.Setenv("OCLI_AGENT_SESSION_ID", "subagent:triage-01")
+
+	var authRequests []url.Values
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/token" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("ParseForm: %v", err)
+		}
+		authRequests = append(authRequests, r.PostForm)
+		switch r.PostForm.Get("grant_type") {
+		case "client_credentials":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "parent-oauth-token",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+		case "urn:ietf:params:oauth:grant-type:token-exchange":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "delegated-child-token",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+		default:
+			t.Fatalf("unexpected grant_type %q", r.PostForm.Get("grant_type"))
+		}
+	}))
+	defer authServer.Close()
+
+	runtimeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/runtime/info":
+			if got := r.Header.Get("Authorization"); got != "" {
+				t.Fatalf("expected unauthenticated runtime info discovery, got %q", got)
+			}
+			if got := r.URL.Query().Get("config"); got != "" {
+				t.Fatalf("expected no config query for remote runtime info, got %q", got)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"contractVersion": "1.1",
+				"capabilities":    []string{"catalog", "brokered-auth"},
+				"auth": map[string]any{
+					"required":                true,
+					"audience":                "oclird",
+					"scopePrefixes":           []string{"bundle:", "profile:", "tool:"},
+					"tokenValidationProfiles": []string{"oidc_jwks"},
+				},
+			})
+		case "/v1/catalog/effective":
+			if got := r.Header.Get("Authorization"); got != "Bearer delegated-child-token" {
+				t.Fatalf("expected delegated runtime bearer token, got %q", got)
+			}
+			if got := r.URL.Query().Get("config"); got != "" {
+				t.Fatalf("expected no config query for remote catalog fetch, got %q", got)
+			}
+			if got := r.URL.Query().Get("agentProfile"); got != "triage" {
+				t.Fatalf("expected agentProfile query to be preserved, got %q", got)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"catalog": map[string]any{
+					"services": []map[string]any{},
+					"tools":    []map[string]any{},
+				},
+				"view": map[string]any{
+					"name":  "discover",
+					"mode":  "discover",
+					"tools": []map[string]any{},
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer runtimeServer.Close()
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+	if err := os.WriteFile(configPath, []byte(fmt.Sprintf(`{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "remote",
+	    "remote": {
+	      "url": %q,
+	      "oauth": {
+	        "mode": "oauthClient",
+	        "scopes": ["bundle:payments"],
+	        "client": {
+	          "tokenURL": %q,
+	          "clientId": { "type": "env", "value": "OAS_REMOTE_CLIENT_ID" },
+	          "clientSecret": { "type": "env", "value": "OAS_REMOTE_CLIENT_SECRET" }
+	        },
+	        "delegation": {
+	          "enabled": true,
+	          "scopes": ["bundle:payments", "tool:tickets:listTickets"]
+	        }
+	      }
+	    }
+	  }
+	}`, runtimeServer.URL, authServer.URL+"/token")), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	cmd, err := NewRootCommand(CommandOptions{
+		ConfigPath:   configPath,
+		StateDir:     filepath.Join(dir, "state"),
+		AgentProfile: "triage",
+		Stdout:       &stdout,
+		Stderr:       &stdout,
+	}, []string{"catalog", "list", "--format", "json"})
+	if err != nil {
+		t.Fatalf("NewRootCommand returned error: %v", err)
+	}
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if len(authRequests) != 2 {
+		t.Fatalf("expected client token request plus delegated exchange, got %d requests", len(authRequests))
+	}
+	if got := authRequests[0].Get("grant_type"); got != "client_credentials" {
+		t.Fatalf("expected initial client_credentials grant, got %q", got)
+	}
+	if got := authRequests[1].Get("grant_type"); got != "urn:ietf:params:oauth:grant-type:token-exchange" {
+		t.Fatalf("expected delegated token exchange grant, got %q", got)
+	}
+	if got := authRequests[1].Get("subject_token"); got != "parent-oauth-token" {
+		t.Fatalf("expected parent token to be exchanged, got %q", got)
+	}
+	if got := authRequests[1].Get("actor_id"); got != "subagent:triage-01" {
+		t.Fatalf("expected actor_id from agent session, got %q", got)
+	}
+	if got := authRequests[1].Get("agent_profile"); got != "triage" {
+		t.Fatalf("expected agent_profile to be forwarded, got %q", got)
+	}
+	if got := authRequests[1].Get("scope"); got != "bundle:payments tool:tickets:listTickets" {
+		t.Fatalf("expected delegated scopes to be requested, got %q", got)
 	}
 }
 
@@ -1483,6 +1623,9 @@ func TestHTTPRuntimeClientRefreshesExpiredOAuthClientTokenOnce(t *testing.T) {
 		case "/v1/runtime/info":
 			if got := r.Header.Get("Authorization"); got != "" {
 				t.Fatalf("expected unauthenticated runtime info discovery, got %q", got)
+			}
+			if got := r.URL.Query().Get("config"); got != "" {
+				t.Fatalf("expected no config query for remote runtime info, got %q", got)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"contractVersion": "1.1",
@@ -1564,13 +1707,13 @@ func TestHTTPRuntimeClientRefreshesExpiredOAuthClientTokenOnce(t *testing.T) {
 		t.Fatalf("newRuntimeClient: %v", err)
 	}
 
-	if _, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{ConfigPath: resolved.ConfigPath, Mode: resolved.Mode, AgentProfile: resolved.AgentProfile, RuntimeToken: resolved.RuntimeToken}); err != nil {
+	if _, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{ConfigPath: resolved.RuntimeRequestConfigPath, Mode: resolved.Mode, AgentProfile: resolved.AgentProfile, RuntimeToken: resolved.RuntimeToken}); err != nil {
 		t.Fatalf("initial FetchCatalog: %v", err)
 	}
 
 	time.Sleep(1100 * time.Millisecond)
 
-	if _, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{ConfigPath: resolved.ConfigPath, Mode: resolved.Mode, AgentProfile: resolved.AgentProfile, RuntimeToken: resolved.RuntimeToken}); err != nil {
+	if _, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{ConfigPath: resolved.RuntimeRequestConfigPath, Mode: resolved.Mode, AgentProfile: resolved.AgentProfile, RuntimeToken: resolved.RuntimeToken}); err != nil {
 		t.Fatalf("expected expired remote runtime token to refresh, got %v", err)
 	}
 	if tokenFetches != 2 {
@@ -1611,6 +1754,9 @@ func TestHTTPRuntimeClientRefreshesAfterAuthnFailedOnNextRequest(t *testing.T) {
 		case "/v1/runtime/info":
 			if got := r.Header.Get("Authorization"); got != "" {
 				t.Fatalf("expected unauthenticated runtime info discovery, got %q", got)
+			}
+			if got := r.URL.Query().Get("config"); got != "" {
+				t.Fatalf("expected no config query for remote runtime info, got %q", got)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"contractVersion": "1.1",
@@ -1700,7 +1846,7 @@ func TestHTTPRuntimeClientRefreshesAfterAuthnFailedOnNextRequest(t *testing.T) {
 		t.Fatalf("expected first execute to fail with authn_failed, got %v", err)
 	}
 
-	if _, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{ConfigPath: resolved.ConfigPath, Mode: resolved.Mode, AgentProfile: resolved.AgentProfile, RuntimeToken: resolved.RuntimeToken}); err != nil {
+	if _, err := client.FetchCatalog(runtimepkg.CatalogFetchOptions{ConfigPath: resolved.RuntimeRequestConfigPath, Mode: resolved.Mode, AgentProfile: resolved.AgentProfile, RuntimeToken: resolved.RuntimeToken}); err != nil {
 		t.Fatalf("expected next request to refresh after authn_failed, got %v", err)
 	}
 	if tokenFetches != 2 {
@@ -1739,9 +1885,15 @@ func TestRootCommandUsesRemoteBrowserLoginBearerToken(t *testing.T) {
 		return "browser-login-token", nil
 	}
 
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".cli.json")
+
 	runtimeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/runtime/info":
+			if got := r.URL.Query().Get("config"); got != "" {
+				t.Fatalf("expected no config query for remote runtime info, got %q", got)
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"contractVersion": "1.1",
 				"capabilities":    []string{"catalog", "brokered-auth", "authorization-envelope"},
@@ -1757,6 +1909,9 @@ func TestRootCommandUsesRemoteBrowserLoginBearerToken(t *testing.T) {
 				},
 			})
 		case "/v1/runtime/browser-auth":
+			if got := r.URL.Query().Get("config"); got != "" {
+				t.Fatalf("expected no config query for remote browser auth metadata, got %q", got)
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"authorizationURL": "https://auth.example.com/authorize",
 				"tokenURL":         "https://auth.example.com/token",
@@ -1785,9 +1940,6 @@ func TestRootCommandUsesRemoteBrowserLoginBearerToken(t *testing.T) {
 		}
 	}))
 	defer runtimeServer.Close()
-
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, ".cli.json")
 	if err := os.WriteFile(configPath, []byte(fmt.Sprintf(`{
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
@@ -1802,17 +1954,6 @@ func TestRootCommandUsesRemoteBrowserLoginBearerToken(t *testing.T) {
 	          "callbackPort": 9123
 	        }
 	      }
-	    }
-	  },
-	  "sources": {
-	    "tickets": {
-	      "type": "openapi",
-	      "uri": "https://example.com/openapi.json"
-	    }
-	  },
-	  "services": {
-	    "tickets": {
-	      "source": "tickets"
 	    }
 	  }
 	}`, runtimeServer.URL)), 0o644); err != nil {

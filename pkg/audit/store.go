@@ -10,23 +10,30 @@ import (
 )
 
 type Event struct {
-	Timestamp     time.Time `json:"timestamp"`
-	EventType     string    `json:"eventType,omitempty"`
-	Principal     string    `json:"principal,omitempty"`
-	SessionID     string    `json:"sessionId,omitempty"`
-	AgentProfile  string    `json:"agentProfile,omitempty"`
-	ToolID        string    `json:"toolId"`
-	ServiceID     string    `json:"serviceId,omitempty"`
-	TargetBaseURL string    `json:"targetBaseUrl,omitempty"`
-	Decision      string    `json:"decision"`
-	ReasonCode    string    `json:"reasonCode"`
-	Method        string    `json:"method,omitempty"`
-	Path          string    `json:"path,omitempty"`
-	AuthScheme    string    `json:"authScheme,omitempty"`
-	RequestSize   int       `json:"requestSize,omitempty"`
-	StatusCode    int       `json:"statusCode,omitempty"`
-	LatencyMS     int64     `json:"latencyMs,omitempty"`
-	RetryCount    int       `json:"retryCount,omitempty"`
+	Timestamp     time.Time          `json:"timestamp"`
+	EventType     string             `json:"eventType,omitempty"`
+	Principal     string             `json:"principal,omitempty"`
+	Lineage       *DelegationLineage `json:"lineage,omitempty"`
+	SessionID     string             `json:"sessionId,omitempty"`
+	AgentProfile  string             `json:"agentProfile,omitempty"`
+	ToolID        string             `json:"toolId"`
+	ServiceID     string             `json:"serviceId,omitempty"`
+	TargetBaseURL string             `json:"targetBaseUrl,omitempty"`
+	Decision      string             `json:"decision"`
+	ReasonCode    string             `json:"reasonCode"`
+	Method        string             `json:"method,omitempty"`
+	Path          string             `json:"path,omitempty"`
+	AuthScheme    string             `json:"authScheme,omitempty"`
+	RequestSize   int                `json:"requestSize,omitempty"`
+	StatusCode    int                `json:"statusCode,omitempty"`
+	LatencyMS     int64              `json:"latencyMs,omitempty"`
+	RetryCount    int                `json:"retryCount,omitempty"`
+}
+
+type DelegationLineage struct {
+	DelegatedBy  string            `json:"delegatedBy,omitempty"`
+	DelegationID string            `json:"delegationId,omitempty"`
+	Actor        map[string]string `json:"actor,omitempty"`
 }
 
 type FileStore struct {

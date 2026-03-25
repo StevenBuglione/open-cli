@@ -165,6 +165,43 @@ func TestLoadEffectiveReturnsFieldDiagnostics(t *testing.T) {
 	}
 }
 
+func TestLoadEffectiveAcceptsRemoteRuntimeOnlyConfig(t *testing.T) {
+	dir := t.TempDir()
+	projectPath := writeJSON(t, dir, "project.json", `{
+	  "cli": "1.0.0",
+	  "mode": { "default": "discover" },
+	  "runtime": {
+	    "mode": "remote",
+	    "remote": {
+	      "url": "http://127.0.0.1:8765",
+	      "oauth": {
+	        "mode": "oauthClient",
+	        "scopes": ["bundle:testapi"],
+	        "client": {
+	          "tokenURL": "http://127.0.0.1:9100/token",
+	          "clientId": { "type": "env", "value": "OAS_REMOTE_CLIENT_ID" },
+	          "clientSecret": { "type": "env", "value": "OAS_REMOTE_CLIENT_SECRET" }
+	        }
+	      }
+	    }
+	  }
+	}`)
+
+	effective, err := config.LoadEffective(config.LoadOptions{ProjectPath: projectPath})
+	if err != nil {
+		t.Fatalf("LoadEffective returned error: %v", err)
+	}
+	if effective.Config.Runtime == nil || effective.Config.Runtime.Remote == nil {
+		t.Fatalf("expected remote runtime config to load")
+	}
+	if len(effective.Config.Sources) != 0 {
+		t.Fatalf("expected no local sources, got %#v", effective.Config.Sources)
+	}
+	if len(effective.Config.Services) != 0 {
+		t.Fatalf("expected no local services, got %#v", effective.Config.Services)
+	}
+}
+
 func TestDiscoverScopePaths(t *testing.T) {
 	root := t.TempDir()
 	managedDir := filepath.Join(root, "etc", "oas-cli")
@@ -194,6 +231,34 @@ func TestDiscoverScopePaths(t *testing.T) {
 	if paths[config.ScopeUser] != userPath {
 		t.Fatalf("expected user path %q, got %q", userPath, paths[config.ScopeUser])
 	}
+	if paths[config.ScopeProject] != projectPath {
+		t.Fatalf("expected project path %q, got %q", projectPath, paths[config.ScopeProject])
+	}
+	if paths[config.ScopeLocal] != localPath {
+		t.Fatalf("expected local path %q, got %q", localPath, paths[config.ScopeLocal])
+	}
+}
+
+func TestDiscoverScopePathsUsesExplicitProjectDirectoryForLocalScope(t *testing.T) {
+	root := t.TempDir()
+	projectDir := filepath.Join(root, "project")
+	workingDir := filepath.Join(root, "workspace")
+
+	for _, dir := range []string{projectDir, workingDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+
+	projectPath := writeJSON(t, projectDir, ".cli.json", `{"cli":"1.0.0","mode":{"default":"discover"}}`)
+	localPath := writeJSON(t, projectDir, ".cli.local.json", `{"runtime":{"server":{"auth":{"issuer":"project-local"}}}}`)
+	_ = writeJSON(t, workingDir, ".cli.local.json", `{"runtime":{"server":{"auth":{"issuer":"working-dir-local"}}}}`)
+
+	paths := config.DiscoverScopePaths(config.LoadOptions{
+		ProjectPath: projectPath,
+		WorkingDir:  workingDir,
+	})
+
 	if paths[config.ScopeProject] != projectPath {
 		t.Fatalf("expected project path %q, got %q", projectPath, paths[config.ScopeProject])
 	}

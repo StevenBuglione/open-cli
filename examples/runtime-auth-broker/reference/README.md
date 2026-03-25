@@ -14,6 +14,7 @@ The reference shape is:
 2. the broker issues a runtime token for audience `oclird`
 3. `oclird` validates that token with `validationProfile: "oidc_jwks"`
 4. runtime scopes such as `bundle:tickets` and `tool:tickets:listTickets` drive catalog filtering and execution authorization
+5. optional sub-agent delegation happens through the same broker boundary, with the broker minting a shorter-lived child token whose scopes are a subset of the parent runtime token
 
 The broker should expose:
 
@@ -22,6 +23,8 @@ The broker should expose:
 - `GET /authorize`
 - `POST /token`
 
+If you support delegated sub-agent execution, the existing `POST /token` surface should also accept a token-exchange style request from the delegating client or orchestration layer. The parent runtime token is presented to the broker, the requested child scope set is subset-checked, and the broker returns another runtime-compatible token for `oclird`.
+
 The broker-issued runtime token should preserve these normalized claims:
 
 - `iss`
@@ -29,6 +32,8 @@ The broker-issued runtime token should preserve these normalized claims:
 - `sub` or `client_id`
 - `scope`
 - `exp`
+
+Delegated child tokens use the same runtime contract. They may additionally carry lineage claims such as `act`, `delegated_by`, or a delegation ID for broker-side auditability, but `oclird` authorization still comes from the runtime-compatible scope set on the token itself.
 
 See:
 

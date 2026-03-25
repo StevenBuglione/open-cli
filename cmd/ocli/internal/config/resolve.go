@@ -17,25 +17,27 @@ import (
 
 // Options holds the fully-resolved command options used throughout the CLI.
 type Options struct {
-	RuntimeURL        string
-	RuntimeDeployment string
-	RuntimeToken      string
-	RuntimeAuth       *runtimepkg.TokenSession
-	ConfigPath        string
-	Mode              string
-	AgentProfile      string
-	Format            string
-	Approval          bool
-	InstanceID        string
-	SessionID         string
-	HeartbeatEnabled  bool
-	ConfigFingerprint string
-	StateDir          string
-	Embedded          bool
-	Demo              bool
-	Stdin             io.Reader
-	Stdout            io.Writer
-	Stderr            io.Writer
+	RuntimeURL               string
+	RuntimeDeployment        string
+	RuntimeRequestConfigPath string
+	RuntimeToken             string
+	RuntimeAuth              *runtimepkg.TokenSession
+	ConfigPath               string
+	Mode                     string
+	AgentProfile             string
+	AuthActorID              string
+	Format                   string
+	Approval                 bool
+	InstanceID               string
+	SessionID                string
+	HeartbeatEnabled         bool
+	ConfigFingerprint        string
+	StateDir                 string
+	Embedded                 bool
+	Demo                     bool
+	Stdin                    io.Reader
+	Stdout                   io.Writer
+	Stderr                   io.Writer
 }
 
 const defaultRuntimeURL = "http://127.0.0.1:8765"
@@ -47,6 +49,7 @@ type ResolveHooks struct {
 	ResolveRuntimeDeployment  func(Options) string
 	ResolveLocalInstanceID    func(Options, configpkg.LocalRuntimeConfig) string
 	ResolveLocalSessionID     func(Options, configpkg.LocalRuntimeConfig) string
+	ResolveAgentSessionID     func() string
 	ResolveInstancePaths      func(Options) (instance.Paths, error)
 	ResolveRuntimeURLFromInst func(Options) (string, bool, error)
 	StartManagedRuntime       func(Options) (string, error)
@@ -157,6 +160,9 @@ func ResolveCommandOptions(options Options, hooks ResolveHooks) (Options, error)
 	if options.StateDir == "" {
 		options.StateDir = os.Getenv("OCLI_STATE_DIR")
 	}
+	if options.AuthActorID == "" && hooks.ResolveAgentSessionID != nil {
+		options.AuthActorID = hooks.ResolveAgentSessionID()
+	}
 	if !options.Demo && options.Embedded {
 		return options, fmt.Errorf("embedded mode is not supported for normal configs")
 	}
@@ -189,6 +195,9 @@ func ResolveCommandOptions(options Options, hooks ResolveHooks) (Options, error)
 			options.SessionID = options.InstanceID
 		}
 	}
+	if options.RuntimeDeployment != "remote" {
+		options.RuntimeRequestConfigPath = options.ConfigPath
+	}
 	if options.Embedded {
 		return options, nil
 	}
@@ -207,8 +216,11 @@ func ResolveCommandOptions(options Options, hooks ResolveHooks) (Options, error)
 				return options, pathsErr
 			}
 			token, session, err := authpkg.ResolveToken(authpkg.TokenResolveOptions{
-				RuntimeURL: options.RuntimeURL,
-				StateDir:   paths.StateDir,
+				RuntimeURL:   options.RuntimeURL,
+				StateDir:     paths.StateDir,
+				ConfigPath:   options.RuntimeRequestConfigPath,
+				AgentProfile: options.AgentProfile,
+				ActorID:      options.AuthActorID,
 			}, *runtimeCfg.Remote.OAuth)
 			if err != nil {
 				return options, err

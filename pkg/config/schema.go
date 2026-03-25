@@ -259,6 +259,12 @@ func validateRuntimeConfig(cfg Config) error {
 				})
 			}
 		}
+		if oauth.Delegation != nil && oauth.Delegation.Enabled && oauth.Mode == "providedToken" && oauth.Delegation.TokenExchangeURL == "" {
+			diagnostics = append(diagnostics, Diagnostic{
+				Path:    "runtime.remote.oauth.delegation.tokenExchangeURL",
+				Message: "required when runtime.remote.oauth.mode is providedToken and delegation is enabled",
+			})
+		}
 	}
 	if cfg.Runtime.Server != nil && cfg.Runtime.Server.Auth != nil {
 		auth := cfg.Runtime.Server.Auth

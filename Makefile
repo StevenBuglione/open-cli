@@ -12,10 +12,10 @@ build:
 verify: fmt test build
 
 verify-spec:
-	cd spec && python3 -m pip install -q -r requirements.txt && python3 scripts/validate_examples.py
+	python3 devtools/bootstrap_python_env.py --requirements spec/requirements.txt -- .venv/bin/python3 spec/scripts/validate_examples.py
 
 verify-conformance:
-	cd conformance && python3 -m pip install -q -r requirements.txt && python3 scripts/run_conformance.py --schema-root ../spec/schemas
+	python3 devtools/bootstrap_python_env.py --requirements conformance/requirements.txt -- .venv/bin/python3 conformance/scripts/run_conformance.py --schema-root spec/schemas
 
 verify-all: verify verify-spec verify-conformance
 

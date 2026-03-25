@@ -91,6 +91,7 @@ These caveats have direct compliance implications:
 - **Durability** — best-effort `fsync` means crash or power loss could cause the final few events to be lost. If you need guaranteed write durability, mount the audit path on a storage layer with its own durability guarantees.
 - **Query / filtering** — the HTTP endpoint returns the full file content. For large deployments, reading and filtering on disk is more practical than polling the HTTP endpoint.
 - **Token revocation coverage** — the audit log records auth events at validation time. It does not record post-issuance revocation because revocation is not implemented. Events in the log do not prove the token was still valid when read back later.
+- **Delegation lineage** — if you use delegated child tokens, include lineage claims such as `act`, `delegated_by`, or a delegation ID in the broker-issued token and retain broker/gateway audit logs. The current runtime audit log records the resolved principal and runtime decision, but it does not emit dedicated delegation-lineage fields.
 
 ## If you are trying to…
 

@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -139,5 +140,63 @@ func TestAuthenticateRequestRejectsOIDCJWKSTokenWithoutPrincipalIdentity(t *test
 	}
 	if authErr.Message != "oidc_jwks token must contain sub or client_id" {
 		t.Fatalf("expected missing principal identity error, got %q", authErr.Message)
+	}
+}
+
+func TestAuthenticateRequestCapturesOIDCJWKSDelegationLineage(t *testing.T) {
+	issuer := newOIDCJWKSInternalTestIssuer(t)
+	server := NewServer(Options{})
+	request := httptest.NewRequest(http.MethodGet, "/v1/catalog/effective", nil)
+	request.Header.Set("Authorization", "Bearer "+issuer.signToken(t, map[string]any{
+		"sub":           "subagent:triage-01",
+		"aud":           "oclird",
+		"scope":         "bundle:tickets profile:sandbox",
+		"delegated_by":  "github:user-123",
+		"delegation_id": "delegation-123",
+		"act": map[string]string{
+			"sub":       "github:user-123",
+			"client_id": "ocli-browser",
+			"actor_id":  "lead-agent",
+		},
+		"exp": time.Now().Add(time.Hour).Unix(),
+	}))
+	cfg := config.Config{
+		Runtime: &config.RuntimeConfig{
+			Server: &config.RuntimeServerConfig{
+				Auth: &config.RuntimeServerAuthConfig{
+					ValidationProfile: "oidc_jwks",
+					Issuer:            issuer.issuer,
+					JWKSURL:           issuer.jwksURL,
+					Audience:          "oclird",
+				},
+			},
+		},
+	}
+
+	result, err := server.authenticateRequest(context.Background(), request, cfg)
+	if err != nil {
+		t.Fatalf("authenticate delegated token: %v", err)
+	}
+	if result.Principal != "subagent:triage-01" {
+		t.Fatalf("expected delegated subject principal, got %#v", result.Principal)
+	}
+	if !reflect.DeepEqual(result.Scopes, []string{"bundle:tickets", "profile:sandbox"}) {
+		t.Fatalf("expected scopes from delegated token, got %#v", result.Scopes)
+	}
+	if result.Lineage == nil {
+		t.Fatal("expected delegation lineage on auth result")
+	}
+	if result.Lineage.DelegatedBy != "github:user-123" {
+		t.Fatalf("expected delegated_by lineage, got %#v", result.Lineage)
+	}
+	if result.Lineage.DelegationID != "delegation-123" {
+		t.Fatalf("expected delegation_id lineage, got %#v", result.Lineage)
+	}
+	if !reflect.DeepEqual(result.Lineage.Actor, map[string]string{
+		"sub":       "github:user-123",
+		"client_id": "ocli-browser",
+		"actor_id":  "lead-agent",
+	}) {
+		t.Fatalf("expected act lineage map, got %#v", result.Lineage.Actor)
 	}
 }

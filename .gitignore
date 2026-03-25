@@ -1,6 +1,15 @@
 .worktrees/
 .cli.local.json
+.cli.browser.local.json
+.authentik.local.env
+.authentik.docker.env
+.browser-login/
+.kiro/
+.vscode/
+/config/.cli.authentik.local.json
 /bin/
 dist/
 .cache/
 coverage.out
+__pycache__/
+*.pyc
