@@ -15,7 +15,7 @@ From the repo root:
 
 ```bash
 go test ./...
-go build ./cmd/ocli ./cmd/oclird
+go build ./cmd/ocli ./cmd/open-cli-toolbox
 ```
 
 Repository convenience targets:
@@ -28,7 +28,7 @@ Current `make verify` runs:
 
 - `gofmt -w $(find . -name '*.go' -print)`
 - `go test ./...`
-- `go build ./cmd/ocli ./cmd/oclird`
+- `go build ./cmd/ocli ./cmd/open-cli-toolbox`
 
 ## Docs verification
 
@@ -118,7 +118,7 @@ No containers are started and no network traffic occurs. If either compose file 
 ## Useful targeted test entry points
 
 - config merge/validation: `go test ./pkg/config -run TestLoadEffective`
-- CLI runtime resolution and embedded mode: `go test ./cmd/ocli -run TestRootCommand`
+- CLI runtime resolution and remote-only guardrails: `go test ./cmd/ocli -run TestRootCommand`
 - runtime HTTP API and auth/policy flows: `go test ./internal/runtime -run TestServer`
 - discovery and catalog integration: `go test ./pkg/catalog -run TestBuild`
 

@@ -64,7 +64,7 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 	if err != nil {
 		return nil, FormatError(err,
 			"Could not create runtime client",
-			"Check --runtime URL or start the daemon with oclird")
+			"Check --runtime or configure a reachable open-cli-toolbox server")
 	}
 
 	var response runtimepkg.CatalogResponse
@@ -81,8 +81,8 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 			runtimeUnavailable = true
 		} else {
 			return nil, FormatError(catalogErr,
-				"The runtime daemon returned an error when loading the catalog",
-				"Check your .cli.json config or run 'ocli --demo' to try the built-in demo")
+				"The remote runtime returned an error when loading the catalog",
+				"Check your remote runtime configuration and open-cli-toolbox deployment")
 		}
 	}
 
@@ -105,25 +105,8 @@ func NewRootCommand(options cfgpkg.Options, args []string, hooks RootHooks) (*co
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Getting started:")
 		fmt.Fprintln(w, "  ocli init <url>    Set up a new configuration from an API spec")
-		fmt.Fprintln(w, "  ocli --demo        Try ocli with a built-in demo API")
+		fmt.Fprintln(w, "  ocli status        Check connectivity to your remote open-cli-toolbox server")
 		return nil
-	}
-
-	if options.RuntimeDeployment == "local" && options.HeartbeatEnabled && options.SessionID != "" {
-		root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
-			if !hooks.ShouldSendHeartbeat(cmd) {
-				return nil
-			}
-			_, err := client.Heartbeat(options.SessionID)
-			return err
-		}
-		root.PersistentPostRunE = func(cmd *cobra.Command, _ []string) error {
-			if !hooks.ShouldSendHeartbeat(cmd) {
-				return nil
-			}
-			_, err := client.Heartbeat(options.SessionID)
-			return err
-		}
 	}
 	root.SetOut(options.Stdout)
 	root.SetErr(options.Stderr)

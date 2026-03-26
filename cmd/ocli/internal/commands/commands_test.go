@@ -458,7 +458,7 @@ func TestSearchCommandRuntimeUnavailable(t *testing.T) {
 	if strings.Contains(err.Error(), "--embedded") {
 		t.Fatalf("unexpected embedded guidance: %v", err)
 	}
-	if !strings.Contains(err.Error(), "Start the daemon with oclird") {
+	if !strings.Contains(err.Error(), "Check the configured open-cli-toolbox runtime URL") {
 		t.Fatalf("expected daemon guidance, got: %v", err)
 	}
 }
@@ -483,7 +483,7 @@ func TestRootCommandRuntimeClientErrorDoesNotSuggestEmbedded(t *testing.T) {
 	if strings.Contains(err.Error(), "--embedded") {
 		t.Fatalf("unexpected embedded guidance: %v", err)
 	}
-	if !strings.Contains(err.Error(), "start the daemon with oclird") {
+	if !strings.Contains(err.Error(), "configure a reachable open-cli-toolbox server") {
 		t.Fatalf("expected daemon guidance, got: %v", err)
 	}
 }
@@ -1192,7 +1192,7 @@ func TestStatusCommandTerminalRuntimeUnavailableDoesNotSuggestEmbedded(t *testin
 	if strings.Contains(output, "--embedded") {
 		t.Fatalf("unexpected embedded guidance: %s", output)
 	}
-	if !strings.Contains(output, "Start the daemon with oclird") {
+	if !strings.Contains(output, "Check the remote open-cli-toolbox URL and deployment") {
 		t.Fatalf("expected daemon guidance, got: %s", output)
 	}
 }
@@ -1635,7 +1635,7 @@ func TestAuthLoginRuntimeUnavailableDoesNotSuggestEmbedded(t *testing.T) {
 	if strings.Contains(err.Error(), "--embedded") {
 		t.Fatalf("unexpected embedded guidance: %v", err)
 	}
-	if !strings.Contains(err.Error(), "Start the daemon with oclird") {
+	if !strings.Contains(err.Error(), "Check the configured open-cli-toolbox runtime URL") {
 		t.Fatalf("expected daemon guidance, got: %v", err)
 	}
 }
@@ -1656,7 +1656,7 @@ func TestAuthLoginRuntimeInfoErrorDoesNotSuggestEmbedded(t *testing.T) {
 	if strings.Contains(err.Error(), "--embedded") {
 		t.Fatalf("unexpected embedded guidance: %v", err)
 	}
-	if !strings.Contains(err.Error(), "start the daemon with oclird") {
+	if !strings.Contains(err.Error(), "Check the configured open-cli-toolbox runtime URL") {
 		t.Fatalf("expected daemon guidance, got: %v", err)
 	}
 }

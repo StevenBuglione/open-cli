@@ -18,7 +18,7 @@ const paths: PersonaPath[] = [
     title: 'First run',
     audience: 'End users · agent authors',
     description:
-      'You want commands that work. Start with the quickstart, understand the two binaries, then run your first tool.',
+      'You want commands that work. Start with the quickstart, understand the two binaries, then connect ocli to a hosted runtime.',
     links: [
       {label: 'Choose your path', href: '/docs/getting-started/choose-your-path'},
       {label: 'Quickstart', href: '/docs/getting-started/quickstart'},
@@ -30,7 +30,7 @@ const paths: PersonaPath[] = [
     title: 'Runtime depth',
     audience: 'Operators · developers',
     description:
-      'You are configuring a reusable daemon, hardening a deployment, or wiring up auth, policy, and overlays.',
+      'You are hosting open-cli-toolbox, hardening a deployment, or wiring up auth, policy, and overlays for shared use.',
     links: [
       {label: 'Deployment models', href: '/docs/runtime/deployment-models'},
       {label: 'Configuration overview', href: '/docs/configuration/overview'},
@@ -42,7 +42,7 @@ const paths: PersonaPath[] = [
     title: 'Enterprise evaluation',
     audience: 'Security reviewers · procurement',
     description:
-      'You need a reviewable evidence package: real auth proof, reproducible test artifacts, auditability, and known gaps.',
+      'You need a reviewable evidence package: hosted-runtime auth proof, reproducible test artifacts, auditability, and known gaps.',
     links: [
       {label: 'Enterprise overview', href: '/docs/enterprise/overview'},
       {label: 'Adoption checklist', href: '/docs/enterprise/adoption-checklist'},
@@ -62,8 +62,8 @@ export default function PersonaPaths(): ReactNode {
             Choose the path that matches why you are here
           </Heading>
           <p>
-            Each path links to the first doc that matters for your role — no
-            hunting through unrelated sections.
+            Each path links to the first doc that matters for your role — no hunting
+            through unrelated sections.
           </p>
         </div>
         <div className={styles.grid3}>

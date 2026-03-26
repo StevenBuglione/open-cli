@@ -53,9 +53,7 @@ fleet-matrix-ci:
 	rm -rf $(FLEET_OUTPUT_DIR)
 	python3 ../devtools/bootstrap_python_env.py --venv ../.venv --requirements requirements.txt -- \
 	  ../.venv/bin/python3 scripts/run-agent-campaign.py --matrix $(FLEET_MATRIX) \
-	  --lane local-daemon-core \
-	  --lane local-daemon-process \
-	  --lane remote-runtime-oauth-client \
+			  --lane remote-runtime-oauth-client \
 	  --lane remote-runtime-auth-failures \
 	  --lane mcp-stdio-core \
 	  --lane remote-api-core \

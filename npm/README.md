@@ -1,10 +1,10 @@
 # @sbuglione/open-cli
 
-> Turn OpenAPI descriptions and MCP servers into a local, policy-aware command surface.
+> Remote-only API and MCP command tooling with an operator-hosted open-cli-toolbox runtime server.
 
 ## What is open-cli?
 
-**open-cli** (`ocli`) converts OpenAPI specs and MCP server definitions into executable CLI commands, so you can explore, test, and audit APIs from your terminal. A companion daemon (`oclird`) runs alongside to manage runtime state and policy evaluation.
+**open-cli** (`ocli`) converts OpenAPI specs and MCP server definitions into executable CLI commands, so you can explore, test, and audit APIs from your terminal. `ocli` always connects to a separately hosted runtime server (`open-cli-toolbox`), which handles catalog execution, token-scoped tool exposure, policy evaluation, and enterprise deployment concerns.
 
 ## Platform Support
 
@@ -22,7 +22,7 @@ npm install -g @sbuglione/open-cli
 
 ### What happens during install
 
-The `postinstall` script automatically downloads the correct pre-built `ocli` and `oclird` binaries for your platform from [GitHub Releases](https://github.com/StevenBuglione/open-cli/releases). No compiler or Go toolchain is needed.
+The `postinstall` script automatically downloads the correct pre-built `ocli` and `open-cli-toolbox` binaries for your platform from [GitHub Releases](https://github.com/StevenBuglione/open-cli/releases). No compiler or Go toolchain is needed.
 
 ## Quick Start
 
@@ -30,12 +30,14 @@ The `postinstall` script automatically downloads the correct pre-built `ocli` an
 # 1. Install globally
 npm install -g @sbuglione/open-cli
 
-# 2. Explore the built-in demo API
-ocli --demo
+# 2. Point ocli at your hosted runtime
+ocli --runtime https://toolbox.example.com
 
-# 3. Point at your own API
+# 3. Initialize your own API catalog
 ocli init <your-api>
 ```
+
+`ocli` does not embed a local execution daemon. Operators host `open-cli-toolbox`, secure it, and decide which tools are visible to each token.
 
 ## Troubleshooting
 

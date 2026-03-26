@@ -2,7 +2,7 @@
 
 This directory contains the official reference deployment for the brokered runtime auth contract using **Authentik as the broker**.
 
-Authentik is the worked example, **not** the requirement. Organizations can replace it with any broker or gateway that emits the same external contract expected by `ocli` and `oclird`.
+Authentik is the worked example, **not** the requirement. Organizations can replace it with any broker or gateway that emits the same external contract expected by `ocli` and the hosted `open-cli-toolbox` runtime.
 
 ## What this reference proves
 
@@ -14,13 +14,13 @@ The reference deployment covers two proof paths:
    - the browser redirects to Authentik
    - Authentik can federate to Microsoft Entra ID
    - Authentik issues the runtime token
-   - `oclird` validates the token and enforces scopes
+   - `open-cli-toolbox` validates the token and enforces scopes
 
 2. **Workload path (`oauthClient`)**
    - a workload authenticates to Authentik with client credentials
    - Authentik issues a runtime token
    - `ocli` acquires that token before runtime requests
-   - `oclird` validates the token with `oidc_jwks`
+   - `open-cli-toolbox` validates the token with `oidc_jwks`
    - catalog visibility and execution remain fail-closed
 
 ## Validated Authentik facts
@@ -37,7 +37,7 @@ These details were verified against the repo-managed Authentik harness:
 Validated scope-mapping expression:
 
 ```python
-audience = "oclird"
+audience = "open-cli-toolbox"
 return {
     "scope": " ".join(token.scope),
     "aud": audience,
@@ -47,7 +47,7 @@ return {
 If you need a deliberate negative test audience:
 
 ```python
-audience = "wrong-audience" if "profile:wrong-audience" in token.scope else "oclird"
+audience = "wrong-audience" if "profile:wrong-audience" in token.scope else "open-cli-toolbox"
 return {
     "scope": " ".join(token.scope),
     "aud": audience,
@@ -81,7 +81,7 @@ Browser provider requirements:
 - redirect URI: `http://127.0.0.1:8787/callback`
 - client type: `public`
 - signing key: a key that is published through JWKS
-- runtime audience: `oclird`
+- runtime audience: `open-cli-toolbox`
 - runtime scopes: normalized values such as `bundle:tickets` and `tool:tickets:listTickets`
 
 Workload provider requirements:
@@ -89,10 +89,10 @@ Workload provider requirements:
 - client type: `confidential`
 - client credentials enabled for client-credentials token acquisition
 - signing key: a key that is published through JWKS
-- runtime audience: `oclird`
+- runtime audience: `open-cli-toolbox`
 - runtime scopes: normalized values such as `bundle:tickets` and `tool:tickets:listTickets`
 
-If you later need sub-agent delegation, treat Authentik as the identity-facing broker and add the delegated token-exchange behavior in a broker or gateway layer that can validate the parent runtime token, subset-check requested runtime scopes, and mint a shorter-lived child token that still matches the same `oclird` runtime contract.
+If you later need sub-agent delegation, treat Authentik as the identity-facing broker and add the delegated token-exchange behavior in a broker or gateway layer that can validate the parent runtime token, subset-check requested runtime scopes, and mint a shorter-lived child token that still matches the same `open-cli-toolbox` hosted runtime contract.
 
 Do **not** assume that you can keep one rendered config and only flip `runtime.remote.oauth.mode`. Authentik discovery and JWKS are provider-specific, so the browser and workload proofs need separate rendered configs when they use different provider types.
 
@@ -106,7 +106,7 @@ export AUTHENTIK_JWKS_URL="https://auth.example.com/application/o/ocli-runtime/j
 export AUTHENTIK_AUTHORIZATION_URL="https://auth.example.com/application/o/authorize/"
 export AUTHENTIK_TOKEN_URL="https://auth.example.com/application/o/token/"
 export AUTHENTIK_BROWSER_CLIENT_ID="ocli-browser"
-export RUNTIME_AUDIENCE="oclird"
+export RUNTIME_AUDIENCE="open-cli-toolbox"
 export RUNTIME_URL="https://runtime.example.com"
 
 envsubst < runtime.cli.json.tmpl > runtime.cli.json
@@ -120,7 +120,7 @@ Render `runtime.oauth-client.cli.json.tmpl` with your **confidential workload-pr
 export AUTHENTIK_ISSUER="https://auth.example.com/application/o/ocli-runtime-workload/"
 export AUTHENTIK_JWKS_URL="https://auth.example.com/application/o/ocli-runtime-workload/jwks/"
 export AUTHENTIK_TOKEN_URL="https://auth.example.com/application/o/token/"
-export RUNTIME_AUDIENCE="oclird"
+export RUNTIME_AUDIENCE="open-cli-toolbox"
 export RUNTIME_URL="https://runtime.example.com"
 
 envsubst < runtime.oauth-client.cli.json.tmpl > runtime.oauth-client.cli.json
@@ -142,13 +142,13 @@ The rendered workload file should look like this:
       "validationProfile": "oidc_jwks",
       "issuer": "https://auth.example.com/application/o/ocli-runtime-workload/",
       "jwksURL": "https://auth.example.com/application/o/ocli-runtime-workload/jwks/",
-      "audience": "oclird"
+      "audience": "open-cli-toolbox"
     }
   },
   "remote": {
     "oauth": {
       "mode": "oauthClient",
-      "audience": "oclird",
+      "audience": "open-cli-toolbox",
       "scopes": ["bundle:tickets", "tool:tickets:listTickets"],
       "client": {
         "tokenURL": "https://auth.example.com/application/o/token/",
@@ -160,9 +160,9 @@ The rendered workload file should look like this:
 }
 ```
 
-### 5. Configure the runtime server
+### 5. Configure the hosted runtime server
 
-`oclird` must validate the Authentik-issued runtime tokens:
+`open-cli-toolbox` must validate the Authentik-issued runtime tokens:
 
 ```json
 {
@@ -172,7 +172,7 @@ The rendered workload file should look like this:
         "validationProfile": "oidc_jwks",
         "issuer": "https://auth.example.com/application/o/ocli-runtime/",
         "jwksURL": "https://auth.example.com/application/o/ocli-runtime/jwks/",
-        "audience": "oclird",
+        "audience": "open-cli-toolbox",
         "authorizationURL": "https://auth.example.com/application/o/authorize/",
         "tokenURL": "https://auth.example.com/application/o/token/",
         "browserClientId": "ocli-browser"
@@ -228,7 +228,7 @@ Before claiming the deployment is ready, verify:
 - [ ] JWKS returns at least one signing key
 - [ ] the token endpoint returns a JWT for client credentials
 - [ ] the JWT contains `iss`, `aud`, `sub` or `client_id`, `scope`, and `exp`
-- [ ] `oclird` accepts a valid token and rejects invalid ones
+- [ ] `open-cli-toolbox` accepts a valid token and rejects invalid ones
 - [ ] `/v1/runtime/info` advertises `oidc_jwks`
 
 ## Entra federation

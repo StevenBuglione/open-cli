@@ -13,10 +13,10 @@ export default function Hero(): ReactNode {
           <span className={styles.heroTitleAccent}>end to end.</span>
         </Heading>
         <p className={clsx('hero__subtitle', styles.heroLead)}>
-          <strong>oclird</strong> discovers your APIs, normalises them, resolves
-          credentials, enforces policy, and writes an audit log — so{' '}
-          <strong>ocli</strong> and your agents always work against a clean,
-          governed catalog.
+          <strong>open-cli-toolbox</strong> is the hosted runtime that discovers APIs,
+          normalizes catalogs, resolves credentials, enforces policy, and writes audit
+          events. <strong>ocli</strong> is the thin client that renders commands and sends
+          execution requests into that remote boundary.
         </p>
         <div className={styles.heroButtons}>
           <Link

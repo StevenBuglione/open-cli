@@ -3,11 +3,11 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o oclird ./cmd/oclird
+RUN CGO_ENABLED=0 go build -o open-cli-toolbox ./cmd/open-cli-toolbox
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 WORKDIR /app
-COPY --from=builder /build/oclird /app/oclird
+COPY --from=builder /build/open-cli-toolbox /app/open-cli-toolbox
 EXPOSE 8765
-ENTRYPOINT ["/app/oclird"]
+ENTRYPOINT ["/app/open-cli-toolbox"]

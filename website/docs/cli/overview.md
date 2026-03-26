@@ -6,7 +6,7 @@ title: CLI Overview
 
 **Read this if** you are deploying or scripting `ocli` and need to understand its command shape, flag surface, and runtime dependency. This page answers: how are commands named, what flags exist everywhere, and why does `ocli --help` need a reachable runtime.
 
-`ocli` is a **runtime-backed CLI**. It does not ship a fixed set of service commands. Instead, it asks the runtime for the effective catalog, then builds a Cobra command tree from the returned services and tools.
+`ocli` is a **runtime-backed client**. It does not ship a fixed set of service commands. Instead, it asks `open-cli-toolbox` for the effective catalog, then builds a Cobra command tree from the returned services and tools.
 
 ## Command families
 
@@ -62,15 +62,14 @@ These flags exist on the root command and apply to built-in and dynamic commands
 
 | Flag | Meaning |
 | --- | --- |
-| `--runtime` | Runtime base URL. If omitted, `ocli` tries `OCLI_RUNTIME_URL`, then the instance registry, then `http://127.0.0.1:8765`. |
+| `--runtime` | Runtime base URL. If omitted, `ocli` tries `OCLI_RUNTIME_URL`, then `runtime.remote.url`, otherwise it errors. |
 | `--config` | Path to the project `.cli.json`. |
 | `--mode` | Requested mode, typically `discover` or `curated`. |
 | `--agent-profile` | Agent profile name used for the selected effective view. |
 | `--format` | Output format: `json` (default), `yaml`, or `pretty`. |
 | `--approval` | Grants approval for tools that need it. |
-| `--instance-id` | Selects an isolated runtime instance. |
+| `--instance-id` | Selects an isolated runtime instance for cache, audit, and auth state. |
 | `--state-dir` | Overrides the state root used for runtime metadata and derived cache paths. |
-| `--embedded` | Uses an in-process runtime instead of an external daemon. |
 
 ## Output behavior
 
@@ -89,14 +88,14 @@ These flags exist on the root command and apply to built-in and dynamic commands
 Safe help patterns:
 
 ```bash
-# embedded mode
-./bin/ocli --embedded --config ./.cli.json --help
-
-# external daemon mode
+# explicit runtime URL
 ./bin/ocli --runtime http://127.0.0.1:8765 --config ./.cli.json --help
+
+# config-driven runtime URL
+./bin/ocli --config ./.cli.json --help
 ```
 
-By contrast, `oclird --help` is static because it uses Go's `flag` package and does not fetch a catalog.
+By contrast, `open-cli-toolbox --help` is static because it uses Go's `flag` package and does not fetch a catalog.
 
 ## Supported HTTP operations
 
@@ -124,4 +123,4 @@ Do not assume that `HEAD`, `OPTIONS`, or `TRACE` operations become CLI tools in 
 
 - Use [Catalog and explain](./catalog-and-explain) to inspect the catalog.
 - Use [Tool execution](./tool-execution) for request mapping rules.
-- Use [Deployment models](../runtime/deployment-models) to understand runtime resolution and embedded mode.
+- Use [Deployment models](../runtime/deployment-models) to understand hosted runtime deployment and resolution.

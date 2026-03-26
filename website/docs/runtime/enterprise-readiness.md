@@ -12,7 +12,7 @@ Before reading the detail sections, understand where each capability claim sits:
 
 | Claim | Proof type | What backs it |
 |---|---|---|
-| Deployment models (embedded / local / remote) | CI-reproducible | Fleet matrix lanes |
+| Hosted runtime deployment on localhost or shared infra | CI-reproducible | Fleet matrix lanes |
 | Runtime bearer auth, scope filtering, execution denial | CI-reproducible | Fleet matrix + Authentik product test |
 | Auth failure paths (missing, expired, tampered tokens) | CI-reproducible | Fleet matrix `remote-runtime-auth-failures` lane |
 | Authentik automated proof (`oauthClient`) | CI-reproducible | `capability_runtime_auth_authentik_test.go` |
@@ -29,7 +29,7 @@ This table is the answer to "what does the repo actually prove vs. what do I sti
 
 The repository already exposes concrete proof for:
 
-- deployment choices from embedded mode to reusable local daemon to remote runtime
+- hosted runtime deployment from localhost evaluation to brokered remote hosting
 - runtime bearer auth enforced server-side through `runtime.server.auth`
 - scoped catalog filtering and execution denial at the runtime boundary
 - reproducible fleet validation for CI-safe lanes
@@ -46,7 +46,7 @@ Read:
 - [Runtime overview](./overview)
 - [Security overview](../security/overview)
 
-This establishes where the runtime runs, what the default localhost safety model is, and when you should enable runtime auth.
+This establishes where the runtime runs, how `ocli` reaches it, and when you should enable runtime auth.
 
 ### 2. Runtime auth proof
 
@@ -83,8 +83,8 @@ These pages explain what operators can inspect after execution and how separate 
 
 By the time you finish the pages above, you should be able to answer:
 
-- which deployment model fits a workstation, CI runner, or hosted runtime
-- how remote callers authenticate to `oclird`
+- which hosted runtime topology fits a workstation, CI runner, or shared deployment
+- how remote callers authenticate to `open-cli-toolbox`
 - how runtime scopes limit what a caller can see and execute
 - what proof is reproducible in CI versus what needs a live external environment
 - what logs and artifacts remain after a fleet validation run

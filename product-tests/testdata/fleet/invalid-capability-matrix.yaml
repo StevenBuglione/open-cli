@@ -1,6 +1,6 @@
 lanes:
   - workstream: product-validation
-    capability: local-daemon
+    capability: remote-runtime
     capabilityFamily: mode
     environmentClass: ci-containerized
     authPattern: none

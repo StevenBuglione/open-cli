@@ -264,6 +264,9 @@ paths:
 		configPath := writeFile(t, dir, ".cli.json", `{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "protectedSource": {
       "type": "openapi",
@@ -367,6 +370,9 @@ paths:
 		configPath := writeFile(t, dir, ".cli.json", `{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "protectedSource": {
       "type": "openapi",
@@ -532,6 +538,9 @@ paths:
 		configPath := writeFile(t, dir, ".cli.json", `{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "protectedSource": {
       "type": "openapi",
@@ -609,6 +618,9 @@ paths:
 		configPath := writeFile(t, dir, ".cli.json", `{
   "cli": "1.0.0",
   "mode": { "default": "curated" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "protectedSource": {
       "type": "openapi",
@@ -677,6 +689,9 @@ paths:
 		configPath := writeFile(t, dir, ".cli.json", `{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "protectedSource": {
       "type": "openapi",

@@ -1,5 +1,5 @@
 // Package helpers provides utilities for product-test scenarios that
-// require fully-isolated oclird runtime instances.
+// require fully-isolated open-cli-toolbox runtime instances.
 package helpers
 
 import (

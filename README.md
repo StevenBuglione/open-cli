@@ -1,6 +1,6 @@
 # open-cli
 
-**`ocli`** and **`oclird`** turn OpenAPI descriptions and MCP servers into a local, policy-aware command surface. Discovery, auth resolution, policy enforcement, and audit logging happen inside the runtime — not spread across callers.
+**`ocli`** and **`open-cli-toolbox`** turn OpenAPI descriptions and MCP servers into a remote-only, policy-aware command surface. Discovery, auth resolution, policy enforcement, token-scoped tool exposure, and audit logging happen inside the hosted runtime boundary — not spread across callers.
 
 This is the Go reference implementation of the [Open CLI specification](spec/).
 
@@ -16,7 +16,7 @@ This is the Go reference implementation of the [Open CLI specification](spec/).
 npm install -g @sbuglione/open-cli
 ```
 
-This installs both `ocli` and `oclird` globally. The package automatically downloads the correct binary for your platform (macOS, Linux, Windows — x64 and arm64).
+This installs both `ocli` and `open-cli-toolbox` globally. The package automatically downloads the correct binaries for your platform (macOS, Linux, Windows — x64 and arm64).
 
 ### Download a release binary
 
@@ -28,31 +28,25 @@ Requires Go 1.25.1+:
 
 ```bash
 go install github.com/StevenBuglione/open-cli/cmd/ocli@latest
-go install github.com/StevenBuglione/open-cli/cmd/oclird@latest
+go install github.com/StevenBuglione/open-cli/cmd/open-cli-toolbox@latest
 ```
 
 ---
 
-## Two binaries, one execution model
+## Two binaries, one remote-only model
 
 The project ships two binaries with a deliberate split:
 
 | Binary | Role |
 |--------|------|
-| `ocli` | Operator-facing CLI. Renders the effective catalog, exposes dynamic commands derived from your OpenAPI or MCP sources, and forwards execution requests. |
-| `oclird` | Runtime daemon. Loads config, performs discovery, normalizes catalogs, resolves auth, enforces policy, executes upstream HTTP requests, and records audit events. |
+| `ocli` | Operator-facing CLI. Renders the effective catalog, exposes dynamic commands derived from your OpenAPI or MCP sources, and forwards execution requests to the hosted runtime. |
+| `open-cli-toolbox` | Runtime server. Loads config, performs discovery, normalizes catalogs, resolves auth, enforces policy, executes upstream HTTP requests, and records audit events. |
 
-`ocli` always needs a runtime. In **embedded mode** it starts one in-process — no separate process required. In **local daemon mode** it connects to a running `oclird`. In either case the same runtime server logic executes.
+`ocli` always needs a remote runtime. `open-cli-toolbox` is that standalone server boundary: operators host it, secure it, and point `ocli` at it with `--runtime` or `runtime.remote.url`.
 
 ---
 
 ## Quick Start
-
-### Try the demo (no setup needed)
-
-    ocli --demo catalog list --format pretty
-
-This uses a built-in sample API to show how open-cli works.
 
 ### Set up your own API
 
@@ -70,6 +64,12 @@ Create a minimal `.cli.json` pointing at an OpenAPI document:
 {
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote",
+    "remote": {
+      "url": "https://toolbox.example.com"
+    }
+  },
   "sources": {
     "ticketsSource": {
       "type": "openapi",
@@ -86,64 +86,58 @@ Create a minimal `.cli.json` pointing at an OpenAPI document:
 }
 ```
 
-Inspect the catalog — no daemon, no upstream calls:
+Inspect the catalog through your hosted runtime:
 
 ```bash
-ocli --embedded --config ./.cli.json catalog list --format pretty
+ocli --config ./.cli.json catalog list --format pretty
 ```
 
-This prints the normalized catalog: service aliases, tools, and generated command names derived from your OpenAPI document. Nothing contacts any upstream service.
+This prints the normalized catalog visible through the hosted runtime: service aliases, tools, and generated command names derived from your OpenAPI document.
 
 Inspect a specific tool before executing it:
 
 ```bash
-ocli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
-ocli --embedded --config ./.cli.json explain tickets:listTickets --format pretty
+ocli --config ./.cli.json tool schema tickets:listTickets --format pretty
+ocli --config ./.cli.json explain tickets:listTickets --format pretty
 ```
 
 Preview the generated command tree:
 
 ```bash
-ocli --embedded --config ./.cli.json helpdesk tickets --help
+ocli --config ./.cli.json helpdesk tickets --help
 ```
 
 For a complete walkthrough including a sample OpenAPI document, see the [quickstart](https://open-cli.dev/docs/getting-started/quickstart).
 
 ---
 
-## Deployment modes
+## Runtime deployment
 
-| Mode | Description | When to use |
-|------|-------------|-------------|
-| **Embedded** | Runtime runs in-process per invocation. No daemon required. | Local dev, scripting, CI |
-| **Local daemon** | Single `oclird` shared across CLI invocations. Warmed catalog cache. | Local MCP servers, persistent session, shared cache |
-| **Remote runtime** | Centrally hosted `oclird` with network-controlled access. | Team-shared enforcement point, brokered access control |
+`open-cli-toolbox` is the only supported runtime deployment target.
 
-**Starting a local daemon:**
+You can host it anywhere you control. The example below uses localhost to illustrate the split, but it is still the same remote runtime contract that production deployments expose:
 
 ```bash
-oclird --config ./.cli.json --addr 127.0.0.1:8765
+open-cli-toolbox --config ./.cli.json --addr 127.0.0.1:8765
 
 # In another shell:
 ocli --runtime http://127.0.0.1:8765 --config ./.cli.json catalog list --format pretty
 ```
 
-**Config-driven selection** — avoid flags by declaring mode in `.cli.json`:
+**Config-driven selection** — avoid flags by declaring the remote runtime in `.cli.json`:
 
 ```json
 {
   "runtime": {
-    "mode": "auto",
-    "local": {
-      "sessionScope": "terminal",
-      "shutdown": "when-owner-exits",
-      "share": "exclusive"
+    "mode": "remote",
+    "remote": {
+      "url": "http://127.0.0.1:8765"
     }
   }
 }
 ```
 
-`mode: auto` stays embedded unless local MCP sources are present, in which case `ocli` promotes to local-daemon mode automatically. Managed local runtimes register a session lease and shut down when the owning session exits.
+Manual config can still be restrictive, but runtime reachability and tool exposure are resolved from the hosted runtime plus the token scopes it accepts.
 
 ---
 
@@ -153,7 +147,7 @@ Auth and policy enforcement live inside the runtime, not in the CLI layer.
 
 **Per-request auth resolution** — OpenAPI `oauth2` and `openIdConnect` flows; MCP `streamable-http` with `clientCredentials` OAuth and `headerSecrets`; MCP transports `stdio`, legacy `sse`, and `streamable-http`; per-instance token caching under the runtime state directory.
 
-**Remote runtime bearer auth** — when `oclird` is deployed with `runtime.server.auth` configured, it:
+**Remote runtime bearer auth** — when `open-cli-toolbox` is deployed with `runtime.server.auth` configured, it:
 
 - validates bearer tokens against `oidc_jwks` or `oauth2_introspection`
 - filters the visible catalog by `bundle:*`, `profile:*`, and `tool:*` scopes
@@ -176,7 +170,7 @@ Remote client auth modes — `providedToken` (forward a bearer token from an env
 | Goal | Link |
 |------|------|
 | Quickstart with a sample OpenAPI document | [Quickstart](https://open-cli.dev/docs/getting-started/quickstart) |
-| Choose embedded, local daemon, or remote runtime | [Deployment models](https://open-cli.dev/docs/runtime/deployment-models) |
+| Understand the hosted runtime model | [Deployment models](https://open-cli.dev/docs/runtime/deployment-models) |
 | Configuration reference | [Configuration overview](https://open-cli.dev/docs/configuration/overview) |
 | Full CLI command model | [CLI overview](https://open-cli.dev/docs/cli/overview) |
 | Auth, policy, and secret sources | [Security overview](https://open-cli.dev/docs/security/overview) |
@@ -188,8 +182,8 @@ Remote client auth modes — `providedToken` (forward a bearer token from an env
 ## Repository layout
 
 ```
-cmd/ocli        CLI entrypoint and runtime client
-cmd/oclird      Daemon entrypoint
+cmd/ocli              CLI entrypoint and runtime client
+cmd/open-cli-toolbox  Hosted runtime entrypoint
 internal/runtime  Runtime HTTP API and wiring
 pkg/              Config, discovery, catalog, policy, execution, caching, audit, observability
 spec/             Normative Open CLI specification and JSON schemas (single source of truth)
@@ -215,7 +209,7 @@ Spec and conformance targets create a `.venv` and install Python dependencies au
 
 ```bash
 make product-test-smoke  # validate infra configs only, no services started (runs in CI)
-make product-test-full   # bring up services and run all capability tests (requires Docker)
+make product-test-full   # current full-lane placeholder: smoke + service bring-up/tear-down (requires Docker)
 ```
 
 **Docs site** — when `website/` or repo-facing docs change:

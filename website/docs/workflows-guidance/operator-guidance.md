@@ -89,5 +89,5 @@ A practical setup is:
 
 - keep security scheme names stable so `secrets` mappings do not break
 - prefer env/file/keychain secrets over `exec` unless necessary
-- bind `oclird` to localhost unless you have external protections
+- bind `open-cli-toolbox` to localhost for local evaluation, or put it behind runtime auth and external protections for shared use
 - test both `catalog list` and a real tool execution after changing auth or curation

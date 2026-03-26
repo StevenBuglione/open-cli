@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
   <title id="title">open-cli</title>
-  <desc id="desc">Stateless CLI plus local runtime for OpenAPI discovery, policy, and execution.</desc>
+  <desc id="desc">Remote-only CLI plus hosted runtime for OpenAPI discovery, policy, and execution.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#f7fbff" />
@@ -11,6 +11,6 @@
   <rect x="64" y="64" width="160" height="160" rx="24" fill="#255fb0" />
   <text x="144" y="165" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="52" font-weight="700" fill="#ffffff">OCLI</text>
   <text x="280" y="200" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="700" fill="#10233f">open-cli</text>
-  <text x="280" y="280" font-family="Inter, Arial, sans-serif" font-size="34" fill="#29415f">A stateless CLI and local runtime for OpenAPI discovery, policy, and execution.</text>
-  <text x="280" y="360" font-family="Inter, Arial, sans-serif" font-size="28" fill="#29415f">ocli renders commands • oclird discovers, authorizes, executes, and audits</text>
+  <text x="280" y="280" font-family="Inter, Arial, sans-serif" font-size="34" fill="#29415f">A remote-only CLI and hosted runtime for OpenAPI discovery, policy, and execution.</text>
+  <text x="280" y="360" font-family="Inter, Arial, sans-serif" font-size="28" fill="#29415f">ocli renders commands • open-cli-toolbox discovers, authorizes, executes, and audits</text>
 </svg>

@@ -6,13 +6,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$REPO_ROOT/product-tests/authentik/docker-compose.yml"
 BOOTSTRAP_SCRIPT="$SCRIPT_DIR/bootstrap-authentik.py"
 
-DAEMON_CONFIG_PATH="${OCLI_DAEMON_CONFIG_PATH:-$REPO_ROOT/config/.cli.authentik.local.json}"
+RUNTIME_CONFIG_PATH="${OCLI_RUNTIME_CONFIG_PATH:-${OCLI_DAEMON_CONFIG_PATH:-$REPO_ROOT/config/.cli.authentik.local.json}}"
 CONFIG_PATH="${OCLI_LOCAL_CONFIG_PATH:-$REPO_ROOT/.cli.local.json}"
 BROWSER_CONFIG_PATH="${OCLI_BROWSER_CONFIG_PATH:-$REPO_ROOT/.browser-login/.cli.json}"
 ENV_PATH="${OCLI_LOCAL_ENV_PATH:-$REPO_ROOT/.authentik.local.env}"
 DOCKER_ENV_PATH="${OCLI_DOCKER_ENV_PATH:-$REPO_ROOT/.authentik.docker.env}"
 AUTHENTIK_BASE_URL="${AUTHENTIK_BASE_URL:-http://127.0.0.1:9100}"
-DAEMON_AUTHENTIK_BASE_URL="${OCLI_DAEMON_AUTHENTIK_BASE_URL:-$(python3 - <<'PY' "$AUTHENTIK_BASE_URL"
+DEFAULT_RUNTIME_AUTHENTIK_BASE_URL="$(python3 - <<'PY' "$AUTHENTIK_BASE_URL"
 from urllib.parse import urlparse, urlunparse
 import sys
 
@@ -23,9 +23,10 @@ if hostname in {"127.0.0.1", "localhost"}:
     parsed = parsed._replace(netloc=netloc)
 print(urlunparse(parsed))
 PY
-)}"
+)"
+RUNTIME_AUTHENTIK_BASE_URL="${OCLI_RUNTIME_AUTHENTIK_BASE_URL:-${OCLI_DAEMON_AUTHENTIK_BASE_URL:-$DEFAULT_RUNTIME_AUTHENTIK_BASE_URL}}"
 RUNTIME_URL="${OCLI_RUNTIME_URL:-http://127.0.0.1:8765}"
-RUNTIME_AUDIENCE="${OCLI_RUNTIME_AUDIENCE:-oclird}"
+RUNTIME_AUDIENCE="${OCLI_RUNTIME_AUDIENCE:-open-cli-toolbox}"
 RUNTIME_SERVICE_ID="${OCLI_RUNTIME_SERVICE_ID:-testapi}"
 RUNTIME_EXTRA_SERVICE_IDS="${OCLI_RUNTIME_EXTRA_SERVICE_IDS:-}"
 RUNTIME_EXTRA_SCOPES="${OCLI_RUNTIME_EXTRA_SCOPES:-}"
@@ -203,7 +204,7 @@ browser_jwks_url="$(printf '%s' "$browser_discovery_json" | json_field jwks_uri)
 browser_token_url="$(printf '%s' "$browser_discovery_json" | json_field token_endpoint)"
 browser_authorization_url="$(printf '%s' "$browser_discovery_json" | json_field authorization_endpoint)"
 
-mkdir -p "$(dirname "$DAEMON_CONFIG_PATH")" "$(dirname "$CONFIG_PATH")" "$(dirname "$BROWSER_CONFIG_PATH")" "$(dirname "$ENV_PATH")" "$(dirname "$DOCKER_ENV_PATH")"
+mkdir -p "$(dirname "$RUNTIME_CONFIG_PATH")" "$(dirname "$CONFIG_PATH")" "$(dirname "$BROWSER_CONFIG_PATH")" "$(dirname "$ENV_PATH")" "$(dirname "$DOCKER_ENV_PATH")"
 
 python3 - <<'PY' "$ENV_PATH" "$client_id" "$client_secret"
 import pathlib
@@ -223,7 +224,7 @@ path.write_text(
 path.chmod(0o600)
 PY
 
-python3 - <<'PY' "$DAEMON_CONFIG_PATH" "$issuer" "$jwks_url" "$token_url" "$browser_authorization_url" "$browser_client_id" "$RUNTIME_AUDIENCE" "$RUNTIME_URL" "$RUNTIME_BUNDLE_SCOPE" "$RUNTIME_SERVICE_ID" "$OPENAPI_URI" "$REPO_ROOT" "$RUNTIME_EXTRA_SERVICE_IDS" "$BOOTSTRAP_EXTRA_SCOPES" "$DAEMON_AUTHENTIK_BASE_URL"
+python3 - <<'PY' "$RUNTIME_CONFIG_PATH" "$issuer" "$jwks_url" "$token_url" "$browser_authorization_url" "$browser_client_id" "$RUNTIME_AUDIENCE" "$RUNTIME_URL" "$RUNTIME_BUNDLE_SCOPE" "$RUNTIME_SERVICE_ID" "$OPENAPI_URI" "$REPO_ROOT" "$RUNTIME_EXTRA_SERVICE_IDS" "$BOOTSTRAP_EXTRA_SCOPES" "$RUNTIME_AUTHENTIK_BASE_URL"
 import json
 import os
 import pathlib
@@ -244,11 +245,11 @@ openapi_uri = sys.argv[11]
 repo_root = pathlib.Path(sys.argv[12]).resolve()
 extra_service_ids = [item for item in sys.argv[13].replace(",", " ").split() if item]
 extra_scopes = [item for item in sys.argv[14].split() if item]
-daemon_authentik_base_url = sys.argv[15]
+runtime_authentik_base_url = sys.argv[15]
 
 def remap_authentik_url(url: str) -> str:
     parsed = urlparse(url)
-    base = urlparse(daemon_authentik_base_url)
+    base = urlparse(runtime_authentik_base_url)
     return urlunparse(parsed._replace(scheme=base.scheme, netloc=base.netloc))
 
 def rendered_uri(config_path: pathlib.Path, uri: str) -> str:
@@ -410,26 +411,26 @@ config = {
 path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 PY
 
-python3 - <<'PY' "$DOCKER_ENV_PATH" "$DAEMON_CONFIG_PATH" "$REPO_ROOT/config"
+python3 - <<'PY' "$DOCKER_ENV_PATH" "$RUNTIME_CONFIG_PATH" "$REPO_ROOT/config"
 import pathlib
 import shlex
 import sys
 
 path = pathlib.Path(sys.argv[1])
-daemon_config_path = pathlib.Path(sys.argv[2]).resolve()
+runtime_config_path = pathlib.Path(sys.argv[2]).resolve()
 mounted_config_dir = pathlib.Path(sys.argv[3]).resolve()
 try:
-    relative_config_path = daemon_config_path.relative_to(mounted_config_dir)
+    relative_config_path = runtime_config_path.relative_to(mounted_config_dir)
 except ValueError as exc:
-    raise SystemExit(f"daemon config path must live under {mounted_config_dir}: {daemon_config_path}") from exc
+    raise SystemExit(f"runtime config path must live under {mounted_config_dir}: {runtime_config_path}") from exc
 path.write_text(
-    "export OCLIRD_CONFIG_PATH={}\n".format(shlex.quote(f"/config/{relative_config_path.as_posix()}")),
+    "export OPEN_CLI_TOOLBOX_CONFIG_PATH={}\n".format(shlex.quote(f"/config/{relative_config_path.as_posix()}")),
     encoding="utf-8",
 )
 path.chmod(0o600)
 PY
 
-echo "==> Wrote daemon runtime config: $DAEMON_CONFIG_PATH"
+echo "==> Wrote hosted runtime config: $RUNTIME_CONFIG_PATH"
 echo "==> Wrote workload client config: $CONFIG_PATH"
 echo "==> Wrote browser client config: $BROWSER_CONFIG_PATH"
 echo "==> Wrote client credential exports: $ENV_PATH"
@@ -437,11 +438,11 @@ echo "==> Wrote Docker runtime exports: $DOCKER_ENV_PATH"
 echo
 echo "Next steps:"
 echo "  source \"$ENV_PATH\""
-echo "  go run ./cmd/oclird --addr 127.0.0.1:8765 --config \"$DAEMON_CONFIG_PATH\""
-echo "  source \"$DOCKER_ENV_PATH\" && docker compose up -d oclird"
+echo "  go run ./cmd/open-cli-toolbox --addr 127.0.0.1:8765 --config \"$RUNTIME_CONFIG_PATH\""
+echo "  source \"$DOCKER_ENV_PATH\" && docker compose up -d open-cli-toolbox"
 echo "  source \"$ENV_PATH\" && go run ./cmd/ocli --config \"$CONFIG_PATH\" catalog list --format pretty"
 echo "  # browser client config written to: \"$BROWSER_CONFIG_PATH\""
-echo "  # hosted browser login still needs a browser-matched daemon auth config"
+echo "  # hosted browser login still needs a browser-matched runtime auth config"
 echo
 echo "Optional execution fixture:"
 echo "  cd product-tests && make services-up"

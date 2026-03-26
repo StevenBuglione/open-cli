@@ -13,8 +13,8 @@ import FirstRunSnippet from '../components/homepage/FirstRunSnippet';
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="ocli &amp; oclird"
-      description="Governed OpenAPI execution — discovery, policy, auth, and audit in a single local runtime. Documentation for ocli and oclird.">
+      title="ocli &amp; open-cli-toolbox"
+      description="Governed OpenAPI execution with a remote-only CLI and hosted runtime. Documentation for ocli and open-cli-toolbox.">
       <Hero />
       <main>
         <WhyItExists />
@@ -29,4 +29,3 @@ export default function Home(): ReactNode {
     </Layout>
   );
 }
-

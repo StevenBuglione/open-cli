@@ -7,7 +7,7 @@ const { execFileSync } = require("child_process");
 const path = require("path");
 
 const ext = process.platform === "win32" ? ".exe" : "";
-const bin = path.join(__dirname, "oclird" + ext);
+const bin = path.join(__dirname, "open-cli-toolbox" + ext);
 
 if (!fs.existsSync(bin)) {
   console.error(`open-cli: binary not found at ${bin}`);

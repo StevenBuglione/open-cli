@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	authentikRuntimeAudience   = "oclird"
+	authentikRuntimeAudience   = "open-cli-toolbox"
 	authentikPrimarySlug       = "ocli-runtime"
 	authentikAlternateSlug     = "ocli-runtime-alt-issuer"
 	authentikCallbackURL       = "http://127.0.0.1:8787/callback"
@@ -407,7 +407,7 @@ func bootstrapAuthentikRuntime(t *testing.T, workerID string) authentikBootstrap
 	t.Helper()
 
 	scopeExpression := `
-audience = "wrong-audience" if "profile:wrong-audience" in token.scope else "oclird"
+audience = "wrong-audience" if "profile:wrong-audience" in token.scope else "open-cli-toolbox"
 return {"scope": " ".join(token.scope), "aud": audience}
 `
 	script := fmt.Sprintf(`

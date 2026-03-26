@@ -11,7 +11,7 @@ That reference proof covers two paths:
 - **automated workload proof** with `oauthClient`
 - **operator-run browser proof** with Authentik federating to Microsoft Entra ID
 
-Authentik is the example, not the requirement. Any broker or gateway is acceptable as long as it satisfies the runtime auth contract expected by `ocli` and `oclird`.
+Authentik is the example, not the requirement. Any broker or gateway is acceptable as long as it satisfies the runtime auth contract expected by `ocli` and `open-cli-toolbox`.
 
 ## Proof boundary
 
@@ -30,7 +30,7 @@ The automated Authentik product test proves that:
 
 - Authentik serves discovery, JWKS, authorization, and token endpoints
 - `ocli` can acquire a runtime token through `oauthClient`
-- `oclird` validates that token with `oidc_jwks`
+- `open-cli-toolbox` validates that token with `oidc_jwks`
 - catalog visibility is filtered by runtime scopes
 - allowed execution succeeds
 - denied execution fails closed
@@ -50,7 +50,7 @@ The manual proof is the human path:
 3. the browser redirects to Authentik
 4. Authentik federates to Entra
 5. Authentik issues the runtime token
-6. `oclird` validates the token and enforces scopes
+6. `open-cli-toolbox` validates the token and enforces scopes
 
 That proof is documented rather than auto-executed because it requires a real Entra tenant, application, and test identity.
 
@@ -84,7 +84,7 @@ The shipped product proof validated these Authentik-specific details:
 Validated scope-mapping expression:
 
 ```python
-audience = "oclird"
+audience = "open-cli-toolbox"
 return {
     "scope": " ".join(token.scope),
     "aud": audience,
@@ -95,12 +95,12 @@ return {
 
 Delegated sub-agent access stays on the **broker side** of the runtime boundary.
 
-The current runtime contract does not require a special sub-agent API in `oclird`. Instead, the deployment pattern is:
+The current runtime contract does not require a special sub-agent API in `open-cli-toolbox`. Instead, the deployment pattern is:
 
-1. a parent actor already holds a valid runtime token for audience `oclird`
+1. a parent actor already holds a valid runtime token for audience `open-cli-toolbox`
 2. a broker or broker-adjacent gateway performs a token-exchange step
 3. that broker mints a separate child token for the sub-agent
-4. `oclird` validates the child token like any other runtime token and enforces only the child scope set
+4. `open-cli-toolbox` validates the child token like any other runtime token and enforces only the child scope set
 
 Important constraints for operators:
 
@@ -119,7 +119,7 @@ For Authentik-backed deployments, the safest assumption is:
 - **Authentik remains the identity-facing broker**
 - **delegated token exchange happens in an external broker or gateway layer in front of the runtime-facing contract**
 
-That extra layer can validate the parent runtime token, subset-check the requested runtime scopes, add lineage claims, and mint the short-lived child token that `oclird` already knows how to validate.
+That extra layer can validate the parent runtime token, subset-check the requested runtime scopes, add lineage claims, and mint the short-lived child token that `open-cli-toolbox` already knows how to validate.
 
 Do not assume that Authentik alone should become the full delegation engine for sub-agent execution just because it is the reference broker for the base runtime auth proof. The official proof in this repository covers runtime-compatible token issuance and validation; delegated exchange should be added as a broker/gateway layer without changing the runtime-facing contract.
 

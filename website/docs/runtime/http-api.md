@@ -20,7 +20,7 @@ When `runtime.server.auth` is enabled, this endpoint requires `Authorization: Be
 
 | Parameter | Meaning |
 | --- | --- |
-| `config` | Path to `.cli.json`. Required unless the daemon was started with a default config. |
+| `config` | Path to `.cli.json`. Required unless the runtime was started with a default config. |
 | `mode` | Optional mode override. |
 | `agentProfile` | Optional profile name. |
 
@@ -196,7 +196,7 @@ Example response:
   "authorizationURL": "https://auth.example.com/authorize",
   "tokenURL": "https://auth.example.com/token",
   "clientId": "ocli-browser",
-  "audience": "oclird",
+  "audience": "open-cli-toolbox",
   "required": true,
   "scopePrefixes": ["bundle:", "profile:", "tool:"],
   "tokenValidationProfiles": ["oidc_jwks"],
@@ -210,7 +210,7 @@ Example response:
 Notes:
 
 - `required` signals whether bearer auth is enforced by the runtime for the selected config.
-- `tokenValidationProfiles` advertises the configured bearer-token validation profile(s) used by the daemon.
+- `tokenValidationProfiles` advertises the configured bearer-token validation profile(s) used by the hosted runtime.
 - `scopePrefixes` and `authorizationEnvelope.version` help operators confirm how catalog filtering and execution parity are derived from runtime scopes.
 
 ## `GET /v1/runtime/info`
@@ -232,13 +232,13 @@ Example response:
   ],
   "instanceId": "team-a",
   "url": "http://127.0.0.1:18765",
-  "runtimeMode": "local",
+  "runtimeMode": "remote",
   "auditPath": "/state/instances/team-a/audit.log",
   "stateDir": "/state/instances/team-a",
   "cacheDir": "/cache/instances/team-a/http",
   "auth": {
     "required": true,
-    "audience": "oclird",
+    "audience": "open-cli-toolbox",
     "scopePrefixes": ["bundle:", "profile:", "tool:"],
     "tokenValidationProfiles": ["oidc_jwks"],
     "browserLogin": {
@@ -271,13 +271,13 @@ Notes:
 - `auth.required`, `auth.tokenValidationProfiles`, and `auth.browserLogin` tell remote clients whether they must attach a bearer token and whether browser login discovery is available. Common profiles are `oidc_jwks` and `oauth2_introspection`.
 - `auth.principal` is echoed only when the runtime already resolved an authenticated subject for the current request.
 - `auth.authorizationEnvelope.version` and `auth.scopePrefixes` let operators diagnose catalog/execution parity when runtime scopes are involved.
-- `runtimeMode` is typically `embedded` or `local` in the current implementation.
-- `shareKeyPresent` is only a boolean marker; the daemon never echoes the raw `shareKey`.
-- The `lifecycle` block is present for lease-aware managed local runtimes and is what `ocli` uses to validate reuse before attaching.
+- `runtimeMode` is typically `remote` in the current implementation.
+- `shareKeyPresent` is only a boolean marker; the runtime never echoes the raw `shareKey`.
+- The `lifecycle` block is present when the runtime was started with lifecycle metadata; it is mainly useful for operator diagnostics and compatibility checks.
 
 ## `POST /v1/runtime/heartbeat`
 
-Registers or renews a local managed-runtime session lease.
+Registers or renews a runtime session lease when the hosted runtime exposes lifecycle tracking.
 
 ### Request body
 
@@ -291,11 +291,11 @@ Registers or renews a local managed-runtime session lease.
 Common error responses:
 
 - `409 runtime_attach_conflict` when the runtime is exclusive and a different session tries to attach
-- `409 runtime_attach_mismatch` when the caller's effective local-runtime config fingerprint differs from the daemon's
+- `409 runtime_attach_mismatch` when the caller's effective config fingerprint differs from the runtime's recorded fingerprint
 
 ## `POST /v1/runtime/stop`
 
-Invokes the runtime shutdown hook when the daemon was started with one configured.
+Invokes the runtime shutdown hook when the hosted runtime was started with one configured.
 
 Success response:
 

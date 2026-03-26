@@ -17,7 +17,7 @@ Answer these questions before investing evaluation time. A "no" answer does not 
 
 | Question | If no |
 |---|---|
-| Is local-first (loopback-only) acceptable as the baseline? | You will need to enable runtime auth and plan network controls before any production use. |
+| Can you host `open-cli-toolbox` as a separate runtime boundary? | `ocli` is remote-only; you need a reachable hosted runtime before the workflow fits. |
 | Can you tolerate revocation as a tracked gap rather than a solved capability? | Token revocation is not implemented. Short expiry + network controls are the current mitigation path. |
 | Can you supply audit log rotation and retention tooling? | There is no built-in log rotation, retention policy, or push exporter. |
 | Do you have infrastructure available for live identity proof (Authentik, Entra, or equivalent)? | Browser-login and federation proof cannot be validated in CI — you need real identity infrastructure. |
@@ -29,9 +29,9 @@ If your answers to these questions are acceptable, continue with the phases belo
 
 ## Phase 1 — Understand the deployment model
 
-- [ ] Read [Deployment Models](../runtime/deployment-models) and choose one of: embedded, local daemon, or remote runtime.
+- [ ] Read [Deployment Models](../runtime/deployment-models) and choose how you will host the supported remote runtime.
 - [ ] Confirm whether multiple isolated instances (`--instance-id`) are needed for your environment.
-- [ ] Review the stale-registry fallback behavior to understand how `ocli` handles a dead daemon.
+- [ ] Decide whether `runtime.remote.url` will be configured in `.cli.json`, injected via environment, or passed by automation.
 
 **Reference:** [Deployment Models](../runtime/deployment-models), [Runtime Overview](../runtime/overview)
 
@@ -39,7 +39,7 @@ If your answers to these questions are acceptable, continue with the phases belo
 
 ## Phase 2 — Enable and validate runtime auth
 
-- [ ] Enable `runtime.server.auth` on `oclird` with a suitable `validationProfile`.
+- [ ] Enable `runtime.server.auth` on `open-cli-toolbox` with a suitable `validationProfile`.
 - [ ] Verify that catalog filtering and execution denial work under authenticated access.
 - [ ] Confirm token validation covers issuer, audience, expiry, and signature checks.
 - [ ] Document which auth flows are needed: `providedToken`, `oauthClient`, or `browserLogin`.
@@ -73,7 +73,7 @@ If your answers to these questions are acceptable, continue with the phases belo
 
 ## Phase 5 — Run fleet validation
 
-- [ ] Run `make product-test-fleet` from the repo root and inspect artifacts under `/tmp/ocli-fleet/`.
+- [ ] Run `make product-test-fleet` from the repo root.
 - [ ] Confirm the `rubric.json` and `transcript.log` artifacts for each lane that covers your deployment scenario.
 - [ ] For remote runtime auth scenarios, verify the `remote-runtime-oauth-client` lane passes.
 - [ ] For browser-login or Entra federation, review `product-tests/testdata/fleet/live-proof-matrix.yaml` and plan live proof execution against your identity infrastructure.
@@ -97,7 +97,7 @@ These items are not provided by `open-cli`. Each requires operator-owned infrast
 
 - [ ] **Token revocation** — confirm your risk model accepts expiry-based validity windows, or plan an external revocation check in your network path.
 - [ ] **Audit log rotation and retention** — confirm `logrotate`, a log sidecar, or a log forwarder is in place against the audit path.
-- [ ] **Network access control** — for remote runtime deployments, confirm firewall rules, reverse proxy auth, or container/network isolation are in place.
+- [ ] **Network access control** — for hosted runtime deployments, confirm firewall rules, reverse proxy auth, or container/network isolation are in place.
 - [ ] **Audit SIEM integration** — plan how audit data will reach your SIEM. Pull-based log shipper reading the audit file is the available path today.
 - [ ] **Live identity proof** — for browser-login or Entra federation, confirm you have the necessary tenant, application registration, and test identity to run the live proof matrix.
 

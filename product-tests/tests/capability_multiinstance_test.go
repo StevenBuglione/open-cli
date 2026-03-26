@@ -1,6 +1,6 @@
 package tests_test
 
-// capability_multiinstance_test.go verifies that two or more oclird
+// capability_multiinstance_test.go verifies that two or more open-cli-toolbox
 // runtime instances can operate concurrently while keeping all mutable
 // filesystem state (audit log, state dir, cache dir) strictly per-instance.
 
@@ -55,6 +55,9 @@ func minimalCLIConfig(openapiPath string) string {
 	return `{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "src": {
       "type": "openapi",

@@ -1,7 +1,6 @@
 # product-tests
 
-End-to-end product tests for ocli. These tests spin up real infrastructure
-(REST API, OAuth server, MCP servers) and exercise the CLI against them.
+End-to-end product tests for the remote-only `ocli` + `open-cli-toolbox` flow. These tests spin up real infrastructure (REST API, OAuth server, MCP servers) and exercise the CLI against the hosted runtime boundary.
 
 ## Layout
 
@@ -25,8 +24,8 @@ product-tests/
       filesystem.env        # Env vars for MCP filesystem stdio server
       time.env              # Env vars for timezone configuration
   services/
-    oauthstub/              # Embedded OAuth stub service (Go)
-    testapi/                # Embedded REST test API service (Go)
+    oauthstub/              # Repo-owned OAuth stub service (Go)
+    testapi/                # Repo-owned REST test API service (Go)
   testdata/
     configs/
       mcp-stdio.cli.json    # CLI config: filesystem server via stdio
@@ -167,10 +166,10 @@ It is now the automated reference proof for the workload path and verifies:
 - live Authentik discovery/JWKS/token reachability
 - repo-managed provider/application bootstrap through Authentik
 - real `ocli` `oauthClient` token acquisition against Authentik
-- live `oidc_jwks` validation in `oclird`
+- live `oidc_jwks` validation in `open-cli-toolbox`
 - fail-closed rejection for insufficient scope, wrong audience, expired token, and alternate issuer
 
-The product harness uses a tiny local proxy in the test fixture so `ocli` and `oclird` can reach the self-signed Authentik test stack without weakening the runtime contract. The validated token `iss` still comes from Authentik.
+The product harness uses a tiny local proxy in the test fixture so `ocli` and `open-cli-toolbox` can reach the self-signed Authentik test stack without weakening the runtime contract. The validated token `iss` still comes from Authentik.
 
 This fixture is intentionally **workload-only**: it bootstraps a confidential Authentik provider for `oauthClient` and does **not** advertise `/v1/auth/browser-config`. The browser proof is covered separately with the public-client reference template under `examples/runtime-auth-broker/authentik/`.
 

@@ -34,8 +34,8 @@ func TestCapabilityRuntimeAuthAuthentikOAuthClient(t *testing.T) {
 	if got := auth["required"]; got != true {
 		t.Fatalf("expected auth.required=true, got %#v", got)
 	}
-	if got := auth["audience"]; got != "oclird" {
-		t.Fatalf("expected auth audience oclird, got %#v", got)
+	if got := auth["audience"]; got != "open-cli-toolbox" {
+		t.Fatalf("expected auth audience open-cli-toolbox, got %#v", got)
 	}
 	if got := auth["principal"]; got == "" || got == nil {
 		t.Fatalf("expected resolved principal in runtime info, got %#v", got)

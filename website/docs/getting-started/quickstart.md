@@ -4,25 +4,15 @@ title: Quickstart
 
 # Quickstart
 
-**Goal:** get a generated command tree running in under 5 minutes.
+**Goal:** get a generated command tree running in under 5 minutes with the supported hosted-runtime model.
 
-This quickstart uses **embedded mode** because it removes one moving part — you do not need a separate daemon just to inspect the catalog. You will need `ocli` from [Installation](./installation) before continuing.
+You will install `ocli`, generate a `.cli.json`, start `open-cli-toolbox`, and then drive it with `ocli`.
 
 :::tip First win
-After step 1, you will already have a working demo. **If you only need a first win, stop at step 1** and return when you are ready to point at your own API.
+After step 3, you will already have a working catalog. If you only need a first win, stop there and return when you are ready to point at your own API.
 :::
 
-## 1. Try the built-in demo — zero config ✓
-
-No config file, no OpenAPI document, nothing to create:
-
-```bash
-ocli --demo catalog list --format pretty
-```
-
-This uses a built-in sample API to show how open-cli works. If you see catalog output, `ocli` is installed and working.
-
-## 2. Set up your own API with `ocli init`
+## 1. Generate a starter config
 
 Point `ocli init` at any OpenAPI spec to generate a `.cli.json` automatically:
 
@@ -43,6 +33,12 @@ If you prefer to create the config by hand, see the [Configuration overview](../
 {
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote",
+    "remote": {
+      "url": "http://127.0.0.1:8765"
+    }
+  },
   "sources": {
     "ticketsSource": {
       "type": "openapi",
@@ -60,10 +56,20 @@ If you prefer to create the config by hand, see the [Configuration overview](../
 ```
 :::
 
-## 3. Inspect the catalog
+## 2. Start `open-cli-toolbox`
 
 ```bash
-ocli --embedded --config ./.cli.json catalog list --format pretty
+open-cli-toolbox --config ./.cli.json --addr 127.0.0.1:8765
+```
+
+This hosts the runtime locally on loopback, which is the quickest way to evaluate the remote-only contract.
+
+## 3. Inspect the catalog
+
+In another shell:
+
+```bash
+ocli --runtime http://127.0.0.1:8765 --config ./.cli.json catalog list --format pretty
 ```
 
 **What to expect:**
@@ -80,33 +86,19 @@ If you see catalog output, discovery succeeded.
 These are the safest first commands because they do **not** call the upstream API:
 
 ```bash
-ocli --embedded --config ./.cli.json tool schema tickets:listTickets --format pretty
-ocli --embedded --config ./.cli.json explain tickets:listTickets --format pretty
+ocli --runtime http://127.0.0.1:8765 --config ./.cli.json tool schema tickets:listTickets --format pretty
+ocli --runtime http://127.0.0.1:8765 --config ./.cli.json explain tickets:listTickets --format pretty
 ```
 
 ## 5. Preview the dynamic command tree
 
 ```bash
-ocli --embedded --config ./.cli.json helpdesk tickets --help
+ocli --runtime http://127.0.0.1:8765 --config ./.cli.json helpdesk tickets --help
 ```
 
-This help renders correctly because the runtime and config are already available. Without `--embedded` and a valid config path, top-level help can fail before Cobra renders anything — that is expected behavior, not a bug.
+This help renders correctly because the runtime and config are already available. Without a reachable runtime plus config, top-level help can fail before Cobra renders anything — that is expected behavior, not a bug.
 
-## 6. Start the daemon when you want a reusable runtime
-
-```bash
-oclird --config ./.cli.json --addr 127.0.0.1:8765
-```
-
-In another shell:
-
-```bash
-ocli --runtime http://127.0.0.1:8765 --config ./.cli.json catalog list --format pretty
-```
-
-`oclird` writes instance metadata to `runtime.json`, so later `ocli` commands can resolve the runtime automatically when the instance ID and state directory line up. See [Deployment models](../runtime/deployment-models) and [Tracing and instances](../operations/tracing-and-instances).
-
-## 7. Execute a real tool only when the upstream API is reachable
+## 6. Execute a real tool only when the upstream API is reachable
 
 With the sample config, a dynamic command looks like this:
 
@@ -114,7 +106,7 @@ With the sample config, a dynamic command looks like this:
 ocli --runtime http://127.0.0.1:8765 --config ./.cli.json helpdesk tickets list-tickets --status open
 ```
 
-This calls the first OpenAPI server URL (`https://api.example.com` in this sample). Replace it with a real service before expecting a successful response.
+This calls the first OpenAPI server URL (`https://api.example.com` in the sample config). Replace it with a real service before expecting a successful response.
 
 ## Where to go next
 

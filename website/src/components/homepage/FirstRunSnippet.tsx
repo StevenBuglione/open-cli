@@ -4,14 +4,14 @@ import Heading from '@theme/Heading';
 import CodeBlock from '@theme/CodeBlock';
 import styles from './homepage.module.css';
 
-const snippet = `# Embedded mode — no daemon needed for a first run
-ocli --embedded --config .cli.json catalog list
+const snippet = `# Start the hosted runtime once
+open-cli-toolbox --config .cli.json --addr 127.0.0.1:8765
 
-# Inspect a tool's schema and usage guidance
-ocli --embedded --config .cli.json explain tickets:listTickets
+# In another shell, inspect the governed catalog
+ocli --runtime http://127.0.0.1:8765 --config .cli.json catalog list
 
-# Execute a tool — dynamic commands are shaped by your OpenAPI spec
-ocli --embedded --config .cli.json helpdesk tickets list-tickets --status open`.trim();
+# Inspect or execute a tool through the runtime boundary
+ocli --runtime http://127.0.0.1:8765 --config .cli.json explain tickets:listTickets`.trim();
 
 const deepLinks = [
   {label: 'Quickstart', href: '/docs/getting-started/quickstart'},
@@ -31,10 +31,9 @@ export default function FirstRunSnippet(): ReactNode {
             Your first run
           </Heading>
           <p>
-            Three commands from install to executed tool — no daemon required.
-            See the{' '}
-            <Link to="/docs/getting-started/quickstart">quickstart</Link> for
-            installation and <code>.cli.json</code> config setup.
+            Start <code>open-cli-toolbox</code>, then drive it with <code>ocli</code>.
+            See the <Link to="/docs/getting-started/quickstart">quickstart</Link> for
+            installation and <code>.cli.json</code> setup.
           </p>
         </div>
         <div className={styles.snippetWrapper}>

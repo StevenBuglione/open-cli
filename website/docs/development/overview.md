@@ -9,7 +9,7 @@ title: Development Overview
 The repository is organized around a clear split:
 
 - **CLI surface** in `cmd/ocli`
-- **runtime daemon** in `cmd/oclird` and `internal/runtime`
+- **hosted runtime** in `cmd/open-cli-toolbox` and `internal/runtime`
 - **library packages** under `pkg/` for config, discovery, catalog building, execution, caching, audit, instance handling, and observability
 - **docs site** under `website/` for the published Docusaurus documentation and contributor guides
 
@@ -50,7 +50,7 @@ Each bucket has a natural owner package; resist the urge to push behavior into `
 
 ## Maturity signal: fleet validation
 
-Contributors and evaluators can both read this the same way: the fleet validation matrix in `product-tests/testdata/fleet/capability-matrix.yaml` is executable evidence, not aspirational copy. It covers multi-session daemon lifecycle, remote runtime auth, MCP transports, and real upstream API patterns. The live proof matrix covers flows that require external identity infrastructure.
+Contributors and evaluators can both read this the same way: the fleet validation matrix in `product-tests/testdata/fleet/capability-matrix.yaml` is executable evidence, not aspirational copy. It covers multi-session hosted runtime deployment, remote runtime auth, MCP transports, and real upstream API patterns. The live proof matrix covers flows that require external identity infrastructure.
 
 See [Fleet validation](./fleet-validation) for the full picture.
 

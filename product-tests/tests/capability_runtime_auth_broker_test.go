@@ -45,7 +45,7 @@ func TestCapabilityRuntimeAuthBroker(t *testing.T) {
 
 	for _, upstream := range []string{"microsoft", "google", "github"} {
 		t.Run("client_credentials_"+upstream, func(t *testing.T) {
-			token := broker.AcquireClientCredentialsToken(t, upstream, "oclird", []string{
+			token := broker.AcquireClientCredentialsToken(t, upstream, "open-cli-toolbox", []string{
 				"bundle:tickets",
 				"tool:tickets:listTickets",
 			})
@@ -194,11 +194,11 @@ func TestCapabilityRuntimeAuthBroker(t *testing.T) {
 	})
 
 	t.Run("delegated_token_exchange", func(t *testing.T) {
-		parentToken := broker.AcquireClientCredentialsToken(t, "github", "oclird", []string{
+		parentToken := broker.AcquireClientCredentialsToken(t, "github", "open-cli-toolbox", []string{
 			"bundle:tickets",
 			"tool:tickets:listTickets",
 		})
-		childToken := broker.ExchangeDelegatedToken(t, parentToken, "oclird", []string{
+		childToken := broker.ExchangeDelegatedToken(t, parentToken, "open-cli-toolbox", []string{
 			"tool:tickets:listTickets",
 		}, "subagent:triage-01")
 
@@ -288,7 +288,7 @@ func TestCapabilityRuntimeAuthBroker(t *testing.T) {
 	})
 
 	t.Run("delegated_token_exchange_rejects_scope_escalation", func(t *testing.T) {
-		parentToken := broker.AcquireClientCredentialsToken(t, "github", "oclird", []string{
+		parentToken := broker.AcquireClientCredentialsToken(t, "github", "open-cli-toolbox", []string{
 			"bundle:tickets",
 			"tool:tickets:listTickets",
 		})
@@ -298,7 +298,7 @@ func TestCapabilityRuntimeAuthBroker(t *testing.T) {
 		form.Set("subject_token", parentToken)
 		form.Set("subject_token_type", "urn:ietf:params:oauth:token-type:access_token")
 		form.Set("requested_token_type", "urn:ietf:params:oauth:token-type:access_token")
-		form.Set("audience", "oclird")
+		form.Set("audience", "open-cli-toolbox")
 		form.Set("scope", "tool:users:listUsers")
 
 		resp, err := http.PostForm(broker.TokenURL, form)

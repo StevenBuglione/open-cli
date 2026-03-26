@@ -14,12 +14,12 @@ Those upstream identities are normalized before runtime token issuance. `ocli` d
 
 ## Runtime token requirements
 
-The broker-issued token must be acceptable to `oclird` under `validationProfile: "oidc_jwks"` and should include:
+The broker-issued token must be acceptable to `open-cli-toolbox` under `validationProfile: "oidc_jwks"` and should include:
 
 ```json
 {
   "iss": "https://broker.example.com",
-  "aud": "oclird",
+  "aud": "open-cli-toolbox",
   "sub": "github:user-123",
   "scope": "bundle:tickets tool:tickets:listTickets",
   "exp": 1773599999
@@ -34,10 +34,10 @@ Delegated child tokens for sub-agents follow the same runtime-compatible shape. 
 
 Sub-agent delegation should stay inside the existing brokered runtime model:
 
-1. a parent actor already has a valid runtime token for audience `oclird`
+1. a parent actor already has a valid runtime token for audience `open-cli-toolbox`
 2. a delegating client, agent supervisor, or broker-adjacent orchestration layer requests a child token from the broker before starting a sub-agent
 3. the broker validates the parent token and mints a new runtime-compatible child token
-4. `oclird` validates the child token exactly like any other runtime token and enforces only the child scope set
+4. `open-cli-toolbox` validates the child token exactly like any other runtime token and enforces only the child scope set
 
 The recommended request shape is an OAuth token-exchange style `POST /token` call. A dedicated broker-internal endpoint is acceptable if needed, but the external contract should stay equivalent to:
 
@@ -49,7 +49,7 @@ grant_type=urn:ietf:params:oauth:grant-type:token-exchange
 &subject_token=<parent-runtime-token>
 &subject_token_type=urn:ietf:params:oauth:token-type:access_token
 &requested_token_type=urn:ietf:params:oauth:token-type:access_token
-&audience=oclird
+&audience=open-cli-toolbox
 &scope=bundle:tickets tool:tickets:listTickets
 &actor_id=subagent:triage-01
 ```
@@ -58,7 +58,7 @@ The broker may accept equivalent JSON or internal metadata in front of this exch
 
 - the caller is asking for a child runtime token, not broader access
 - the parent runtime token is the authority for the maximum delegation envelope
-- the requested audience remains `oclird`
+- the requested audience remains `open-cli-toolbox`
 - the requested scopes are explicit and are checked before issuance
 
 ## Delegation subset rules
@@ -84,12 +84,12 @@ If the parent token is invalid, expired, missing required identity claims, carri
 
 ## Recommended child claims
 
-The child token presented to `oclird` should still look like a normal runtime token:
+The child token presented to `open-cli-toolbox` should still look like a normal runtime token:
 
 ```json
 {
   "iss": "https://broker.example.com",
-  "aud": "oclird",
+  "aud": "open-cli-toolbox",
   "sub": "github:user-123",
   "client_id": "ocli-browser",
   "scope": "tool:tickets:listTickets",
@@ -109,13 +109,13 @@ Lineage claims are recommended for audit and traceability:
 - `delegated_by` as a simple string fallback when `act` is not practical
 - `delegation_id` or `jti` for correlation, revocation logs, and audit joins
 
-Those lineage claims do not grant permissions on their own. Authorization still derives from the child token `scope` claim as enforced by `oclird`.
+Those lineage claims do not grant permissions on their own. Authorization still derives from the child token `scope` claim as enforced by `open-cli-toolbox`.
 
 ## Security constraints
 
 - child tokens should be short-lived; use minutes, not hours, and keep the TTL materially shorter than the parent token lifetime
 - delegation must be explicit per child token request; do not mint ambient reusable child tokens without a requested scope set
-- child tokens must keep `aud` fixed to `oclird`
+- child tokens must keep `aud` fixed to `open-cli-toolbox`
 - the broker should copy or narrow the parent principal identity, not replace it with an unrelated subject
 - failures must stay explicit and fail-closed: no fallback to the parent token, no automatic scope widening, no best-effort partial issuance unless the narrower scope set is the one explicitly returned to the caller
 - if lineage claims are omitted, issuance may still proceed, but the broker should treat audit lineage as a recommended control and not as authorization data

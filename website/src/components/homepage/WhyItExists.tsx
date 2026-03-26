@@ -33,9 +33,7 @@ export default function WhyItExists(): ReactNode {
           <Heading as="h2" id="why-it-exists-heading">
             The problem it solves
           </Heading>
-          <p>
-            Most teams operate OpenAPI tooling with three unresolved gaps.
-          </p>
+          <p>Most teams operate OpenAPI tooling with three unresolved gaps.</p>
         </div>
         <div className={styles.whyGrid}>
           {problems.map((p) => (
@@ -46,9 +44,8 @@ export default function WhyItExists(): ReactNode {
           ))}
         </div>
         <p className={styles.whySolution}>
-          <strong>oclird</strong> closes all three gaps — discovery, auth
-          resolution, policy enforcement, and audit — before any command reaches
-          the wire.
+          <strong>open-cli-toolbox</strong> closes all three gaps — discovery, auth
+          resolution, policy enforcement, and audit — before any command reaches the wire.
         </p>
       </div>
     </section>

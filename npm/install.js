@@ -9,7 +9,7 @@ const https = require("https");
 const { execSync, execFileSync } = require("child_process");
 
 const REPO = "StevenBuglione/open-cli";
-const BINARIES = ["ocli", "oclird"];
+const BINARIES = ["ocli", "open-cli-toolbox"];
 const MAX_RETRIES = 3;
 const DEFAULT_TIMEOUT_S = 30;
 
@@ -174,7 +174,7 @@ function verifyVersion(binDir, ext, platform, arch) {
     const out = execFileSync(path.join(binDir, "ocli" + ext), ["--version"], {
       timeout: 5000,
     }).toString().trim();
-    console.log(`open-cli: ✓ installed ocli and oclird (${out}, ${platform}-${arch})`);
+    console.log(`open-cli: ✓ installed ocli and open-cli-toolbox (${out}, ${platform}-${arch})`);
   } catch {
     console.error("open-cli: ⚠ binaries downloaded but --version check failed");
   }

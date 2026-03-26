@@ -9,11 +9,11 @@ sections:
           - /docs/getting-started/choose-your-path
           - /docs/getting-started/quickstart
       - id: mental-model
-        description: The site explains ocli versus oclird early.
+        description: The site explains ocli versus open-cli-toolbox early.
         path: website/docs/getting-started/intro.md
         expectText:
           - "`ocli`"
-          - "`oclird`"
+          - "`open-cli-toolbox`"
   - id: depth
     title: Progressive depth
     criteria:

@@ -139,6 +139,9 @@ func restCLIConfig(openapiPath string) string {
 	return `{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "testapiSource": {
       "type": "openapi",

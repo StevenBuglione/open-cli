@@ -37,7 +37,7 @@ func TestLoadEffectiveSupportsCanonicalMCPSources(t *testing.T) {
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "sources": {
 	    "remoteDocs": {
@@ -128,7 +128,7 @@ func TestLoadEffectiveAutoCreatesServiceForCanonicalMCPSource(t *testing.T) {
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "sources": {
 	    "filesystem": {
@@ -161,7 +161,7 @@ func TestLoadEffectiveInjectsSourceForCanonicalMCPService(t *testing.T) {
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "sources": {
 	    "filesystem": {
@@ -195,7 +195,7 @@ func TestLoadEffectiveNormalizesMCPServersAndInjectsServiceSource(t *testing.T) 
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "mcpServers": {
 	    "filesystem": {
@@ -253,7 +253,7 @@ func TestLoadEffectiveAutoCreatesServiceForMCPServer(t *testing.T) {
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "mcpServers": {
 	    "filesystem": {
@@ -312,7 +312,7 @@ func TestLoadEffectiveRejectsMCPServiceSourceConflicts(t *testing.T) {
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "services": {
 	    "filesystem": {
@@ -338,7 +338,7 @@ func TestLoadEffectiveRejectsCanonicalMCPServiceSourceConflicts(t *testing.T) {
 	  "cli": "1.0.0",
 	  "mode": { "default": "discover" },
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "sources": {
 	    "filesystem": {
@@ -413,7 +413,7 @@ func TestLoadEffectiveRejectsInvalidMCPTransportConfig(t *testing.T) {
 			  "cli": "1.0.0",
 			  "mode": { "default": "discover" },
 			  "runtime": {
-			    "mode": "local"
+			    "mode": "remote"
 			  },
 			  "sources": {
 			    "remoteDocs": {
@@ -594,7 +594,7 @@ func TestLoadEffectiveRejectsInvalidMCPSourceRelationships(t *testing.T) {
 			  "cli": "1.0.0",
 			  "mode": { "default": "discover" },
 			  "runtime": {
-			    "mode": "local"
+			    "mode": "remote"
 			  },
 			  "sources": {
 			    "remoteDocs": {
@@ -664,7 +664,7 @@ func TestLoadEffectiveClearsExclusiveFieldsWhenSourceTypeChanges(t *testing.T) {
 	}`)
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "sources": {
 	    "filesystem": {
@@ -735,7 +735,7 @@ func TestLoadEffectiveAllowsHigherScopeToRepairMCPServiceSource(t *testing.T) {
 	}`)
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "services": {
 	    "demo": {
@@ -792,7 +792,7 @@ func TestLoadEffectiveClearsExclusiveFieldsWhenMCPTransportTypeChanges(t *testin
 	}`)
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "sources": {
 	    "demo": {
@@ -1008,7 +1008,7 @@ func TestLoadEffectiveClearsExclusiveFieldsWhenMCPOAuthModeChanges(t *testing.T)
 	}`)
 	projectPath := writeJSON(t, dir, ".cli.json", `{
 	  "runtime": {
-	    "mode": "local"
+	    "mode": "remote"
 	  },
 	  "sources": {
 	    "remoteDocs": {

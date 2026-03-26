@@ -22,20 +22,8 @@ func ResolveDeployment(opts DeploymentOptions) string {
 		mode = runtimeCfg.Mode
 	}
 	switch mode {
-	case "embedded", "local", "remote":
-		return mode
-	case "auto":
-		effective, err := configpkg.LoadEffective(configpkg.LoadOptions{
-			ProjectPath: opts.ConfigPath,
-			WorkingDir:  filepath.Dir(opts.ConfigPath),
-		})
-		if err != nil {
-			return ""
-		}
-		if HasLocalMCPSource(effective.Config) {
-			return "local"
-		}
-		return "embedded"
+	case "remote":
+		return "remote"
 	default:
 		return ""
 	}
@@ -54,18 +42,4 @@ func LoadConfig(opts DeploymentOptions) (*configpkg.RuntimeConfig, bool) {
 		return nil, false
 	}
 	return effective.Config.Runtime, true
-}
-
-// HasLocalMCPSource returns true if the config contains at least one
-// MCP source with stdio transport.
-func HasLocalMCPSource(cfg configpkg.Config) bool {
-	for _, source := range cfg.Sources {
-		if source.Type != "mcp" || source.Transport == nil {
-			continue
-		}
-		if source.Transport.Type == "stdio" {
-			return true
-		}
-	}
-	return false
 }

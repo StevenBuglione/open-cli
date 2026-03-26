@@ -17,19 +17,19 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", "", "listen address (defaults to an automatic local port)")
-	configPath := flag.String("config", "", "default .cli.json path used for instance derivation and requests")
-	instanceID := flag.String("instance-id", "", "instance id for isolated runtime state")
-	stateDir := flag.String("state-dir", "", "state directory root for runtime metadata and audit logs")
+	addr := flag.String("addr", "", "listen address (defaults to 127.0.0.1:8765)")
+	configPath := flag.String("config", "", "default .cli.json path used to resolve catalogs and policies")
+	instanceID := flag.String("instance-id", "", "instance id for toolbox runtime state")
+	stateDir := flag.String("state-dir", "", "state directory root for toolbox metadata and audit logs")
 	auditPath := flag.String("audit-path", "", "audit log path")
 	cacheDir := flag.String("cache-dir", "", "cache directory for remote discovery and OpenAPI documents")
-	heartbeatSeconds := flag.Int("heartbeat-seconds", 0, "heartbeat interval in seconds for lease management")
-	missedHeartbeatLimit := flag.Int("missed-heartbeat-limit", 0, "number of missed heartbeats before session expiry")
+	heartbeatSeconds := flag.Int("heartbeat-seconds", 0, "heartbeat interval in seconds for session lease management")
+	missedHeartbeatLimit := flag.Int("missed-heartbeat-limit", 0, "number of missed heartbeats before a session lease expires")
 	shutdownMode := flag.String("shutdown", "", "shutdown mode: when-owner-exits or manual")
-	sessionScope := flag.String("session-scope", "", "local runtime session scope")
-	shareMode := flag.String("share", "", "local runtime share mode")
-	shareKeyPresent := flag.Bool("share-key-present", false, "whether a shared-group runtime was derived from a configured share key")
-	configFingerprint := flag.String("config-fingerprint", "", "local runtime config fingerprint")
+	sessionScope := flag.String("session-scope", "", "toolbox session scope")
+	shareMode := flag.String("share", "", "toolbox session share mode")
+	shareKeyPresent := flag.Bool("share-key-present", false, "whether a shared-group session was derived from a configured share key")
+	configFingerprint := flag.String("config-fingerprint", "", "toolbox runtime config fingerprint")
 	flag.Parse()
 
 	paths, err := instance.Resolve(instance.Options{
@@ -48,7 +48,7 @@ func main() {
 	}
 	listenAddr := *addr
 	if listenAddr == "" {
-		listenAddr = "127.0.0.1:0"
+		listenAddr = "127.0.0.1:8765"
 	}
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
@@ -63,7 +63,7 @@ func main() {
 		DefaultConfigPath:    *configPath,
 		InstanceID:           paths.InstanceID,
 		RuntimeURL:           runtimeURL,
-		RuntimeMode:          "local",
+		RuntimeMode:          "remote",
 		HeartbeatSeconds:     *heartbeatSeconds,
 		MissedHeartbeatLimit: *missedHeartbeatLimit,
 		ShutdownMode:         *shutdownMode,
@@ -104,7 +104,7 @@ func main() {
 			}
 			_ = server.CloseWithContext(ctx)
 			_ = os.Remove(paths.RuntimePath)
-			log.Printf("runtime shutdown: %s", trigger)
+			log.Printf("open-cli-toolbox shutdown: %s", trigger)
 		})
 	}
 

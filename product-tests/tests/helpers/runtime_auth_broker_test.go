@@ -13,16 +13,16 @@ func TestRuntimeAuthBrokerDelegatedTokenExchangeIssuesShortLivedChild(t *testing
 	t.Parallel()
 
 	broker := NewRuntimeAuthBroker(t)
-	parentToken := broker.AcquireClientCredentialsToken(t, "github", "oclird", []string{
+	parentToken := broker.AcquireClientCredentialsToken(t, "github", "open-cli-toolbox", []string{
 		"bundle:tickets",
 		"tool:tickets:listTickets",
 	})
 
-	childToken := broker.ExchangeDelegatedToken(t, parentToken, "oclird", []string{
+	childToken := broker.ExchangeDelegatedToken(t, parentToken, "open-cli-toolbox", []string{
 		"tool:tickets:listTickets",
 	}, "subagent:triage-01")
 
-	claims, err := broker.validateRuntimeToken(childToken, "oclird")
+	claims, err := broker.validateRuntimeToken(childToken, "open-cli-toolbox")
 	if err != nil {
 		t.Fatalf("validate delegated token: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestRuntimeAuthBrokerDelegatedTokenExchangeRejectsScopeEscalation(t *testin
 	t.Parallel()
 
 	broker := NewRuntimeAuthBroker(t)
-	parentToken := broker.AcquireClientCredentialsToken(t, "github", "oclird", []string{
+	parentToken := broker.AcquireClientCredentialsToken(t, "github", "open-cli-toolbox", []string{
 		"bundle:tickets",
 		"tool:tickets:listTickets",
 	})
@@ -63,7 +63,7 @@ func TestRuntimeAuthBrokerDelegatedTokenExchangeRejectsScopeEscalation(t *testin
 	form.Set("subject_token", parentToken)
 	form.Set("subject_token_type", accessTokenType)
 	form.Set("requested_token_type", accessTokenType)
-	form.Set("audience", "oclird")
+	form.Set("audience", "open-cli-toolbox")
 	form.Set("scope", "tool:users:listUsers")
 
 	resp, err := http.PostForm(broker.TokenURL, form)

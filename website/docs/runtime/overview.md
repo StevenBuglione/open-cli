@@ -4,13 +4,9 @@ title: Runtime Overview
 
 # Runtime Overview
 
-**Read this if** you are deploying `oclird`, debugging policy or auth behavior, or evaluating the runtime as a shared enforcement point. This page answers: what does the runtime own, what is its HTTP surface, and how does the request lifecycle work end to end.
+**Read this if** you are deploying `open-cli-toolbox`, debugging policy or auth behavior, or evaluating the runtime as a shared enforcement point. This page answers: what does the runtime own, what is its HTTP surface, and how does the request lifecycle work end to end.
 
-`oclird` is the execution and policy plane for `ocli`.
-
-Even when you use embedded mode, the same runtime server implementation is doing the work behind the scenes.
-
-The CLI can now pick that runtime path from `.cli.json` through `runtime.mode`, not just from CLI flags and environment variables.
+`open-cli-toolbox` is the execution and policy plane for `ocli`.
 
 ## Responsibilities
 
@@ -36,38 +32,30 @@ The current runtime API is intentionally small:
 - `POST /v1/workflows/run`
 - `GET` or `POST /v1/refresh`
 - `GET /v1/audit/events`
+- `GET /v1/runtime/info`
+- `GET /v1/auth/browser-config`
 
 See [HTTP API](./http-api) for request and response examples.
 
-## Local-first deployment
+## Remote-only deployment model
 
-`oclird` defaults to `127.0.0.1:0`, which means:
+`ocli` always talks to `open-cli-toolbox` over HTTP.
 
-- it binds only to localhost by default
-- the OS picks an available port
-- the chosen URL is written to the instance registry (`runtime.json`)
-
-This default matters because the safest baseline is still local-only access on loopback. When you do expose the daemon more broadly, `oclird` can enforce its own runtime auth boundary through `runtime.server.auth`, and you should still keep external network controls in front of it.
+- For development, you can host `open-cli-toolbox` on loopback (`127.0.0.1:8765`).
+- For shared deployments, host it on infrastructure you control and point `ocli` at the runtime URL.
+- `runtime.mode` must be `remote`; embedded and local-daemon modes are no longer supported.
 
 ## Default config path behavior
 
-If you start the daemon with `--config /path/to/.cli.json`, that path becomes the runtime's default config for HTTP requests. External callers may then omit the `config` query/body field.
+If you start the runtime with `--config /path/to/.cli.json`, that path becomes the runtime's default config for HTTP requests. External callers may then omit the `config` query/body field.
 
 If you do not set a default config, runtime requests must provide one.
-
-## Embedded mode uses the same server logic
-
-`ocli --embedded` creates `internal/runtime.Server` in-process and sends requests through an `httptest` recorder. This means:
-
-- catalog building, policy, auth, cache, and audit behavior match the daemon path closely
-- there is no separate `oclird` process to manage
-- there is also no runtime registry file to discover later
 
 ## Request lifecycle
 
 A normal `ocli` request looks like this:
 
-1. resolve runtime location or use embedded mode
+1. resolve runtime location from `--runtime`, `OCLI_RUNTIME_URL`, or `runtime.remote.url`
 2. fetch the effective catalog
 3. build the Cobra command tree
 4. execute a selected tool or built-in command
@@ -76,19 +64,21 @@ A normal `ocli` request looks like this:
 
 Because catalog resolution happens so early, runtime availability affects even CLI help and schema inspection.
 
-For remote runtimes, `ocli` can also attach runtime-level bearer auth before those HTTP calls. The current client supports:
+## Runtime auth for hosted deployments
+
+For remote runtimes, `ocli` can attach runtime-level bearer auth before those HTTP calls. The current client supports:
 
 - forwarding an operator-provided token (`runtime.remote.oauth.mode: "providedToken"`)
 - acquiring a client-credentials token (`runtime.remote.oauth.mode: "oauthClient"`)
 - browser login against runtime-hosted metadata (`runtime.remote.oauth.mode: "browserLogin"`)
 
-When `runtime.server.auth` is enabled on `oclird`, the daemon itself now becomes the authorization boundary for remote callers:
+When `runtime.server.auth` is enabled on `open-cli-toolbox`, the runtime becomes the authorization boundary for remote callers:
 
 - bearer auth is required on runtime HTTP requests
 - the effective catalog is filtered by runtime scopes
 - execution is denied outside the resolved authorization envelope
 - `GET /v1/runtime/info` advertises whether auth is required, which validation profile is active, the scope prefixes used to derive the authorization envelope, and the envelope metadata version for compatibility checks
-- `GET /v1/auth/browser-config` exposes the browser-login metadata plus the same scope/envelope diagnostics that remote clients need before starting an interactive sign-in flow
+- `GET /v1/auth/browser-config` exposes the browser-login metadata plus the same scope and envelope diagnostics that remote clients need before starting an interactive sign-in flow
 - when a request is already authenticated, the runtime handshake echoes the resolved principal for diagnostics and operator troubleshooting
 
 The reference brokered deployment verified in product tests is documented in [Authentik reference proof](./authentik-reference).
@@ -97,7 +87,7 @@ The reference brokered deployment verified in product tests is documented in [Au
 
 | Goal | Go to |
 | --- | --- |
-| Choose between embedded, local daemon, or remote runtime | [Deployment models](./deployment-models) |
+| Choose how to host the supported remote runtime | [Deployment models](./deployment-models) |
 | Enable runtime bearer auth and catalog filtering | [Security overview](../security/overview) |
 | Review HTTP API request/response shapes | [HTTP API](./http-api) |
 | Evaluate enterprise or brokered deployment readiness | [Enterprise readiness](./enterprise-readiness) |

@@ -7,7 +7,7 @@ title: Workflow Run
 `ocli workflow run <workflow-id>` is a **validation and planning** command, not a workflow engine.
 
 ```bash
-./bin/ocli --embedded --config ./.cli.json workflow run triageTicket --format pretty
+./bin/ocli --runtime http://127.0.0.1:8765 --config ./.cli.json workflow run triageTicket --format pretty
 ```
 
 ## What it does

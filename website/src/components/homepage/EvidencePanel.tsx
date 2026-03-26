@@ -24,7 +24,7 @@ const evidence: EvidenceItem[] = [
     id: 'fleet-validation',
     title: 'Fleet validation matrix',
     description:
-      'CI-reproducible capability matrix covering local daemon, remote runtime, MCP, and remote API paths. Each cell maps to a concrete test artifact or known gap — no unverified claims.',
+      'CI-reproducible capability matrix covering hosted runtime auth, MCP, and remote API paths. Each cell maps to a concrete test artifact or known gap — no unverified claims.',
     href: '/docs/development/fleet-validation',
     label: 'View fleet matrix',
   },
@@ -55,8 +55,8 @@ export default function EvidencePanel(): ReactNode {
             Evidence for enterprise evaluation
           </Heading>
           <p>
-            Reproducible proof artifacts — not marketing claims. Each item links to a concrete
-            doc or test fixture.
+            Reproducible proof artifacts — not marketing claims. Each item links to a
+            concrete doc or test fixture.
           </p>
         </div>
         <div className={styles.grid2}>

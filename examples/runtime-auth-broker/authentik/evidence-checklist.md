@@ -76,7 +76,7 @@ Recommended file names:
 Do not sign off until each answer is “yes”:
 
 - [ ] Did `ocli` discover auth requirements from the runtime instead of using a hand-crafted token?
-- [ ] Did Authentik, not Entra directly, mint the runtime token presented to `oclird`?
-- [ ] Did `oclird` validate the token using `oidc_jwks`?
+- [ ] Did Authentik, not Entra directly, mint the runtime token presented to `open-cli-toolbox`?
+- [ ] Did `open-cli-toolbox` validate the token using `oidc_jwks`?
 - [ ] Did the allowed and denied examples both go through the live runtime?
 - [ ] Are the artifacts stored under the standard directory and file names above?

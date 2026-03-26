@@ -163,51 +163,29 @@ func ResolveCommandOptions(options Options, hooks ResolveHooks) (Options, error)
 	if options.AuthActorID == "" && hooks.ResolveAgentSessionID != nil {
 		options.AuthActorID = hooks.ResolveAgentSessionID()
 	}
-	if !options.Demo && options.Embedded {
-		return options, fmt.Errorf("embedded mode is not supported for normal configs")
+	if options.Demo {
+		return options, fmt.Errorf("demo mode has been removed; connect ocli to a remote open-cli-toolbox server instead")
 	}
-	if !options.Embedded {
-		options.Embedded = EnvBool("OCLI_EMBEDDED")
-	}
-	if options.Embedded {
-		if options.Demo {
-			options.RuntimeDeployment = "embedded"
-			return options, nil
-		}
-		return options, fmt.Errorf("embedded mode is not supported for normal configs")
+	if options.Embedded || EnvBool("OCLI_EMBEDDED") {
+		return options, fmt.Errorf("embedded mode has been removed; connect ocli to a remote open-cli-toolbox server instead")
 	}
 	if options.RuntimeDeployment == "" {
 		options.RuntimeDeployment = hooks.ResolveRuntimeDeployment(options)
 	}
-	if options.RuntimeDeployment == "embedded" {
-		return options, fmt.Errorf("embedded deployment is not supported for normal configs")
+	if options.RuntimeDeployment != "" && options.RuntimeDeployment != "remote" {
+		return options, fmt.Errorf("runtime.mode %q is no longer supported; configure a remote open-cli-toolbox server instead", options.RuntimeDeployment)
 	}
-	if options.RuntimeDeployment == "local" && options.InstanceID == "" {
-		if runtimeCfg, ok := loadCachedRuntimeConfig(); ok && runtimeCfg.Local != nil {
-			options.InstanceID = hooks.ResolveLocalInstanceID(options, *runtimeCfg.Local)
-		}
-	}
-	if options.RuntimeDeployment == "local" && options.SessionID == "" {
-		if runtimeCfg, ok := loadCachedRuntimeConfig(); ok && runtimeCfg.Local != nil {
-			options.SessionID = hooks.ResolveLocalSessionID(options, *runtimeCfg.Local)
-		}
-		if options.SessionID == "" {
-			options.SessionID = options.InstanceID
-		}
-	}
+	options.RuntimeDeployment = "remote"
 	options.RuntimeRequestConfigPath = options.ConfigPath
-	if options.Embedded {
-		return options, nil
-	}
 	if options.RuntimeURL == "" {
 		options.RuntimeURL = os.Getenv("OCLI_RUNTIME_URL")
 	}
-	if options.RuntimeURL == "" && options.RuntimeDeployment == "remote" {
+	if options.RuntimeURL == "" {
 		if runtimeCfg, ok := loadCachedRuntimeConfig(); ok && runtimeCfg.Remote != nil && runtimeCfg.Remote.URL != "" {
 			options.RuntimeURL = runtimeCfg.Remote.URL
 		}
 	}
-	if options.RuntimeToken == "" && options.RuntimeDeployment == "remote" {
+	if options.RuntimeToken == "" {
 		if runtimeCfg, ok := loadCachedRuntimeConfig(); ok && runtimeCfg.Remote != nil && runtimeCfg.Remote.OAuth != nil {
 			paths, pathsErr := hooks.ResolveInstancePaths(options)
 			if pathsErr != nil {
@@ -228,50 +206,31 @@ func ResolveCommandOptions(options Options, hooks ResolveHooks) (Options, error)
 		}
 	}
 	if options.RuntimeURL == "" {
-		if runtimeURL, ok, err := hooks.ResolveRuntimeURLFromInst(options); err != nil {
-			return options, err
-		} else if ok {
-			options.RuntimeURL = runtimeURL
-		}
-	}
-	if options.RuntimeURL == "" && options.RuntimeDeployment == "local" {
-		runtimeURL, err := hooks.StartManagedRuntime(options)
-		if err != nil {
-			return options, err
-		}
-		options.RuntimeURL = runtimeURL
-	}
-	if options.RuntimeURL == "" {
-		options.RuntimeURL = defaultRuntimeURL
+		return options, fmt.Errorf("runtime.remote.url or --runtime is required for remote operation")
 	}
 	if err := validateRuntimeTarget(options); err != nil {
 		return options, err
-	}
-	if options.RuntimeDeployment == "local" && options.RuntimeURL != "" {
-		handshaken, err := hooks.LocalSessionHandshake(options)
-		if err != nil {
-			return options, err
-		}
-		options = handshaken
 	}
 	return options, nil
 }
 
 func validateRuntimeTarget(options Options) error {
-	if options.RuntimeDeployment != "local" || options.RuntimeURL == "" {
+	if options.RuntimeURL == "" {
 		return nil
 	}
 	u, err := url.Parse(options.RuntimeURL)
 	if err != nil {
-		return fmt.Errorf("invalid local runtime URL: %w", err)
+		return fmt.Errorf("invalid runtime URL: %w", err)
 	}
 	host := strings.ToLower(u.Hostname())
 	if host == "localhost" {
 		return nil
 	}
-	ip := net.ParseIP(host)
-	if ip != nil && ip.IsLoopback() {
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
 		return nil
 	}
-	return fmt.Errorf("local runtime URL must target a local daemon")
+	if strings.TrimSpace(u.Scheme) == "" || strings.TrimSpace(u.Host) == "" {
+		return fmt.Errorf("runtime URL must include scheme and host")
+	}
+	return nil
 }

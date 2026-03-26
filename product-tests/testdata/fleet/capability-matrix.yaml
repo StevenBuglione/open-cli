@@ -1,24 +1,4 @@
 lanes:
-  - id: local-daemon-core
-    workstream: product-validation
-    capability: local-daemon
-    capabilityFamily: mode
-    environmentClass: ci-containerized
-    authPattern: none
-    goTestPattern: ^TestCampaignLocalDaemonMatrix$
-    expectedArtifacts:
-      - transcript.log
-      - rubric.json
-  - id: local-daemon-process
-    workstream: product-validation
-    capability: local-daemon
-    capabilityFamily: mode
-    environmentClass: ci-containerized
-    authPattern: none
-    goTestPattern: ^TestCampaignLocalDaemonProcess$
-    expectedArtifacts:
-      - transcript.log
-      - rubric.json
   - id: remote-runtime-oauth-client
     workstream: product-validation
     capability: remote-runtime

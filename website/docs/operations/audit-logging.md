@@ -16,10 +16,10 @@ For a resolved instance, the default audit path is:
 <state-root>/instances/<instance-id>/audit.log
 ```
 
-You can override it in daemon mode with:
+You can override it in hosted-runtime mode with:
 
 ```bash
-oclird --audit-path /var/log/ocli/team-a.audit.log
+open-cli-toolbox --audit-path /var/log/ocli/team-a.audit.log
 ```
 
 ## File format
@@ -87,7 +87,7 @@ The `eventType` field distinguishes the main runtime categories:
 
 These caveats have direct compliance implications:
 
-- **Retention** — there is no expiry or purge mechanism. If your compliance framework requires retention limits, you must enforce them outside the daemon (e.g., with `logrotate` or a log pipeline that archives and rotates the file).
+- **Retention** — there is no expiry or purge mechanism. If your compliance framework requires retention limits, you must enforce them outside the runtime (e.g., with `logrotate` or a log pipeline that archives and rotates the file).
 - **Durability** — best-effort `fsync` means crash or power loss could cause the final few events to be lost. If you need guaranteed write durability, mount the audit path on a storage layer with its own durability guarantees.
 - **Query / filtering** — the HTTP endpoint returns the full file content. For large deployments, reading and filtering on disk is more practical than polling the HTTP endpoint.
 - **Token revocation coverage** — the audit log records auth events at validation time. It does not record post-issuance revocation because revocation is not implemented. Events in the log do not prove the token was still valid when read back later.
@@ -97,7 +97,7 @@ These caveats have direct compliance implications:
 
 | Goal | Go to |
 | --- | --- |
-| Override the audit file path in daemon mode | See `--audit-path` flag in this page |
+| Override the audit file path in hosted-runtime mode | See `--audit-path` flag in this page |
 | Understand what is missing from audit coverage | See [Caveats](#caveats) in this page |
 | Route audit data to an external sink | Read the file directly or poll `GET /v1/audit/events`; there is no push exporter today |
 | Review the full HTTP API surface | [HTTP API](../runtime/http-api) |

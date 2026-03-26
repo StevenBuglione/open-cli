@@ -4,23 +4,18 @@ title: Security Overview
 
 # Security Overview
 
-**Read this if** you are responsible for the auth model, secret management, or understanding when and how `oclird` becomes an authorization boundary. This page answers: what are the two distinct security layers, when is runtime auth enforced, and what are the real current caveats around OAuth and missing secrets.
+**Read this if** you are responsible for the auth model, secret management, or understanding when and how `open-cli-toolbox` becomes an authorization boundary. This page answers: what are the two distinct security layers, when is runtime auth enforced, and what are the real current caveats around OAuth and missing secrets.
 
 Security in `open-cli` has two distinct layers:
 
-1. **runtime access**: who is allowed to call `oclird`
+1. **runtime access**: who is allowed to call `open-cli-toolbox`
 2. **upstream API execution**: which credentials are applied when a tool calls the target API
-
-The current implementation focuses heavily on the second layer and leaves the first layer to deployment controls.
 
 ## Runtime trust boundary
 
-`oclird` can run either:
+`open-cli-toolbox` can run on loopback for local evaluation or behind shared network infrastructure for team and enterprise use.
 
-- unauthenticated on loopback-only local deployments
-- with runtime auth enabled through `runtime.server.auth`
-
-The current server-side auth surface is profile-based rather than introspection-only. `oclird` can validate runtime bearer tokens with `oauth2_introspection` or `oidc_jwks`, derive runtime scopes from the validated token, filter catalogs by those scopes, and reject out-of-scope execution requests.
+The current server-side auth surface is profile-based rather than introspection-only. `open-cli-toolbox` can validate runtime bearer tokens with `oauth2_introspection` or `oidc_jwks`, derive runtime scopes from the validated token, filter catalogs by those scopes, and reject out-of-scope execution requests.
 
 The repository’s official reference proof for that runtime-auth boundary uses Authentik as an example broker, with Microsoft Entra ID documented as the upstream federation example. That reference proof does **not** make Authentik or Entra normative; the contract remains broker-neutral.
 
@@ -33,7 +28,7 @@ If you expose the runtime on a broader network, do not rely on bind address alon
 - SSH tunneling
 - container/network isolation
 
-See also [Deployment models](../runtime/deployment-models) for the local-loopback default and [Runtime overview](../runtime/overview) for the runtime handshake and browser-config surfaces.
+See also [Deployment models](../runtime/deployment-models) for the hosted-runtime deployment story and [Runtime overview](../runtime/overview) for the runtime handshake and browser-config surfaces.
 
 ## Upstream auth model
 

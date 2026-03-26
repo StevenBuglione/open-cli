@@ -15,7 +15,7 @@ The main implementation lives in a compact set of directories.
     docs-pages.yml      GitHub Pages deployment for website/
 cmd/
   ocli/               CLI entrypoint and runtime client
-  oclird/             daemon entrypoint
+  open-cli-toolbox/   hosted runtime entrypoint
 internal/
   runtime/              HTTP API handlers and runtime wiring
 pkg/
@@ -56,7 +56,7 @@ README.md               repository front door and install/verify summary
 | If you need to change... | Start here |
 | --- | --- |
 | CLI flags, output, runtime client behavior | `cmd/ocli/main.go` |
-| daemon startup, flags, registry writing | `cmd/oclird/main.go` |
+| hosted runtime startup, flags, registry writing | `cmd/open-cli-toolbox/main.go` |
 | runtime endpoints | `internal/runtime/server.go` |
 | config schema or merge behavior | `pkg/config/` |
 | discovery behavior | `pkg/discovery/` |

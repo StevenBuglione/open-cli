@@ -1,5 +1,5 @@
 {
-  "$comment": "Reference configuration for a multi-instance oclird deployment.  Each instance is started with its own --state-dir, --cache-dir, and --audit so that filesystem state never crosses instance boundaries.  Adjust 'uri' values to point at your real API spec locations.",
+  "$comment": "Reference configuration for a multi-instance open-cli-toolbox deployment.  Each instance is started with its own --state-dir, --cache-dir, and --audit so that filesystem state never crosses instance boundaries.  Adjust 'uri' values to point at your real API spec locations.",
   "cli": "1.0.0",
   "mode": { "default": "discover" },
   "sources": {

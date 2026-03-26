@@ -15,7 +15,6 @@ import (
 	authpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/auth"
 	cmdspkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/commands"
 	cfgpkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/config"
-	demopkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/demo"
 	runtimepkg "github.com/StevenBuglione/open-cli/cmd/ocli/internal/runtime"
 	"github.com/StevenBuglione/open-cli/internal/version"
 	"github.com/StevenBuglione/open-cli/pkg/catalog"
@@ -65,12 +64,8 @@ func main() {
 	}
 	options := bootstrapFromArgs(os.Args[1:])
 	if options.Demo {
-		var err error
-		options, err = setupDemoConfig(options)
-		if err != nil {
-			_, _ = fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		_, _ = fmt.Fprintln(os.Stderr, "demo mode has been removed; connect ocli to a remote open-cli-toolbox server instead")
+		os.Exit(1)
 	}
 	command, err := NewRootCommand(options, os.Args[1:])
 	if err != nil {
@@ -89,7 +84,6 @@ func NewRootCommand(options CommandOptions, args []string) (*cobra.Command, erro
 		NewRuntimeClient: func(opts cfgpkg.Options) (runtimepkg.Client, error) {
 			return newRuntimeClient(opts)
 		},
-		ShouldSendHeartbeat: shouldSendLocalHeartbeat,
 	})
 }
 
@@ -121,13 +115,8 @@ func resolveCommandOptions(options CommandOptions) (CommandOptions, error) {
 	return cfgpkg.ResolveCommandOptions(options, cfgpkg.ResolveHooks{
 		LoadRuntimeConfig:         loadRuntimeConfig,
 		ResolveRuntimeDeployment:  resolveRuntimeDeployment,
-		ResolveLocalInstanceID:    resolveLocalRuntimeInstanceID,
-		ResolveLocalSessionID:     resolveLocalSessionID,
 		ResolveAgentSessionID:     agentSessionIdentityProvider,
 		ResolveInstancePaths:      resolveInstancePaths,
-		ResolveRuntimeURLFromInst: resolveRuntimeURLFromInstance,
-		StartManagedRuntime:       managedRuntimeStarter,
-		LocalSessionHandshake:     localSessionHandshake,
 	})
 }
 
@@ -137,10 +126,6 @@ func resolveRuntimeDeployment(options CommandOptions) string {
 
 func loadRuntimeConfig(options CommandOptions) (*configpkg.RuntimeConfig, bool) {
 	return runtimepkg.LoadConfig(runtimepkg.DeploymentOptions{ConfigPath: options.ConfigPath})
-}
-
-func hasLocalMCPSource(cfg configpkg.Config) bool {
-	return runtimepkg.HasLocalMCPSource(cfg)
 }
 
 func resolveLocalRuntimeInstanceID(options CommandOptions, local configpkg.LocalRuntimeConfig) string {
@@ -320,7 +305,6 @@ func resolveDaemonBinary() (string, error) {
 
 func newRuntimeClient(options CommandOptions) (runtimeClient, error) {
 	return runtimepkg.NewClient(runtimepkg.NewClientOptions{
-		Embedded:          options.Embedded,
 		RuntimeURL:        options.RuntimeURL,
 		ConfigPath:        options.ConfigPath,
 		InstanceID:        options.InstanceID,
@@ -426,52 +410,5 @@ func envBool(name string) bool {
 }
 
 func setupDemoConfig(options CommandOptions) (CommandOptions, error) {
-	cacheDir, err := os.UserCacheDir()
-	if err != nil {
-		cacheDir = os.TempDir()
-	}
-	dir := filepath.Join(cacheDir, "ocli", "demo")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return options, fmt.Errorf("demo: create dir: %w", err)
-	}
-	specFile := filepath.Join(dir, "testapi.openapi.yaml")
-	if err := os.WriteFile(specFile, demopkg.Spec, 0o644); err != nil {
-		return options, fmt.Errorf("demo: write spec: %w", err)
-	}
-	configContent := fmt.Sprintf(`{
-  "cli": "1.0.0",
-  "mode": { "default": "discover" },
-  "runtime": {
-    "mode": "local",
-    "local": {
-      "sessionScope": "terminal",
-      "heartbeatSeconds": 15,
-      "missedHeartbeatLimit": 3,
-      "shutdown": "when-owner-exits",
-      "share": "exclusive"
-    }
-  },
-  "sources": {
-    "demoSource": {
-      "type": "openapi",
-      "uri": %q,
-      "enabled": true
-    }
-  },
-  "services": {
-    "demo": {
-      "source": "demoSource",
-      "alias": "demo"
-    }
-  }
-}
-`, specFile)
-	configFile := filepath.Join(dir, ".cli.json")
-	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
-		return options, fmt.Errorf("demo: write config: %w", err)
-	}
-	options.ConfigPath = configFile
-	options.Demo = true
-	options.Embedded = true
-	return options, nil
+	return options, fmt.Errorf("demo mode has been removed; connect ocli to a remote open-cli-toolbox server instead")
 }

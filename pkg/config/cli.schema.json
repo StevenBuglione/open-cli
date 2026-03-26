@@ -173,43 +173,6 @@
       },
       "additionalProperties": false
     },
-    "localRuntime": {
-      "type": "object",
-      "properties": {
-        "sessionScope": {
-          "enum": [
-            "terminal",
-            "agent",
-            "shared-group"
-          ]
-        },
-        "heartbeatSeconds": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "missedHeartbeatLimit": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "shutdown": {
-          "enum": [
-            "when-owner-exits",
-            "manual"
-          ]
-        },
-        "share": {
-          "enum": [
-            "exclusive",
-            "group"
-          ]
-        },
-        "shareKey": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "additionalProperties": false
-    },
     "browserLogin": {
       "type": "object",
       "properties": {
@@ -416,12 +379,8 @@
       "properties": {
         "mode": {
           "enum": [
-            "local",
             "remote"
           ]
-        },
-        "local": {
-          "$ref": "#/$defs/localRuntime"
         },
         "remote": {
           "type": "object",
@@ -438,6 +397,9 @@
         },
         "server": {
           "$ref": "#/$defs/runtimeServer"
+        },
+        "local": {
+          "$ref": "#/$defs/localRuntime"
         }
       },
       "additionalProperties": false
@@ -665,6 +627,43 @@
         },
         "oauth": {
           "$ref": "#/$defs/oauthConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "localRuntime": {
+      "type": "object",
+      "properties": {
+        "heartbeatSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "missedHeartbeatLimit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "share": {
+          "enum": [
+            "exclusive",
+            "group"
+          ]
+        },
+        "shareKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sessionScope": {
+          "enum": [
+            "terminal",
+            "agent",
+            "shared-group"
+          ]
+        },
+        "shutdown": {
+          "enum": [
+            "session",
+            "manual"
+          ]
         }
       },
       "additionalProperties": false

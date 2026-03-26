@@ -56,7 +56,7 @@ func validateDocument(data []byte, partial bool) error {
 
 func normalizeSchemaMessage(path, message string) string {
 	if path == "runtime.mode" && strings.Contains(message, `must be one of the following`) {
-		return "must be local or remote"
+		return "must be remote"
 	}
 	if message != "False always fails validation" {
 		return message
@@ -167,59 +167,16 @@ func validateRuntimeConfig(cfg Config) error {
 		return nil
 	}
 	diagnostics := []Diagnostic{}
-	if cfg.Runtime.Local != nil {
-		local := cfg.Runtime.Local
-		if local.HeartbeatSeconds <= 0 {
-			diagnostics = append(diagnostics, Diagnostic{
-				Path:    "runtime.local.heartbeatSeconds",
-				Message: "must be a positive integer when runtime.local is configured",
-			})
-		}
-		if local.MissedHeartbeatLimit <= 0 {
-			diagnostics = append(diagnostics, Diagnostic{
-				Path:    "runtime.local.missedHeartbeatLimit",
-				Message: "must be a positive integer when runtime.local is configured",
-			})
-		}
-		if local.Shutdown == "manual" && local.SessionScope != "shared-group" {
-			diagnostics = append(diagnostics, Diagnostic{
-				Path:    "runtime.local.shutdown",
-				Message: `manual shutdown requires sessionScope "shared-group"`,
-			})
-		}
-		switch local.SessionScope {
-		case "shared-group":
-			if local.Share != "group" {
-				diagnostics = append(diagnostics, Diagnostic{
-					Path:    "runtime.local.share",
-					Message: `shared-group requires share "group"`,
-				})
-			}
-			if local.ShareKey == "" {
-				diagnostics = append(diagnostics, Diagnostic{
-					Path:    "runtime.local.shareKey",
-					Message: `required when sessionScope is "shared-group"`,
-				})
-			}
-		case "terminal", "agent":
-			if local.Share != "" && local.Share != "exclusive" {
-				diagnostics = append(diagnostics, Diagnostic{
-					Path:    "runtime.local.share",
-					Message: `exclusive sharing is required for terminal and agent scopes`,
-				})
-			}
-			if local.ShareKey != "" {
-				diagnostics = append(diagnostics, Diagnostic{
-					Path:    "runtime.local.shareKey",
-					Message: `shareKey is only allowed when sessionScope is "shared-group"`,
-				})
-			}
-		}
-	}
-	if cfg.Runtime.Mode == "remote" && (cfg.Runtime.Remote == nil || cfg.Runtime.Remote.URL == "") {
+	if cfg.Runtime.Mode != "" && cfg.Runtime.Mode != "remote" {
 		diagnostics = append(diagnostics, Diagnostic{
-			Path:    "runtime.remote.url",
-			Message: "required when runtime.mode is remote",
+			Path:    "runtime.mode",
+			Message: "must be remote",
+		})
+	}
+	if cfg.Runtime.Local != nil {
+		diagnostics = append(diagnostics, Diagnostic{
+			Path:    "runtime.local",
+			Message: "is no longer supported; configure a remote runtime instead",
 		})
 	}
 	if cfg.Runtime.Mode == "remote" && cfg.Runtime.Remote != nil && cfg.Runtime.Remote.OAuth != nil {

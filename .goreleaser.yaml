@@ -25,9 +25,9 @@ builds:
       - -X github.com/StevenBuglione/open-cli/internal/version.Commit={{.ShortCommit}}
       - -X github.com/StevenBuglione/open-cli/internal/version.Date={{.Date}}
 
-  - id: oclird
-    main: ./cmd/oclird
-    binary: oclird
+  - id: open-cli-toolbox
+    main: ./cmd/open-cli-toolbox
+    binary: open-cli-toolbox
     env:
       - CGO_ENABLED=0
     goos:
@@ -47,7 +47,7 @@ archives:
   - id: default
     ids:
       - ocli
-      - oclird
+      - open-cli-toolbox
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     formats:

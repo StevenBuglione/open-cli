@@ -1,48 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="680" height="210" viewBox="0 0 680 210" role="img" aria-label="Deployment modes diagram">
   <rect width="680" height="210" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
 
-  <!-- Dividers -->
   <line x1="228" y1="20" x2="228" y2="190" stroke="#e2e8f0" stroke-width="1"/>
   <line x1="454" y1="20" x2="454" y2="190" stroke="#e2e8f0" stroke-width="1"/>
 
-  <!-- ── Panel 1: Embedded ── -->
-  <text x="114" y="42" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#10233f">Embedded</text>
-  <text x="114" y="58" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#255fb0">no daemon required</text>
-  <!-- single combined box -->
-  <rect x="28" y="72" width="180" height="72" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
-  <text x="118" y="102" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#10233f">ocli + runtime</text>
-  <text x="118" y="120" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">in-process per invocation</text>
-  <text x="114" y="168" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">Zero setup · ideal for CI and laptops</text>
+  <text x="114" y="42" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#10233f">Loopback host</text>
+  <text x="114" y="58" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#255fb0">local evaluation</text>
+  <rect x="28" y="72" width="72" height="42" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
+  <text x="64" y="98" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#10233f">ocli</text>
+  <line x1="100" y1="93" x2="126" y2="93" stroke="#255fb0" stroke-width="2" stroke-dasharray="5 3"/>
+  <polygon points="124,88 134,93 124,98" fill="#255fb0"/>
+  <rect x="134" y="72" width="72" height="42" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
+  <text x="170" y="92" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="600" fill="#10233f">open-cli-</text>
+  <text x="170" y="105" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="600" fill="#10233f">toolbox</text>
+  <text x="114" y="168" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">Same machine · same remote contract</text>
 
-  <!-- ── Panel 2: Local daemon ── -->
-  <text x="341" y="42" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#10233f">Local daemon</text>
-  <text x="341" y="58" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#255fb0">shared warmed runtime</text>
-  <!-- ocli box -->
+  <text x="341" y="42" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#10233f">Shared team runtime</text>
+  <text x="341" y="58" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#255fb0">centralized hosting</text>
   <rect x="244" y="72" width="80" height="42" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
   <text x="284" y="98" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#10233f">ocli</text>
-  <!-- IPC arrow -->
-  <line x1="324" y1="93" x2="350" y2="93" stroke="#255fb0" stroke-width="2"/>
+  <line x1="324" y1="93" x2="350" y2="93" stroke="#255fb0" stroke-width="2" stroke-dasharray="5 3"/>
   <polygon points="348,88 358,93 348,98" fill="#255fb0"/>
-  <text x="337" y="86" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#475569">IPC</text>
-  <!-- oclird box -->
+  <text x="337" y="86" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#475569">network</text>
   <rect x="358" y="72" width="80" height="42" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
-  <text x="398" y="92" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#10233f">oclird</text>
-  <text x="398" y="107" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">persistent</text>
-  <text x="341" y="168" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">Shared cache · instance isolation</text>
+  <text x="398" y="92" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="600" fill="#10233f">open-cli-</text>
+  <text x="398" y="105" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="600" fill="#10233f">toolbox</text>
+  <text x="341" y="168" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">Shared cache · governed catalog</text>
 
-  <!-- ── Panel 3: Remote ── -->
-  <text x="567" y="42" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#10233f">Remote runtime</text>
-  <text x="567" y="58" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#255fb0">centrally hosted</text>
-  <!-- ocli box -->
+  <text x="567" y="42" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="700" fill="#10233f">Brokered enterprise</text>
+  <text x="567" y="58" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#255fb0">auth + perimeter controls</text>
   <rect x="470" y="72" width="80" height="42" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
   <text x="510" y="98" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#10233f">ocli</text>
-  <!-- Network arrow -->
   <line x1="550" y1="93" x2="576" y2="93" stroke="#255fb0" stroke-width="2" stroke-dasharray="5 3"/>
   <polygon points="574,88 584,93 574,98" fill="#255fb0"/>
-  <text x="563" y="86" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#475569">network</text>
-  <!-- oclird box -->
+  <text x="563" y="86" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#475569">token</text>
   <rect x="584" y="72" width="80" height="42" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
-  <text x="624" y="92" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#10233f">oclird</text>
-  <text x="624" y="107" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">shared host</text>
-  <text x="567" y="168" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">Bearer auth · fleet deployments</text>
+  <text x="624" y="92" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="600" fill="#10233f">open-cli-</text>
+  <text x="624" y="105" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" font-weight="600" fill="#10233f">toolbox</text>
+  <text x="567" y="168" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">Bearer auth · network isolation</text>
 </svg>

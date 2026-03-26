@@ -189,9 +189,9 @@ func (broker *RuntimeAuthBroker) handleToken(w http.ResponseWriter, r *http.Requ
 		}
 		audience := strings.TrimSpace(r.Form.Get("audience"))
 		if audience == "" {
-			audience = "oclird"
+			audience = "open-cli-toolbox"
 		}
-		if audience != "oclird" {
+		if audience != "open-cli-toolbox" {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_target"})
 			return
@@ -319,7 +319,7 @@ func (broker *RuntimeAuthBroker) signRuntimeToken(upstream string, claims runtim
 func (broker *RuntimeAuthBroker) signRuntimeTokenWithExpiry(upstream string, claims runtimeTokenClaims, expiry time.Time) (string, error) {
 	audience := claims.Audience
 	if audience == "" {
-		audience = "oclird"
+		audience = "open-cli-toolbox"
 	}
 	if claims.UpstreamProvider != "" {
 		upstream = claims.UpstreamProvider
@@ -573,12 +573,13 @@ paths:
   "cli": "1.0.0",
   "mode": { "default": "discover" },
   "runtime": {
+    "mode": "remote",
     "server": {
       "auth": {
         "validationProfile": "oidc_jwks",
         "issuer": %q,
         "jwksURL": %q,
-        "audience": "oclird",
+        "audience": "open-cli-toolbox",
         "authorizationURL": %q,
         "tokenURL": %q,
         "browserClientId": %q

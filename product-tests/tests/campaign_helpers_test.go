@@ -279,6 +279,9 @@ func oauthCLIConfig(openapiPath, clientID, clientSecret string) string {
 	return `{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "protectedSource": {
       "type": "openapi",

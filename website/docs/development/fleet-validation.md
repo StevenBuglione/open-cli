@@ -21,8 +21,7 @@ The executable source of truth lives in:
 
 Current CI-safe lanes cover:
 
-- local daemon lifecycle and multi-session behavior
-- a real process-backed local daemon attach/use/stop flow
+- hosted runtime deployment and multi-instance behavior
 - remote runtime authorization filtering
 - runtime auth failure paths such as missing, expired, and tampered bearer tokens
 - MCP stdio execution

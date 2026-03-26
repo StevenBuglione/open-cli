@@ -1,41 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="680" height="200" viewBox="0 0 680 200" role="img" aria-label="Runtime flow diagram">
   <rect width="680" height="200" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
 
-  <!-- Sources box -->
   <rect x="18" y="60" width="152" height="80" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
   <text x="94" y="90" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" font-weight="600" fill="#10233f">OpenAPI sources</text>
   <text x="94" y="109" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569">files · URLs · catalogs</text>
   <text x="94" y="126" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569">service discovery</text>
 
-  <!-- Arrow: sources → oclird -->
   <line x1="170" y1="100" x2="204" y2="100" stroke="#255fb0" stroke-width="2"/>
   <polygon points="202,95 212,100 202,105" fill="#255fb0"/>
 
-  <!-- oclird box -->
   <rect x="212" y="38" width="208" height="124" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="2"/>
-  <text x="316" y="68" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="#10233f">oclird</text>
+  <text x="316" y="68" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="#10233f">open-cli-toolbox</text>
   <line x1="228" y1="76" x2="404" y2="76" stroke="#255fb0" stroke-width="0.75" stroke-dasharray="4 3"/>
-  <text x="316" y="96" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569">discover · normalise</text>
+  <text x="316" y="96" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569">discover · normalize</text>
   <text x="316" y="113" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569">policy · auth resolution</text>
   <text x="316" y="130" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569">audit log</text>
 
-  <!-- Vertical fork line from right edge of oclird -->
   <line x1="420" y1="72" x2="420" y2="130" stroke="#255fb0" stroke-width="2"/>
-
-  <!-- Arrow: fork → ocli -->
   <line x1="420" y1="72" x2="454" y2="72" stroke="#255fb0" stroke-width="2"/>
   <polygon points="452,67 462,72 452,77" fill="#255fb0"/>
-
-  <!-- Arrow: fork → MCP -->
   <line x1="420" y1="130" x2="454" y2="130" stroke="#255fb0" stroke-width="2"/>
   <polygon points="452,125 462,130 452,135" fill="#255fb0"/>
 
-  <!-- ocli box -->
   <rect x="462" y="52" width="152" height="42" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
   <text x="538" y="70" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="600" fill="#10233f">ocli</text>
   <text x="538" y="86" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">operator commands</text>
 
-  <!-- MCP box -->
   <rect x="462" y="110" width="152" height="42" rx="8" fill="#eef4fb" stroke="#255fb0" stroke-width="1.5"/>
   <text x="538" y="128" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="600" fill="#10233f">MCP server</text>
   <text x="538" y="144" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10.5" fill="#475569">for agents</text>

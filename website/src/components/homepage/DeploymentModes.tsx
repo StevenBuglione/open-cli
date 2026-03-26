@@ -15,31 +15,31 @@ type DeploymentMode = {
 
 const modes: DeploymentMode[] = [
   {
-    id: 'embedded',
-    name: 'Embedded',
-    tagline: 'No daemon required',
+    id: 'localhost',
+    name: 'Loopback-hosted runtime',
+    tagline: 'Fastest way to evaluate',
     description:
-      'The runtime runs in-process for each ocli invocation. Zero setup, no background process, ideal for developer laptops and CI.',
-    tradeoffs: 'Cold start on every call; no shared cache across invocations.',
+      'Run open-cli-toolbox on the same machine and point ocli at http://127.0.0.1:8765. It is still the remote runtime contract, just hosted locally for development.',
+    tradeoffs: 'Single-user footprint; you manage process lifecycle and runtime URL wiring.',
     href: '/docs/runtime/deployment-models',
   },
   {
-    id: 'local-daemon',
-    name: 'Local daemon',
-    tagline: 'Shared, warmed runtime',
+    id: 'shared-runtime',
+    name: 'Shared team runtime',
+    tagline: 'One hosted control plane',
     description:
-      'A single oclird process persists across CLI calls. Catalog is discovered once, cached, and reused. Supports instance isolation via --instance-id.',
-    tradeoffs: 'Requires a running daemon; process management is your responsibility.',
+      'Host open-cli-toolbox on shared infrastructure so teams, agents, and automation all consume the same governed catalog, policy, cache, and audit boundary.',
+    tradeoffs: 'Requires network reachability planning, shared config ownership, and runtime auth.',
     href: '/docs/runtime/deployment-models',
   },
   {
-    id: 'remote-runtime',
-    name: 'Remote runtime',
-    tagline: 'Centrally hosted',
+    id: 'enterprise-runtime',
+    name: 'Brokered enterprise runtime',
+    tagline: 'Security boundary first',
     description:
-      'oclird runs on a shared host. Access is network-controlled with runtime bearer auth. Suitable for teams and fleet deployments.',
+      'Put open-cli-toolbox behind IdP-issued bearer auth, reverse proxies, and network controls. This is the supported production model for enterprise access review.',
     tradeoffs:
-      'Network dependency; auth must be configured; trust boundary shifts to the host.',
+      'You own external perimeter controls, token lifecycle policy, and runtime hosting.',
     href: '/docs/runtime/deployment-models',
   },
 ];
@@ -52,22 +52,23 @@ export default function DeploymentModes(): ReactNode {
       <div className="container">
         <div className={styles.sectionHeader}>
           <Heading as="h2" id="deployment-modes-heading">
-            Deployment modes
+            Hosted runtime topologies
           </Heading>
           <p>
-            Three topologies — pick the one that matches your operational context.
+            One supported model — a hosted runtime — with deployment shapes that scale
+            from local evaluation to enterprise hosting.
           </p>
         </div>
         <figure className={styles.deploymentDiagram}>
           <img
             src="/img/deployment-modes.svg"
-            alt="Three deployment topologies: Embedded (ocli and runtime in one process), Local daemon (ocli talks to a local oclird over IPC), Remote runtime (ocli reaches oclird over the network with bearer auth)."
+            alt="Three hosted-runtime topologies: loopback-hosted open-cli-toolbox for evaluation, shared team hosting, and brokered enterprise hosting with auth and network controls."
             width="680"
             height="210"
             loading="lazy"
           />
           <figcaption className={styles.diagramCaption}>
-            Left to right: embedded · local daemon · remote runtime
+            Left to right: local host · shared runtime · brokered enterprise
           </figcaption>
         </figure>
         <div className={styles.grid3}>

@@ -11,7 +11,7 @@ The safest way to understand an `ocli` setup is to inspect the catalog before ex
 `catalog list` prints the runtime response from `GET /v1/catalog/effective`:
 
 ```bash
-./bin/ocli --embedded --config ./.cli.json catalog list --format pretty
+./bin/ocli --runtime http://127.0.0.1:8765 --config ./.cli.json catalog list --format pretty
 ```
 
 The payload has two major sections:
@@ -26,7 +26,7 @@ That split matters because the catalog is broader than the command tree you can 
 Use this command when you need machine-readable detail for one tool:
 
 ```bash
-./bin/ocli --embedded --config ./.cli.json tool schema tickets:createTicket --format pretty
+./bin/ocli --runtime http://127.0.0.1:8765 --config ./.cli.json tool schema tickets:createTicket --format pretty
 ```
 
 The schema includes fields such as:
@@ -44,7 +44,7 @@ The schema includes fields such as:
 Use `explain` when skill manifests or overlays added operator guidance:
 
 ```bash
-./bin/ocli --embedded --config ./.cli.json explain tickets:createTicket --format pretty
+./bin/ocli --runtime http://127.0.0.1:8765 --config ./.cli.json explain tickets:createTicket --format pretty
 ```
 
 The response contains:

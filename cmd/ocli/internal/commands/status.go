@@ -202,7 +202,7 @@ func writeStatusTerminal(w io.Writer, report statusReport, runtimeAuthPresent bo
 
 	if runtimeUnavailable {
 		fmt.Fprintln(w)
-		fmt.Fprintln(w, "Suggestion: Start the daemon with oclird")
+		fmt.Fprintln(w, "Suggestion: Check the remote open-cli-toolbox URL and deployment")
 	}
 }
 
@@ -242,16 +242,10 @@ func deriveStatusAuthMode(rawConfig map[string]any, runtimeAuth map[string]any) 
 }
 
 func runtimeMode(options cfgpkg.Options) string {
-	switch {
-	case options.Embedded:
-		return "embedded"
-	case options.RuntimeDeployment == "local":
-		return "local"
-	case options.RuntimeDeployment == "remote":
+	if options.RuntimeDeployment == "remote" {
 		return "remote"
-	default:
-		return "unknown"
 	}
+	return "unknown"
 }
 
 func countEnabledSources(raw map[string]any) statusSourceSummary {

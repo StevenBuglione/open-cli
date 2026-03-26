@@ -4,7 +4,7 @@ title: Operations Overview
 
 # Operations Overview
 
-**Read this if** you are managing a running `oclird` installation and need to understand the state layout, how to inspect cache and audit data, or how to isolate multiple instances. This page answers: where does state live, what does the runtime persist, and which pages go deeper on each operational concern.
+**Read this if** you are managing a running `open-cli-toolbox` installation and need to understand the state layout, how to inspect cache and audit data, or how to isolate multiple instances. This page answers: where does state live, what does the runtime persist, and which pages go deeper on each operational concern.
 
 Operationally, `open-cli` is mostly about **state management**:
 
@@ -47,7 +47,7 @@ If `ocli` is given `--state-dir`, it also derives the cache root under `<state-d
 
 ## What the runtime persists
 
-- `runtime.json`: daemon URL plus audit/cache hints
+- `runtime.json`: hosted runtime URL plus audit/cache hints
 - `audit.log`: newline-delimited JSON audit events
 - cache metadata/body pairs for remote fetches
 
@@ -67,7 +67,7 @@ These are not roadmap items — they are current facts that affect production pl
 - **No built-in log rotation or retention.** The audit file grows without bound unless you add external tooling (`logrotate`, a log sidecar, or a forwarder).
 - **No audit push export.** Audit data is readable from disk or via `GET /v1/audit/events`. There is no push exporter or SIEM connector today.
 - **No OpenTelemetry export.** The `obs.Observer` interface is the extension point; there is no built-in trace sink.
-- **Network perimeter is operator-owned.** For remote deployments, firewall rules, reverse proxy auth, or container isolation must be provided outside the daemon.
+- **Network perimeter is operator-owned.** For remote deployments, firewall rules, reverse proxy auth, or container isolation must be provided outside the runtime.
 
 Continue with:
 

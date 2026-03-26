@@ -49,9 +49,9 @@ export default function TrustBoundary(): ReactNode {
             CLI vs runtime: where enforcement lives
           </Heading>
           <p>
-            The CLI is a thin command surface. Enforcement — policy, auth, audit — lives in the
-            runtime. This split is intentional: the CLI can be replaced or bypassed; the runtime
-            holds the invariants.
+            The CLI is a thin command surface. Enforcement — policy, auth, audit — lives in
+            the runtime. This split is intentional: the CLI can be replaced or bypassed; the
+            hosted runtime holds the invariants.
           </p>
         </div>
         <div className={styles.tableWrapper} role="region" aria-label="Trust boundary table" tabIndex={0}>
@@ -60,7 +60,7 @@ export default function TrustBoundary(): ReactNode {
               <tr>
                 <th scope="col">Concern</th>
                 <th scope="col">CLI (ocli)</th>
-                <th scope="col">Runtime (oclird)</th>
+                <th scope="col">Runtime (open-cli-toolbox)</th>
               </tr>
             </thead>
             <tbody>
@@ -77,9 +77,8 @@ export default function TrustBoundary(): ReactNode {
           </table>
         </div>
         <p className={styles.trustNote}>
-          Full details in the{' '}
-          <Link to="/docs/security/overview">Security overview</Link> and{' '}
-          <Link to="/docs/security/policy-and-approval">Policy and approval</Link>.
+          Full details in the <Link to="/docs/security/overview">Security overview</Link>{' '}
+          and <Link to="/docs/security/policy-and-approval">Policy and approval</Link>.
         </p>
       </div>
     </section>

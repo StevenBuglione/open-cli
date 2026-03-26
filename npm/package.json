@@ -1,8 +1,8 @@
 {
   "name": "@sbuglione/open-cli",
   "version": "0.0.0",
-  "description": "Turn OpenAPI descriptions and MCP servers into a local, policy-aware command surface",
-  "files": ["bin/ocli.js", "bin/oclird.js", "install.js", "README.md"],
+  "description": "Remote-first API and MCP command client plus the open-cli-toolbox runtime server",
+  "files": ["bin/ocli.js", "bin/open-cli-toolbox.js", "install.js", "README.md"],
   "keywords": [
     "openapi",
     "mcp",
@@ -26,7 +26,7 @@
   "author": "Steven Buglione",
   "bin": {
     "ocli": "bin/ocli.js",
-    "oclird": "bin/oclird.js"
+    "open-cli-toolbox": "bin/open-cli-toolbox.js"
   },
   "scripts": {
     "postinstall": "node install.js"

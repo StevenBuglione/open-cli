@@ -4,7 +4,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'open-cli',
-  tagline: 'A stateless CLI and local runtime for OpenAPI discovery, policy, and execution.',
+  tagline: 'A remote-only CLI and hosted runtime for governed OpenAPI execution.',
   favicon: 'img/favicon.ico',
 
   url: 'https://open-cli.dev',

@@ -19,13 +19,13 @@ For the structured checklist form of this material, see [Adoption Checklist](./a
 
 ## 1. Deployment
 
-`oclird` supports three practical deployment topologies.
+`open-cli-toolbox` is the only supported runtime deployment target.
 
 | Model | Description | Reference |
 |---|---|---|
-| Embedded | Runtime runs in-process per invocation. No daemon. | [Deployment Models](../runtime/deployment-models) |
-| Local daemon | Single `oclird` process shared across CLI invocations. Warmed cache. | [Deployment Models](../runtime/deployment-models) |
-| Remote runtime | Centrally hosted `oclird` with network-controlled access. | [Deployment Models](../runtime/deployment-models) |
+| Loopback-hosted runtime | Host `open-cli-toolbox` on localhost or a single machine for evaluation. `ocli` still talks to it over HTTP. | [Deployment Models](../runtime/deployment-models) |
+| Shared hosted runtime | Host `open-cli-toolbox` for teams, agents, or automation behind a stable URL. | [Deployment Models](../runtime/deployment-models) |
+| Brokered enterprise runtime | Put `open-cli-toolbox` behind runtime bearer auth plus network controls. This is the production posture to evaluate. | [Deployment Models](../runtime/deployment-models) |
 
 Multiple isolated instances are supported (`--instance-id`) so different configs, caches, and audit logs remain separated.
 
@@ -33,7 +33,7 @@ Multiple isolated instances are supported (`--instance-id`) so different configs
 
 ## 2. Authentication
 
-Runtime auth is opt-in. When you enable `runtime.server.auth`, the daemon validates bearer tokens and applies runtime scopes before it exposes catalog entries or executes tools.
+Runtime auth is opt-in. When you enable `runtime.server.auth`, the hosted runtime validates bearer tokens and applies runtime scopes before it exposes catalog entries or executes tools.
 
 | Capability | Reference |
 |---|---|
@@ -54,7 +54,7 @@ Enterprise reviews typically need evidence that claimed capabilities can be exer
 
 | Evidence type | How to verify | Reference |
 |---|---|---|
-| CI-reproducible product paths | `make product-test-fleet` — artifacts written under `/tmp/ocli-fleet/` | [Fleet Validation](../development/fleet-validation) |
+| CI-reproducible product paths | `make product-test-fleet` and inspect the generated `rubric.json` / `transcript.log` artifacts | [Fleet Validation](../development/fleet-validation) |
 | Runtime auth failure paths | Covered in the `remote-runtime-auth-failures` fleet lane | [Fleet Validation](../development/fleet-validation) |
 | Live proof (external IdP, Entra federation) | Documented in `live-proof-matrix.yaml`; requires real infrastructure | [Fleet Validation](../development/fleet-validation) |
 
@@ -96,6 +96,6 @@ The following capabilities are **not provided by `open-cli` itself**. They requi
 |---|---|---|
 | Token revocation / introspection | Runtime validates token at issuance time. Revoked tokens remain valid until expiry. | External revocation check in your network path, or short expiry windows as mitigation. |
 | Audit log rotation and retention | Audit file is append-only with no built-in rotation, retention, or purge policy. | Log rotation tooling (`logrotate`, sidecar, or log forwarder) against the audit path. |
-| Network access control to `oclird` | Bind address controls the interface. Beyond that, `oclird` itself does not enforce network perimeter. | Firewall rules, reverse proxy auth, SSH tunneling, or container/network isolation for remote deployments. |
+| Network access control to `open-cli-toolbox` | Runtime auth does not replace your network perimeter. | Firewall rules, reverse proxy auth, SSH tunneling, or container/network isolation for hosted deployments. |
 | Live identity proof | Authentik and Entra federation require a real tenant, application registration, and test identity. | Own infrastructure for browser-login and federation proof runs. |
 | Audit sink / SIEM integration | There is no push exporter. Audit data is available on disk or via `GET /v1/audit/events` (full file, no filtering). | Pull-based log shipper or a sidecar reading the audit file. |

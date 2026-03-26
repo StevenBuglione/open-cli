@@ -149,6 +149,9 @@ func gapCLIConfig(openapiPath string) string {
 	return fmt.Sprintf(`{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "gapSource": {
       "type": "openapi",

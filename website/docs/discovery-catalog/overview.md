@@ -4,9 +4,9 @@ title: Discovery and Catalog Overview
 
 # Discovery and Catalog Overview
 
-**Read this if** you need to understand how `oclird` finds API descriptions and turns them into the normalized catalog that `ocli` works from. This page answers: what source types exist, what the catalog contains after the pipeline runs, and how unreferenced sources behave.
+**Read this if** you need to understand how `open-cli-toolbox` finds API descriptions and turns them into the normalized catalog that `ocli` works from. This page answers: what source types exist, what the catalog contains after the pipeline runs, and how unreferenced sources behave.
 
-Discovery is how `oclird` finds API descriptions. Catalog building is how it turns those descriptions into stable tool metadata for `ocli`.
+Discovery is how `open-cli-toolbox` finds API descriptions. Catalog building is how it turns those descriptions into stable tool metadata for `ocli`.
 
 ## The pipeline
 

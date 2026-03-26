@@ -18,6 +18,9 @@ func curatedCLIConfig(openapiPath string) string {
 	return `{
   "cli": "1.0.0",
   "mode": { "default": "curated" },
+  "runtime": {
+    "mode": "remote"
+  },
   "sources": {
     "testapiSource": {
       "type": "openapi",

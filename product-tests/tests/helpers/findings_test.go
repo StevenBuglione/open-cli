@@ -30,7 +30,7 @@ func TestCampaignRubricPreservesInlineArtifacts(t *testing.T) {
 	rec := NewFindingsRecorder("remote-runtime-auth")
 	if err := rec.AddJSONArtifact("browser-config.json", map[string]any{
 		"clientId": "ocli-browser",
-		"audience": "oclird",
+		"audience": "open-cli-toolbox",
 	}); err != nil {
 		t.Fatalf("AddJSONArtifact: %v", err)
 	}

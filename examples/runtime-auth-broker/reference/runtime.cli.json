@@ -9,7 +9,7 @@
         "validationProfile": "oidc_jwks",
         "issuer": "https://broker.example.com",
         "jwksURL": "https://broker.example.com/jwks.json",
-        "audience": "oclird",
+        "audience": "open-cli-toolbox",
         "authorizationURL": "https://broker.example.com/authorize",
         "tokenURL": "https://broker.example.com/token",
         "browserClientId": "ocli-browser"

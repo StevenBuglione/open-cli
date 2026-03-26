@@ -4,7 +4,7 @@ title: Tracing and Instances
 
 # Tracing and Instances
 
-**Read this if** you are running multiple isolated `oclird` instances, need deterministic instance IDs, or want to understand the observability hooks available in the runtime. This page answers: how instance IDs are derived, what `runtime.json` contains, and what happens when a registration goes stale.
+**Read this if** you are running multiple isolated `open-cli-toolbox` instances, need deterministic instance IDs, or want to understand the observability hooks available in the runtime. This page answers: how instance IDs are derived, what `runtime.json` contains, and how runtime state stays isolated.
 
 Instances keep runtime state isolated. Observability hooks make it possible to inspect what the runtime is doing internally.
 
@@ -25,7 +25,7 @@ That makes IDs deterministic without leaking full paths.
 
 ## `runtime.json`
 
-A running daemon writes:
+A running hosted runtime writes:
 
 ```json
 {
@@ -37,18 +37,13 @@ A running daemon writes:
 }
 ```
 
-`ocli` reads this file during runtime resolution.
+Treat this as operator metadata. In the remote-only model, `ocli` does not auto-discover or auto-promote runtimes from `runtime.json`.
 
-## Stale registry cleanup
+## Shutdown behavior
 
-If the recorded daemon PID is no longer alive, or the stored URL no longer accepts TCP connections, `ocli` treats that registration as stale. For managed local runtimes it first attempts to terminate any recorded MCP child processes from the dead daemon, then deletes the stale `runtime.json` file.
+`open-cli-toolbox` removes `runtime.json` on normal shutdown.
 
-Managed `oclird` also removes `runtime.json` on shutdown after draining tracked managed MCP children.
-
-After cleanup, resolution continues normally:
-
-- local deployments restart `oclird`
-- non-local resolution falls back to the default runtime URL
+If the process dies unexpectedly, the file can become stale. Clean it up as part of operator troubleshooting rather than expecting `ocli` to attach to it automatically.
 
 ## Observability hooks
 
@@ -69,20 +64,20 @@ The runtime uses `X-Request-ID` if the caller provides one. Otherwise it generat
 
 | Goal | Go to |
 | --- | --- |
-| Start multiple isolated daemon instances | See [Practical multi-instance pattern](#practical-multi-instance-pattern) in this page |
-| Understand runtime resolution order when `runtime.json` exists | [Deployment models](../runtime/deployment-models) |
+| Start multiple isolated hosted runtime instances | See [Practical multi-instance pattern](#practical-multi-instance-pattern) in this page |
+| Understand state and audit paths for an instance | [Operations overview](./overview) |
 | Plug in a custom observer for testing | See `pkg/obs.Observer` — `obs.NewRecorder()` is the test implementation |
 | Add OpenTelemetry export | Not available today; `obs.Observer` is the extension point |
 
 ## Practical multi-instance pattern
 
 ```bash
-./bin/oclird --config /srv/team-a/.cli.json --instance-id team-a --state-dir /var/lib/ocli
-./bin/oclird --config /srv/team-b/.cli.json --instance-id team-b --state-dir /var/lib/ocli
+./bin/open-cli-toolbox --config /srv/team-a/.cli.json --instance-id team-a --state-dir /var/lib/ocli
+./bin/open-cli-toolbox --config /srv/team-b/.cli.json --instance-id team-b --state-dir /var/lib/ocli
 ```
 
-Then callers select the matching instance with:
+Then callers select the matching runtime with:
 
 ```bash
-./bin/ocli --config /srv/team-a/.cli.json --instance-id team-a --state-dir /var/lib/ocli catalog list
+./bin/ocli --runtime http://127.0.0.1:9031 --config /srv/team-a/.cli.json --instance-id team-a --state-dir /var/lib/ocli catalog list
 ```

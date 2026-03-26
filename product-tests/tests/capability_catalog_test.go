@@ -266,6 +266,9 @@ func mcpCLIConfig(serverURL string) string {
 	return `{
   "cli": "1.0.0",
   "mode": { "default": "discover" },
+  "runtime": {
+    "mode": "remote"
+  },
   "mcpServers": {
     "filesystem": {
       "type": "stdio",

@@ -16,7 +16,7 @@ This implementation also carries a local copy at `pkg/config/cli.schema.json`, a
 | --- | --- | --- | --- |
 | `cli` | string | yes | Must be non-empty. |
 | `mode` | object | yes | Requires `default`. |
-| `runtime` | object | no | Runtime deployment selection plus local/remote runtime settings. |
+| `runtime` | object | no | Hosted runtime selection and runtime-auth settings. |
 | `sources` | object | yes | Must contain at least one source after final merge. |
 | `mcpServers` | object | no | Compatibility input normalized into canonical MCP sources and services. |
 | `services` | object | no | Optional named services. |
@@ -44,22 +44,9 @@ For `openapi`, `serviceRoot`, and `apiCatalog` sources, `uri` is the only discov
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `mode` | string | `auto`, `embedded`, `local`, or `remote` |
-| `local` | object | Local runtime lifecycle and sharing configuration |
+| `mode` | string | Must be `remote` in the current CLI |
+| `local` | object | Legacy schema field retained for compatibility; rejected by current semantic validation |
 | `remote` | object | Remote runtime URL and runtime-auth configuration |
-
-## `runtime.local`
-
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `sessionScope` | string | `terminal`, `agent`, or `shared-group` |
-| `heartbeatSeconds` | integer | Expected heartbeat interval for managed local ownership |
-| `missedHeartbeatLimit` | integer | Missed heartbeat threshold before considering the owner gone |
-| `shutdown` | string | `when-owner-exits` or `manual` |
-| `share` | string | `exclusive` or `group` |
-| `shareKey` | string | Explicit group-sharing key |
-
-`shutdown: "manual"` is only valid with `sessionScope: "shared-group"`.
 
 ## `runtime.remote`
 
@@ -186,6 +173,8 @@ It also validates MCP transport constraints, OAuth ownership of the transport `A
 It also validates runtime-specific rules such as:
 
 - `runtime.mode: "remote"` requires `runtime.remote.url`
+- any other `runtime.mode` value is rejected (`must be remote`)
+- `runtime.local` is rejected as unsupported
 - `runtime.remote.oauth.mode: "providedToken"` requires `runtime.remote.oauth.tokenRef`
 - `runtime.remote.oauth.mode: "oauthClient"` requires `client.tokenURL`, `client.clientId`, and `client.clientSecret`
 - `runtime.server.auth.validationProfile: "oidc_jwks"` requires `issuer`, `jwksURL`, and `audience`
