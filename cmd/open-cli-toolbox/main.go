@@ -91,7 +91,7 @@ func main() {
 	}
 
 	rootMux := http.NewServeMux()
-	rootMux.Handle("/v1/admin/", httpapi.RegisterRoutes(http.NewServeMux(), httpapi.NewDependencies()))
+	rootMux.Handle("/v1/admin/", httpapi.RegisterRoutes(http.NewServeMux(), httpapi.NewDependencies(nil, nil)))
 	rootMux.Handle("/", server.Handler())
 	httpServer = &http.Server{Handler: rootMux}
 
