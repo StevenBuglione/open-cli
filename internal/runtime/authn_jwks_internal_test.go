@@ -107,7 +107,7 @@ func TestAuthenticateRequestRejectsOIDCJWKSTokenWithoutPrincipalIdentity(t *test
 	server := NewServer(Options{})
 	request := httptest.NewRequest(http.MethodGet, "/v1/catalog/effective", nil)
 	request.Header.Set("Authorization", "Bearer "+issuer.signToken(t, map[string]any{
-		"aud":   "oclird",
+		"aud":   "open-cli-toolbox",
 		"scope": "bundle:tickets",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	}))
@@ -118,7 +118,7 @@ func TestAuthenticateRequestRejectsOIDCJWKSTokenWithoutPrincipalIdentity(t *test
 					ValidationProfile: "oidc_jwks",
 					Issuer:            issuer.issuer,
 					JWKSURL:           issuer.jwksURL,
-					Audience:          "oclird",
+					Audience:          "open-cli-toolbox",
 				},
 			},
 		},
@@ -149,7 +149,7 @@ func TestAuthenticateRequestCapturesOIDCJWKSDelegationLineage(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/v1/catalog/effective", nil)
 	request.Header.Set("Authorization", "Bearer "+issuer.signToken(t, map[string]any{
 		"sub":           "subagent:triage-01",
-		"aud":           "oclird",
+		"aud":           "open-cli-toolbox",
 		"scope":         "bundle:tickets profile:sandbox",
 		"delegated_by":  "github:user-123",
 		"delegation_id": "delegation-123",
@@ -167,7 +167,7 @@ func TestAuthenticateRequestCapturesOIDCJWKSDelegationLineage(t *testing.T) {
 					ValidationProfile: "oidc_jwks",
 					Issuer:            issuer.issuer,
 					JWKSURL:           issuer.jwksURL,
-					Audience:          "oclird",
+					Audience:          "open-cli-toolbox",
 				},
 			},
 		},

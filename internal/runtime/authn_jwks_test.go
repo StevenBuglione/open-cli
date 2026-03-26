@@ -152,7 +152,7 @@ paths:
 	        "validationProfile": "oidc_jwks",
 	        "issuer": %q,
 	        "jwksURL": %q,
-	        "audience": "oclird"
+	        "audience": "open-cli-toolbox"
 	      }
 	    }
 	  },
@@ -198,7 +198,7 @@ func TestServerAcceptsValidOIDCJWKSToken(t *testing.T) {
 
 	token := issuer.signToken(t, map[string]any{
 		"sub":   "agent-123",
-		"aud":   "oclird",
+		"aud":   "open-cli-toolbox",
 		"scope": "bundle:tickets",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	})
@@ -244,7 +244,7 @@ func TestServerAcceptsMultipleOIDCJWKSBundleScopes(t *testing.T) {
 
 	token := issuer.signToken(t, map[string]any{
 		"sub":   "agent-123",
-		"aud":   "oclird",
+		"aud":   "open-cli-toolbox",
 		"scope": "bundle:tickets bundle:users",
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	})
@@ -391,7 +391,7 @@ func TestServerRejectsOIDCJWKSTokenWithoutExpiration(t *testing.T) {
 
 	token := issuer.signToken(t, map[string]any{
 		"sub":   "agent-123",
-		"aud":   "oclird",
+		"aud":   "open-cli-toolbox",
 		"scope": "bundle:tickets",
 	})
 
