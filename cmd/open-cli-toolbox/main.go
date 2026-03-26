@@ -90,11 +90,8 @@ func main() {
 		log.Fatal(err)
 	}
 	
-	adminMux := http.NewServeMux()
-	adminDeps := httpapi.StubDependencies()
-	adminHandler := httpapi.RegisterRoutes(adminMux, adminDeps)
 	rootMux := http.NewServeMux()
-	rootMux.Handle("/v1/admin/", adminHandler)
+	rootMux.Handle("/v1/admin/", httpapi.RegisterRoutes(http.NewServeMux(), httpapi.NewDependencies()))
 	rootMux.Handle("/", server.Handler())
 	httpServer = &http.Server{Handler: rootMux}
 

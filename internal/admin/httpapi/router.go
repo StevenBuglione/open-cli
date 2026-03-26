@@ -5,7 +5,7 @@ import "net/http"
 type Dependencies struct {
 }
 
-func StubDependencies() Dependencies {
+func NewDependencies() Dependencies {
 	return Dependencies{}
 }
 

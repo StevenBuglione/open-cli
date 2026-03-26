@@ -7,7 +7,7 @@ import (
 )
 
 func TestRouterRegistersAdminMe(t *testing.T) {
-	router := RegisterRoutes(http.NewServeMux(), StubDependencies())
+	router := RegisterRoutes(http.NewServeMux(), NewDependencies())
 	server := httptest.NewServer(router)
 	defer server.Close()
 
