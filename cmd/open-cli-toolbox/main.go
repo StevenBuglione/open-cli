@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/StevenBuglione/open-cli/internal/admin/httpapi"
 	"github.com/StevenBuglione/open-cli/internal/runtime"
 	"github.com/StevenBuglione/open-cli/pkg/instance"
 )
@@ -88,7 +89,11 @@ func main() {
 	if err := instance.WriteRuntimeInfo(paths.RuntimePath, info); err != nil {
 		log.Fatal(err)
 	}
-	httpServer = &http.Server{Handler: server.Handler()}
+
+	rootMux := http.NewServeMux()
+	rootMux.Handle("/v1/admin/", httpapi.RegisterRoutes(http.NewServeMux(), httpapi.NewDependencies(nil, nil)))
+	rootMux.Handle("/", server.Handler())
+	httpServer = &http.Server{Handler: rootMux}
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)

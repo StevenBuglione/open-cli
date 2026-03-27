@@ -1542,3 +1542,18 @@ func splitKeychainReference(reference string) (string, string, error) {
 	}
 	return "", "", fmt.Errorf("osKeychain secret reference must be service/account")
 }
+
+// ManagedConfigLoader is the interface for loading managed configurations from admin control plane
+// This will be implemented to integrate admin-store-backed configurations in future iterations
+type ManagedConfigLoader interface {
+	// LoadActiveRevisions loads all active (published) bundle revisions
+	LoadActiveRevisions(ctx context.Context) (map[string][]byte, error)
+}
+
+// ReloadManagedOptions represents options for reloading managed configurations
+type ReloadManagedOptions struct {
+	// BundleIDs limits reload to specific bundles (empty = all)
+	BundleIDs []string
+	// Force reload even if hash hasn't changed
+	Force bool
+}

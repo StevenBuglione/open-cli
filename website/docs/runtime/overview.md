@@ -84,7 +84,7 @@ When `runtime.server.auth` is enabled on `open-cli-toolbox`, the runtime becomes
 
 Local secured runtime example:
 
-- [`examples/local-authentik/`](../../../examples/local-authentik/README.md) for the Docker Compose Authentik + toolbox flow
+- `examples/local-authentik/README.md` in the repo for the Docker Compose Authentik + toolbox flow
 - [Authentik reference proof](./authentik-reference) for the full broker-backed OAuth proof
 
 ## If you are trying to…
